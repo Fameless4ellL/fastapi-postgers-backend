@@ -12,6 +12,9 @@ class User(Base):
     __tablename__ = "users"
 
     id = Column(Integer, primary_key=True, index=True)
-    name = Column(String(64))
-    email = Column(String(64))
+    telegram_id = Column(Integer, unique=True)
+    first_name = Column(String(64))
+    last_name = Column(String(64))
+    language_code = Column(String(8))
+    email = Column(String(64), nullable=True)
     role = Column(String(64), default=Role.USER.value)

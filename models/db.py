@@ -1,3 +1,4 @@
+from aiogram import BaseMiddleware
 from sqlalchemy.ext.asyncio import AsyncSession, create_async_engine
 from sqlalchemy.orm import sessionmaker
 from sqlalchemy.ext.declarative import declarative_base
@@ -17,6 +18,23 @@ Base = declarative_base()
 async def get_db():
     async with async_session() as session:
         yield session
+
+
+class DBSessionMiddleware(BaseMiddleware):
+    async def __call__(
+        self,
+        handler,  # : Callable[[Message, Dict[str, Any]], Awaitable[Any]],
+        event,  # : Message,
+        data  # : Dict[str, Any]
+    ):
+        async for session in get_db():
+            data["db"] = session
+            break
+        try:
+            return await handler(event, data)
+        finally:
+            if data["db"]:
+                await data["db"].close()
 
 
 async def init_db():

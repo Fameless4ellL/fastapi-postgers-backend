@@ -6,13 +6,13 @@ from routers import router as router_v1
 
 
 @asynccontextmanager
-async def lifespam():
+async def lifespan_db(*args, **kwargs):
 	await init_db()
 	yield
 	# await shutdown_db()
 
 
-fastapp = FastAPI()
+fastapp = FastAPI(lifespan=lifespan_db)
 
 fastapp.include_router(router_v1)
 

@@ -1,6 +1,8 @@
 # FastAPI
 pydantic
-fastapi
+fastapi[all]
+aiogram
+alembic
 sqlalchemy
 asyncpg
 uvicorn
