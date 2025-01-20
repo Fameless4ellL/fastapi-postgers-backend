@@ -22,6 +22,8 @@ services:
       - db
     volumes:
       - .:/app/
+    environment:
+      - BOT_TOKEN=your_bot_token 
     restart: on-failure
 
   nginx:
