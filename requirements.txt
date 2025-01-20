@@ -1,0 +1,10 @@
+# FastAPI
+pydantic
+fastapi
+sqlalchemy
+asyncpg
+uvicorn
+psycopg2
+
+# test
+httpx
