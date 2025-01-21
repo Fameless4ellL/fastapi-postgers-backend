@@ -66,7 +66,9 @@ async def start_handler(message: types.Message, db: AsyncSession):
 async def empty(message: types.Message, db: AsyncSession):
     if message.passport_data:
         credentials = message.passport_data.credentials
-        credentials_secret = decrypt_credential_secret(credentials.secret)
+        credentials_secret, err = decrypt_credential_secret(credentials.secret)
+        if err:
+            return await message.reply("Something went wrong")
         credentials = json.loads(decrypt_data(
             credentials.data,
             credentials_secret,
@@ -77,17 +79,22 @@ async def empty(message: types.Message, db: AsyncSession):
         if credentials['nonce'] != "thisisatest":
             return await message.reply("Invalid nonce")
 
-        for element in message.passport_data.data:
-            if element.type == "email":
-                async with db.begin():
-                    user = await db.execute(
-                        select(User).filter(User.telegram_id == message.from_user.id)
-                    )
-                    user = user.scalars().first()
+        async with db.begin():
+            user = await db.execute(
+                select(User).filter(
+                    User.telegram_id == message.from_user.id)
+                .with_for_update()
+            )
+            user = user.scalars().first()
+
+            for element in message.passport_data.data:
+                if element.type == "email":
                     user.email = element.email
-                    await db.commit()
-                    await db.refresh(user)
-                    return await message.reply("Email received and saved")
+                if element.type == "phone_number":
+                    user.phone_number = element.phone_number
+
+            await db.commit()
+            await db.refresh(user)
 
         # Process the secure data
         # secure_data = credentials['secure_data']

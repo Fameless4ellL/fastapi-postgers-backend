@@ -432,10 +432,7 @@
     Telegram.Passport.createAuthButton('telegram_passport_auth', {
         bot_id: 7112641937, // YOUR BOT ID
         scope: {
-            data: [{
-                type: 'id_document',
-                selfie: true
-            }, 'email'], v: 1
+            data: ['email', "phone_number"], v: 1
         }, // WHAT DATA YOU WANT TO RECEIVE
         public_key: "-----BEGIN PUBLIC KEY-----\n" +
                     "MIIBIjANBgkqhkiG9w0BAQEFAAOCAQ8AMIIBCgKCAQEAzbcLvzlTuySy1+hJDFkq\n" +

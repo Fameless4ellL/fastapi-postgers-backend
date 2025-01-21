@@ -3,6 +3,7 @@ import base64
 import hmac
 
 from operator import itemgetter
+import traceback
 from Crypto.PublicKey import RSA
 from Crypto.Cipher import AES, PKCS1_OAEP
 from schemes.tg import WidgetLogin
@@ -76,12 +77,16 @@ def decrypt_credential_secret(
     credential_secret: str
 ):
     # Check types and decode from base64
-    if not isinstance(credential_secret, bytes):
-        credential_secret = str.encode(credential_secret)
-    credential_secret = base64.decodebytes(credential_secret)
-    # Import key and decrypt secret
-    private_key = RSA.import_key(open("./private.key").read())
-    cipher_rsa = PKCS1_OAEP.new(private_key)
-    decrypted_secret = cipher_rsa.decrypt(credential_secret)
-
-    return base64.encodebytes(decrypted_secret)
+    try:
+        if not isinstance(credential_secret, bytes):
+            credential_secret = str.encode(credential_secret)
+        credential_secret = base64.decodebytes(credential_secret)
+        # Import key and decrypt secret
+        private_key = RSA.import_key(open("./private.key").read())
+        cipher_rsa = PKCS1_OAEP.new(private_key)
+        decrypted_secret = cipher_rsa.decrypt(credential_secret)
+    except (ValueError, IndexError, TypeError):
+        traceback.print_exc()
+        return "", "INVALID_SECRET"
+    finally:
+        return base64.encodebytes(decrypted_secret), ""

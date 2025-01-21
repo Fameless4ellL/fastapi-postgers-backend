@@ -16,5 +16,6 @@ class User(Base):
     first_name = Column(String(64))
     last_name = Column(String(64))
     language_code = Column(String(8))
+    phone_number = Column(String(16), nullable=True)
     email = Column(String(64), nullable=True)
     role = Column(String(64), default=Role.USER.value)
