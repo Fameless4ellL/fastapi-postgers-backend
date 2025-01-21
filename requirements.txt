@@ -8,5 +8,8 @@ asyncpg
 uvicorn
 psycopg2
 
+# utils
+pycryptodome
+
 # test
 httpx

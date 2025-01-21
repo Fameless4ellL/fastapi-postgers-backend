@@ -22,4 +22,5 @@ router = APIRouter(prefix="/v1", tags=["v1"], lifespan=lifespan_tg)
 
 
 from .app import *  # noqa
-from .tg import *
+from .tg import *  # noqa
+from .admin import *  # noqa
