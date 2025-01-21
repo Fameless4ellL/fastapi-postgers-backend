@@ -1,7 +1,7 @@
 from fastapi import status
 from fastapi.responses import JSONResponse
 from pydantic import BaseModel
-from routers import router
+from routers import public
 from schemes.tg import WidgetLogin
 from utils.signature import TgAuth
 from settings import settings
@@ -12,12 +12,12 @@ class UserCreate(BaseModel):
     email: str
 
 
-@router.get("/healthcheck")
+@public.get("/healthcheck")
 async def healthcheck():
     return {"status": status.HTTP_200_OK}
 
 
-@router.post("/tg/login")
+@public.post("/tg/login")
 async def tg_login(item: WidgetLogin):
     """
         Для логина в telegram mini app

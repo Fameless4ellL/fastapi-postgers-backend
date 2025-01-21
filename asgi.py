@@ -2,7 +2,7 @@ from fastapi import FastAPI
 from contextlib import asynccontextmanager
 from fastapi.middleware.cors import CORSMiddleware
 from models.db import init_db
-from routers import router as router_v1
+from routers import public, admin
 
 
 @asynccontextmanager
@@ -14,7 +14,8 @@ async def lifespan_db(*args, **kwargs):
 
 fastapp = FastAPI(lifespan=lifespan_db)
 
-fastapp.include_router(router_v1)
+fastapp.include_router(public)
+fastapp.include_router(admin)
 
 origins = ["*"]
 

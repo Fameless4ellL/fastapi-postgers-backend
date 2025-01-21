@@ -1,15 +1,16 @@
 import json
 from fastapi import Request
 from fastapi.responses import JSONResponse
-from aiogram import types, filters
+from aiogram import types, filters, F
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 from models.user import User
-from routers import router, dp, bot
+from routers import public, dp, bot
 from utils.signature import decrypt_credential_secret, decrypt_data
+from settings import settings
 
 
-@router.post("/telegram")
+@public.post("/telegram", include_in_schema=False)
 async def telegram_handler(request: Request):
     """
     Handler for telegram bot - webhook
@@ -28,7 +29,6 @@ async def start_handler(message: types.Message, db: AsyncSession):
     """
     /start
     """
-    print(message.passport_data)
     # Check if the user exists
     result = await db.execute(
         select(User).filter(User.telegram_id == message.from_user.id)
@@ -47,23 +47,35 @@ async def start_handler(message: types.Message, db: AsyncSession):
         await db.commit()
         await db.refresh(new_user)
         user = new_user
+
     await message.reply(
         f"Hello, {user.first_name} {user.last_name}!\n"
         "Please provide your passport details.",
         reply_markup=types.InlineKeyboardMarkup(
             inline_keyboard=[[types.InlineKeyboardButton(
                 text="Auth",
-                web_app=types.WebAppInfo(
-                    url="https://webhook.site/4f4f47fa-a71b-476d-ba89-298d23ba45ad"
-                ),
+                web_app=types.WebAppInfo(url=settings.web_app_url),
             )]],
             resize_keyboard=True,
         ),
     )
 
 
-@dp.message()
+@dp.message(filters.Command("deposit"))
+@dp.message(F.text == "Deposit")
+async def deposit(message: types.Message):
+    return await message.answer("Under construction")
+
+
+@dp.message(filters.Command("withdraw"))
+@dp.message(F.text == "Withdraw")
+async def withdraw(message: types.Message):
+    return await message.answer("Under construction")
+
+
+@dp.message(F.passport_data)
 async def empty(message: types.Message, db: AsyncSession):
+    # Drop table
     if message.passport_data:
         credentials = message.passport_data.credentials
         credentials_secret, err = decrypt_credential_secret(credentials.secret)
@@ -79,27 +91,38 @@ async def empty(message: types.Message, db: AsyncSession):
         if credentials['nonce'] != "thisisatest":
             return await message.reply("Invalid nonce")
 
-        async with db.begin():
-            user = await db.execute(
-                select(User).filter(
-                    User.telegram_id == message.from_user.id)
-                .with_for_update()
-            )
-            user = user.scalars().first()
+        user = await db.execute(
+            select(User).filter(
+                User.telegram_id == message.from_user.id)
+            .with_for_update()
+        )
+        user = user.scalars().first()
+        if user is None:
+            return await message.reply("User not found")
 
-            for element in message.passport_data.data:
-                if element.type == "email":
-                    user.email = element.email
-                if element.type == "phone_number":
-                    user.phone_number = element.phone_number
+        for element in message.passport_data.data:
+            if element.type == "email":
+                email = element.email
+                user.email = email
+            if element.type == "phone_number":
+                user.phone_number = element.phone_number
 
-            await db.commit()
-            await db.refresh(user)
+        await db.commit()
+        await db.refresh(user)
 
         # Process the secure data
         # secure_data = credentials['secure_data']
         # print(secure_data)
 
-        return await message.reply("Passport data received and processed")
+        return await message.answer(
+            "Passport data received and processed",
+            reply_markup=types.ReplyKeyboardMarkup(
+                keyboard=[[
+                    types.KeyboardButton(text='Deposit'),
+                    types.KeyboardButton(text='Withdraw')
+                ]],
+                resize_keyboard=True
+            )
+        )
     else:
         return await message.reply("I don't understand you.")
