@@ -35,6 +35,7 @@ class Balance(Base):
 
     id = Column(Integer, primary_key=True, index=True)
     user_id = Column(Integer, ForeignKey('users.id', ondelete="CASCADE"), nullable=True)
+    currency_id = Column(Integer, ForeignKey('currencies.id'), nullable=False)
     balance = Column(Integer, default=0)
     created_at = Column(DateTime, default=datetime.datetime.utcnow)
     updated_at = Column(DateTime, default=datetime.datetime.utcnow, onupdate=datetime.datetime.utcnow)
@@ -45,6 +46,7 @@ class BalanceChangeHistory(Base):
 
     id = Column(Integer, primary_key=True, index=True)
     user_id = Column(Integer, ForeignKey('users.id', ondelete='CASCADE'), nullable=True)
+    balance_id = Column(Integer, ForeignKey('balance.id', ondelete='CASCADE'), nullable=True)
     change_amount = Column(Integer, nullable=False)
     change_type = Column(String(64), nullable=False)
     previous_balance = Column(Integer, nullable=False)

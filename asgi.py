@@ -5,14 +5,14 @@ from models.db import init_db
 from routers import public, admin
 
 
-@asynccontextmanager
-async def lifespan_db(*args, **kwargs):
-	await init_db()
-	yield
-	# await shutdown_db()
+# @asynccontextmanager
+# async def lifespan_db(*args, **kwargs):
+# 	await init_db()
+# 	yield
+# await shutdown_db()
 
 
-fastapp = FastAPI(lifespan=lifespan_db)
+fastapp = FastAPI()
 
 fastapp.include_router(public)
 fastapp.include_router(admin)

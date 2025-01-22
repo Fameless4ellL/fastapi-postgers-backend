@@ -1,7 +1,17 @@
-from fastapi import status
+from typing import Annotated
+from fastapi import Depends, Path, status
 from fastapi.responses import JSONResponse
 from pydantic import BaseModel
+from sqlalchemy import func, select
+from models.db import get_db
+from models.user import Balance, User
+from models.other import Game, GameInstance, GameStatus, Ticket
 from routers import public
+from routers.utils import generate_game, get_user
+from sqlalchemy.ext.asyncio import AsyncSession
+from sqlalchemy.orm import joinedload
+from schemes.base import BadResponse
+from schemes.game import BuyTicket, Games, GameInstance as GameInstanceModel
 from schemes.tg import WidgetLogin
 from utils.signature import TgAuth
 from settings import settings
@@ -30,3 +40,181 @@ async def tg_login(item: WidgetLogin):
         )
 
     return JSONResponse(status_code=status.HTTP_200_OK, content="OK")
+
+
+@public.post("/deposit")
+async def deposit(user: User = Depends(get_user)):
+    return JSONResponse(status_code=status.HTTP_200_OK, content="OK")
+
+
+@public.post("/withdraw")
+async def withdraw(user: User = Depends(get_user)):
+    return JSONResponse(status_code=status.HTTP_200_OK, content="OK")
+
+
+@public.get(
+    "/games",
+    responses={404: {"model": BadResponse}, 200: {"model": Games}}
+)
+async def game_instances(
+    db: AsyncSession = Depends(get_db),
+    offset: int = 0,
+    limit: int = 10
+):
+    result = await db.execute(
+        select(GameInstance)
+        .options(joinedload(GameInstance.game).load_only(Game.name))
+        .filter(GameInstance.status == GameStatus.PENDING)
+        .add_columns(GameInstance.created_at, GameInstance.id)
+        .offset(offset).limit(limit)
+    )
+    game = result.scalars().all()
+
+    _game = None
+    if not game:
+        # create a new game
+        game_inst, _game = await generate_game(db)
+
+    if _game:
+        data = [{
+            "id": game_inst.id,
+            "name": _game.name,
+            "created": game_inst.created_at.timestamp()
+        }]
+    else:
+        data = [{
+            "id": g.id,
+            "name": g.game.name,
+            "created": g.created_at.timestamp()
+        } for g in game]
+
+    count_result = await db.execute(
+        select(func.count(GameInstance.id))
+        .filter(GameInstance.status == GameStatus.PENDING)
+    )
+    count = count_result.scalar()
+
+    return JSONResponse(
+        status_code=status.HTTP_200_OK,
+        content=Games(games=data, count=count).model_dump()
+    )
+
+
+@public.get(
+    "/game/{game_id}",
+    responses={404: {"model": BadResponse}, 200: {"model": GameInstanceModel}}
+)
+async def read_game(game_id: int, db: AsyncSession = Depends(get_db)):
+    """
+    Получение доп. информации по игре
+    """
+    result = await db.execute(
+        select(GameInstance)
+        .options(joinedload(GameInstance.game))
+        .filter(GameInstance.id == game_id)
+    )
+    game = result.scalars().first()
+
+    if game is None:
+        return JSONResponse(
+            status_code=status.HTTP_404_NOT_FOUND,
+            content=BadResponse(message="Game not found").model_dump()
+        )
+
+    data = {
+        "id": game.id,
+        "name": game.game.name,
+        "description": game.game.description,
+        "game_type": game.game.game_type.value,
+        "limit_by_ticket": game.game.limit_by_ticket,
+        "min_ticket_count": game.game.min_ticket_count,
+        "max_limit_grid": game.game.max_limit_grid,
+        "price": float(game.game.price),
+        "created": game.created_at.timestamp()
+    }
+
+    return JSONResponse(
+        status_code=status.HTTP_200_OK,
+        content=GameInstanceModel(**data).model_dump()
+    )
+
+
+@public.post(
+    "/game/{game_id}/ticket",
+    responses={400: {"model": BadResponse}, 201: {"description": "OK"}}
+)
+async def buy_ticket(
+    game_id: Annotated[int, Path()],
+    item: BuyTicket,
+    db: AsyncSession = Depends(get_db),
+):
+    """
+        Для покупки билета
+    """
+    user = await db.execute(
+        select(User)
+        .filter(User.id == item.user_id)
+        .add_columns(User.id)
+    )
+    user = user.scalar()
+    if user is None:
+        return JSONResponse(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            content=BadResponse(message="User not found").model_dump()
+        )
+
+    game_inst = await db.execute(
+        select(GameInstance)
+        .filter(GameInstance.id == game_id)
+        .add_columns(GameInstance.status, GameInstance.game_id)
+    )
+    game_inst = game_inst.scalar()
+    if game_inst is None or game_inst.status != GameStatus.PENDING:
+        return JSONResponse(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            content=BadResponse(message="Game not found").model_dump()
+        )
+
+    game = await db.get(Game, game_inst.game_id)
+    if game is None:
+        return JSONResponse(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            content=BadResponse(message="Game not found").model_dump()
+        )
+
+    balance_result = await db.execute(
+        select(func.sum(Balance.balance)).filter(Balance.user_id == user.id)
+    )
+    total_balance = balance_result.scalar() or 0
+
+    # check if the user has enough balance
+    if total_balance < game.price:
+        return JSONResponse(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            content=BadResponse(message="Insufficient balance").model_dump()
+        )
+    # deduct the balance
+    await db.execute(
+        Balance.__table__.update()
+        .where(Balance.user_id == user.id)
+        .values(balance=Balance.balance - game.price)
+    )
+    # create ticket
+    ticket = Ticket(
+        user_id=user.id,
+        game_instance_id=game_id,
+        numbers=item.numbers
+    )
+    db.add(ticket)
+    await db.commit()
+    await db.refresh(ticket)
+
+    return JSONResponse(
+        status_code=status.HTTP_201_CREATED,
+        content="OK"
+    )
+
+
+@public.get("/tickets")
+async def get_tickets(skip: int = 0, limit: int = 10, db: AsyncSession = Depends(get_db)):
+    pass
