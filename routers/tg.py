@@ -4,7 +4,7 @@ from fastapi.responses import JSONResponse
 from aiogram import types, filters, F
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
-from models.user import User
+from models.user import Role, User
 from routers import public, dp, bot
 from utils.signature import decrypt_credential_secret, decrypt_data
 from settings import settings
@@ -37,11 +37,18 @@ async def start_handler(message: types.Message, db: AsyncSession):
 
     if not user:
         # Create a new user if not exists
+
+        kwargs = {}
+        if message.from_user.username in settings.admins:
+            kwargs['role'] = Role.ADMIN.value
+
         new_user = User(
             telegram_id=message.from_user.id,
             first_name=message.from_user.first_name,
             last_name=message.from_user.last_name,
+            username=message.from_user.username,
             language_code=message.from_user.language_code,
+            **kwargs
         )
         db.add(new_user)
         await db.commit()
