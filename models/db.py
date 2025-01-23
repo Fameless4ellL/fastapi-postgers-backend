@@ -23,6 +23,11 @@ async def get_db():
         yield session
 
 
+def get_sync_db():
+    session = sessionmaker(bind=engine)
+    return session()
+
+
 class DBSessionMiddleware(BaseMiddleware):
     async def __call__(
         self,

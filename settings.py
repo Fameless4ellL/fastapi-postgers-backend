@@ -16,6 +16,8 @@ class Settings(BaseSettings):
     database_url: str = "postgresql+asyncpg://postgres:postgres@db/postgres"
     """Secret key for JWT token"""
     jwt_secret: str = "thisisatest"
+    """Cron key for cron jobs"""
+    cron_key: str = "thisisatest"
 
 
 settings = Settings()

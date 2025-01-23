@@ -10,7 +10,12 @@ from routers.utils import generate_game, get_user
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import joinedload
 from schemes.base import BadResponse
-from schemes.game import BuyTicket, Games, GameInstance as GameInstanceModel, Tickets
+from schemes.game import (
+    BuyTicket,
+    Games,
+    GameInstance as GameInstanceModel,
+    Tickets
+)
 from schemes.tg import WidgetLogin
 from utils.signature import TgAuth
 from settings import settings
@@ -19,7 +24,7 @@ from settings import settings
 @public.post("/tg/login")
 async def tg_login(item: WidgetLogin):
     """
-        Для логина в telegram mini app
+        Для логина в telegram mini app через seamless auth
     """
     print(settings.bot_token)
     if not TgAuth(item, settings.bot_token.encode("utf-8")).check_hash():
@@ -29,6 +34,25 @@ async def tg_login(item: WidgetLogin):
         )
 
     return JSONResponse(status_code=status.HTTP_200_OK, content="OK")
+
+
+@public.get("/balance")
+async def balance(
+    user: Annotated[User, Depends(get_user)],
+    db: Annotated[AsyncSession, Depends(get_db)]
+):
+    """
+    Получение баланса пользователя
+    """
+    balance_result = await db.execute(
+        select(func.sum(Balance.balance))
+        .filter(Balance.user_id == user.id)
+    )
+    total_balance = balance_result.scalar() or 0
+    return JSONResponse(
+        status_code=status.HTTP_200_OK,
+        content={"balance": total_balance}
+    )
 
 
 @public.post("/deposit")
@@ -93,7 +117,7 @@ async def game_instances(
     "/game/{game_id}",
     responses={404: {"model": BadResponse}, 200: {"model": GameInstanceModel}}
 )
-async def read_game(game_id: int, db: AsyncSession = Depends(get_db)):
+async def read_game(game_id: int, db: Annotated[AsyncSession, Depends(get_db)]):
     """
     Получение доп. информации по игре
     """

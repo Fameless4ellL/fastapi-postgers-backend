@@ -1,4 +1,3 @@
-# FastAPI
 pydantic
 fastapi[all]
 aiogram
@@ -7,9 +6,12 @@ sqlalchemy
 asyncpg
 uvicorn
 psycopg2
+redis
 
 # utils
 pycryptodome
+python-jose
+passlib[bcrypt]
 
 # test
 httpx
