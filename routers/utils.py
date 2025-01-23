@@ -11,7 +11,6 @@ from utils.signature import decode_access_token
 oauth2_scheme = security.OAuth2PasswordBearer(tokenUrl="/v1/login")
 
 
-
 async def get_user(
     token: str = Depends(oauth2_scheme),
     db: AsyncSession = Depends(get_db)

@@ -1,6 +1,7 @@
 from fastapi import Depends
 from models.db import get_db
 from models.user import User
+from typing import Annotated
 from routers import public
 from fastapi.responses import JSONResponse
 from sqlalchemy import select, or_, and_
@@ -58,7 +59,7 @@ async def login(
 ):
     userdb = await db.execute(
         select(User)
-        .filter(and_(
+        .filter(or_(
             User.phone_number == user.phone_number,
             User.username == user.username
         ))

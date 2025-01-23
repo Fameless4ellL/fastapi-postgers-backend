@@ -1,6 +1,5 @@
 import datetime
 from enum import Enum
-import uuid
 from .db import Base
 from sqlalchemy import (
     Column,
@@ -19,6 +18,11 @@ from sqlalchemy.orm import relationship
 class GameType(Enum):
     GLOBAL = "Global"
     LOCAL = "Local"
+
+
+class GameView(Enum):
+    MONETARY = "monetary"
+    MATERIAL = "material"
 
 
 class GameStatus(Enum):
@@ -49,8 +53,18 @@ class Game(Base):
     max_limit_grid = Column(Integer, default=90)
     price = Column(DECIMAL(10, 2), nullable=False, default=1)
     description = Column(String(500), nullable=True, doc="Description of the game")
+    max_win_amount = Column(DECIMAL(9, 2), nullable=True)
+    prize = Column(DECIMAL(9, 2), nullable=True)
+    country = Column(String(32), nullable=True)
     min_ticket_count = Column(Integer, default=1, doc="Minimum number of tickets per user")
     as_default = Column(Boolean, default=False, doc="Is the game default")
+    
+    scheduled_datetime = Column(DateTime, default=datetime.datetime.utcnow, doc="The date and time when the game instance will be held")
+    timezone = Column(String(50), default="UTC", doc="The timezone of the game instance in UTC format")
+    
+    repeat = Column(Boolean, default=False, doc="Indicates if the game instance is repeated")
+    repeat_days = Column(ARRAY(Integer), nullable=True, doc="The days of the week when the game instance is repeated, required if repeat is True")
+
     created_at = Column(DateTime, default=datetime.datetime.utcnow)
     updated_at = Column(DateTime, default=datetime.datetime.utcnow, onupdate=datetime.datetime.utcnow)
 
@@ -61,9 +75,8 @@ class GameInstance(Base):
     __tablename__ = "game_instances"
 
     id = Column(Integer, primary_key=True, index=True)
-    uuid = Column(String(36), default=lambda: str(uuid.uuid4()), unique=True)
-    status = Column(SqlEnum(GameStatus), default=GameStatus.PENDING)
     game_id = Column(Integer, ForeignKey('games.id'), nullable=False)
+    status = Column(SqlEnum(GameStatus), default=GameStatus.PENDING)
     created_at = Column(DateTime, default=datetime.datetime.utcnow)
     updated_at = Column(DateTime, default=datetime.datetime.utcnow, onupdate=datetime.datetime.utcnow)
 

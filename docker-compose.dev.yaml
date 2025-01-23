@@ -20,6 +20,7 @@ services:
       uvicorn asgi:fastapp --port 8000 --host 0.0.0.0 --reload'
     depends_on:
       - db
+      - redis
     volumes:
       - .:/app/
     environment:
@@ -33,9 +34,43 @@ services:
     image: nginx:alpine
     restart: always
     volumes:
+
       - ./nginx.conf:/etc/nginx/nginx.conf
     ports:
       - "127.0.0.1:8100:8000"
+
+  worker:
+    build:
+      context: .
+    command: >
+      bash -c 'while !</dev/tcp/db/5432; do sleep 1; done; 
+      python3  ./worker/worker.py'
+    volumes:
+      - .:/app/
+    environment:
+      - PYTHONPATH=/app
+    depends_on:
+      - db
+      - redis
+    restart: on-failure
+
+  cronjobs:
+    restart: unless-stopped
+    image: tigpt/cronjobs
+    depends_on:
+      - api
+    volumes:
+      - ./cron:/etc/crontabs/root
+
+  redis:
+    image: redis
+    restart: on-failure
+    volumes:
+        - ./redis/data:/data
+        - ./redis/redis.conf:/usr/local/etc/redis/redis.conf
+    expose:
+        - 6379
+    command: redis-server /usr/local/etc/redis/redis.conf
 
 volumes:
   postgresql-data:
