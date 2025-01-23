@@ -14,6 +14,8 @@ class Settings(BaseSettings):
     """Able to see additional logs"""
     debug: bool = True
     database_url: str = "postgresql+asyncpg://postgres:postgres@db/postgres"
+    """Secret key for JWT token"""
+    jwt_secret: str = "thisisatest"
 
 
 settings = Settings()

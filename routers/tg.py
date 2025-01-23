@@ -44,8 +44,6 @@ async def start_handler(message: types.Message, db: AsyncSession):
 
         new_user = User(
             telegram_id=message.from_user.id,
-            first_name=message.from_user.first_name,
-            last_name=message.from_user.last_name,
             username=message.from_user.username,
             language_code=message.from_user.language_code,
             **kwargs
@@ -56,7 +54,7 @@ async def start_handler(message: types.Message, db: AsyncSession):
         user = new_user
 
     await message.reply(
-        f"Hello, {user.first_name} {user.last_name}!\n"
+        f"Hello, {user.username}!\n"
         "Please provide your passport details.",
         reply_markup=types.InlineKeyboardMarkup(
             inline_keyboard=[[types.InlineKeyboardButton(

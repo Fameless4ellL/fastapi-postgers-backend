@@ -1,12 +1,22 @@
+from datetime import datetime, timedelta
 import hashlib
 import base64
 import hmac
 
 from operator import itemgetter
 import traceback
+from typing import Optional
 from Crypto.PublicKey import RSA
 from Crypto.Cipher import AES, PKCS1_OAEP
 from schemes.tg import WidgetLogin
+from jose import JWTError, jwt
+from passlib.context import CryptContext
+from settings import settings
+
+
+ALGORITHM = "HS256"
+ACCESS_TOKEN_EXPIRE_MINUTES = 60 * 24
+pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
 
 
 class TgAuth:
@@ -41,7 +51,8 @@ def decrypt_data(
 ):
     """
     When the user confirms your request by pressing the "Authorize" button,
-    the Bot API sends an Update with the field passport_data to the bot that contains encrypted Telegram Passport data.
+    the Bot API sends an Update with the field passport_data to the bot that
+    contains encrypted Telegram Passport data.
 
     see: https://core.telegram.org/passport#receiving-information
     """
@@ -90,3 +101,33 @@ def decrypt_credential_secret(
         return "", "INVALID_SECRET"
     finally:
         return base64.encodebytes(decrypted_secret), ""
+
+
+def create_access_token(data: dict, expires_delta: Optional[timedelta] = None):
+    to_encode = data.copy()
+
+    if expires_delta:
+        expire = datetime.utcnow() + expires_delta
+    else:
+        expire = datetime.utcnow() + timedelta(minutes=ACCESS_TOKEN_EXPIRE_MINUTES)
+
+    to_encode.update({"exp": expire})
+    encoded_jwt = jwt.encode(to_encode, settings.jwt_secret, algorithm="HS256")
+
+    return encoded_jwt
+
+
+def verify_password(plain_password, hashed_password):
+    return pwd_context.verify(plain_password, hashed_password)
+
+
+def get_password_hash(password):
+    return pwd_context.hash(password)
+
+
+def decode_access_token(token: str):
+    try:
+        payload = jwt.decode(token, settings.jwt_secret, algorithms=["HS256"])
+        return payload
+    except JWTError:
+        return None
