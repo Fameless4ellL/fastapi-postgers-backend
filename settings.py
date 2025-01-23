@@ -13,7 +13,7 @@ class Settings(BaseSettings):
     admins: list[str] = ["zaurDzass"]
     """Able to see additional logs"""
     debug: bool = True
-    database_url: str = "postgresql+asyncpg://postgres:postgres@db/postgres"
+    database_url: str = "postgresql+{mode}://postgres:postgres@db/postgres"
     """Secret key for JWT token"""
     jwt_secret: str = "thisisatest"
     """Cron key for cron jobs"""

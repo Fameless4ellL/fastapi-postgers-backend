@@ -7,7 +7,8 @@ from concurrent.futures import ThreadPoolExecutor
 from datetime import datetime
 
 from typing import Callable
-from globals import redis, worker
+from globals import redis
+from utils import worker
 
 
 logger = logging.getLogger(__name__)
@@ -15,8 +16,6 @@ logger.setLevel(logging.INFO)
 
 
 WORKER_TASK_KEY = "WORKER:tasks"
-WORKER_PERFORM_TASK_KEY = "WORKER:perform_tasks"
-WORKER_CREATED_TASK_KEY = "WORKER:created_tasks"
 
 
 def add_to_queue(func_name: str, *args, **kwargs):

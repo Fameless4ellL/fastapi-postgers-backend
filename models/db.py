@@ -1,12 +1,21 @@
 from aiogram import BaseMiddleware
-from sqlalchemy.ext.asyncio import AsyncSession, create_async_engine
+from sqlalchemy.ext.asyncio import (
+    AsyncSession,
+    create_async_engine,
+)
+from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker
 from sqlalchemy.ext.declarative import declarative_base
 from settings import settings
 
 
 engine = create_async_engine(
-    settings.database_url,
+    settings.database_url.format(mode="asyncpg"),
+    echo=settings.debug,
+    future=True
+)
+sync_engine = create_engine(
+    settings.database_url.format(mode="psycopg2"),
     echo=settings.debug,
     future=True
 )
@@ -24,7 +33,7 @@ async def get_db():
 
 
 def get_sync_db():
-    session = sessionmaker(bind=engine)
+    session = sessionmaker(bind=sync_engine)
     return session()
 
 

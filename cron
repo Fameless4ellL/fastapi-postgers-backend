@@ -1,1 +1,1 @@
-*/1 * * * * curl -v http://api:8000/v1/calc/daily?key=thisisatest > /dev/stdout
+0 0 * * * curl -v http://api:8000/v1/calc/daily?key=thisisatest > /dev/stdout
