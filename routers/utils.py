@@ -8,7 +8,8 @@ from models.other import Game, GameInstance, GameStatus, GameType
 from utils.signature import decode_access_token
 
 
-oauth2_scheme = security.OAuth2PasswordBearer(tokenUrl="auth/login")
+oauth2_scheme = security.OAuth2PasswordBearer(tokenUrl="/v1/login")
+
 
 
 async def get_user(
@@ -23,8 +24,8 @@ async def get_user(
             detail="Invalid token"
         )
 
-    phone_number = payload.get("sub")
-    username = payload.get("username")
+    phone_number = payload.get("sub", "")
+    username = payload.get("username", "")
 
     if phone_number is None:
         raise HTTPException(

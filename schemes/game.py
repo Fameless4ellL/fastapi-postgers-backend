@@ -27,5 +27,18 @@ class Games(BaseModel):
 
 
 class BuyTicket(BaseModel):
-    user_id: int
-    numbers: Annotated[CommaList, str] = Field(default=[])
+    numbers: list[set[int]]
+    demo: bool = False
+
+
+class Ticket(BaseModel):
+    id: int
+    game_instance_id: int
+    numbers: list[int]
+    demo: bool
+    created: float
+
+
+class Tickets(BaseModel):
+    tickets: list[Ticket] = Field(default=[])
+    count: int = 0

@@ -27,3 +27,4 @@ admin = APIRouter(prefix="/v1/admin", tags=["admin"])
 from .app import *  # noqa
 from .tg import *  # noqa
 from .admin import *  # noqa
+from .auth import *  # noqa

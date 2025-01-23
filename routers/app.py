@@ -1,8 +1,7 @@
 from typing import Annotated
 from fastapi import Depends, Path, status
 from fastapi.responses import JSONResponse
-from pydantic import BaseModel
-from sqlalchemy import func, select
+from sqlalchemy import func, select, exists
 from models.db import get_db
 from models.user import Balance, User
 from models.other import Game, GameInstance, GameStatus, Ticket
@@ -11,20 +10,10 @@ from routers.utils import generate_game, get_user
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import joinedload
 from schemes.base import BadResponse
-from schemes.game import BuyTicket, Games, GameInstance as GameInstanceModel
+from schemes.game import BuyTicket, Games, GameInstance as GameInstanceModel, Tickets
 from schemes.tg import WidgetLogin
 from utils.signature import TgAuth
 from settings import settings
-
-
-class UserCreate(BaseModel):
-    name: str
-    email: str
-
-
-@public.get("/healthcheck")
-async def healthcheck():
-    return {"status": status.HTTP_200_OK}
 
 
 @public.post("/tg/login")
@@ -140,29 +129,18 @@ async def read_game(game_id: int, db: AsyncSession = Depends(get_db)):
 
 
 @public.post(
-    "/game/{game_id}/ticket",
+    "/game/{game_id}/tickets",
     responses={400: {"model": BadResponse}, 201: {"description": "OK"}}
 )
-async def buy_ticket(
+async def buy_tickets(
     game_id: Annotated[int, Path()],
     item: BuyTicket,
-    db: AsyncSession = Depends(get_db),
+    user: Annotated[User, Depends(get_user)],
+    db: Annotated[AsyncSession, Depends(get_db)],
 ):
     """
-        Для покупки билета
+        Для покупки билетов
     """
-    user = await db.execute(
-        select(User)
-        .filter(User.id == item.user_id)
-        .add_columns(User.id)
-    )
-    user = user.scalar()
-    if user is None:
-        return JSONResponse(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            content=BadResponse(message="User not found").model_dump()
-        )
-
     game_inst = await db.execute(
         select(GameInstance)
         .filter(GameInstance.id == game_id)
@@ -181,33 +159,80 @@ async def buy_ticket(
             status_code=status.HTTP_400_BAD_REQUEST,
             content=BadResponse(message="Game not found").model_dump()
         )
-
-    balance_result = await db.execute(
-        select(func.sum(Balance.balance)).filter(Balance.user_id == user.id)
-    )
-    total_balance = balance_result.scalar() or 0
-
-    # check if the user has enough balance
-    if total_balance < game.price:
+    if any(len(n) != game.limit_by_ticket for n in item.numbers):
         return JSONResponse(
             status_code=status.HTTP_400_BAD_REQUEST,
-            content=BadResponse(message="Insufficient balance").model_dump()
+            content=BadResponse(
+                message=f"Invalid ticket numbers, need {game.limit_by_ticket} per ticket"
+            ).model_dump()
         )
-    # deduct the balance
-    await db.execute(
-        Balance.__table__.update()
-        .where(Balance.user_id == user.id)
-        .values(balance=Balance.balance - game.price)
-    )
+
+    if game.min_ticket_count < len(item.numbers):
+        return JSONResponse(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            content=BadResponse(
+                message=f"Not enough tickets to participate, need {game.min_ticket_count}"
+            ).model_dump()
+        )
+    if item.demo and len(item.numbers) > 1:
+        return JSONResponse(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            content=BadResponse(message="Demo mode is available only for one ticket").model_dump()
+        )
+
+    if not item.demo:
+        balance_result = await db.execute(
+            select(func.sum(Balance.balance))
+            .filter(Balance.user_id == user.id)
+        )
+        total_balance = balance_result.scalar() or 0
+        total_price = game.price * len(item.numbers)
+
+        # check if the user has enough balance
+        if total_balance < total_price:
+            return JSONResponse(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                content=BadResponse(message="Insufficient balance").model_dump()
+            )
+        # deduct the balance
+        await db.execute(
+            Balance.__table__.update()
+            .where(Balance.user_id == user.id)
+            .values(balance=Balance.balance - total_price)
+        )
+    else:
+        # if user already has a demo ticket on this game, use exists()
+        ticket = await db.execute(
+            select(exists().where(
+                Ticket.user_id == user.id,
+                Ticket.demo.is_(True),
+                Ticket.game_instance_id == game_id
+            ))
+        )
+        if ticket.scalar():
+            return JSONResponse(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                content=BadResponse(
+                    message="Demo ticket already exists"
+                ).model_dump()
+            )
+
     # create ticket
-    ticket = Ticket(
-        user_id=user.id,
-        game_instance_id=game_id,
-        numbers=item.numbers
-    )
-    db.add(ticket)
+    tickets = [
+        Ticket(
+            user_id=user.id,
+            game_instance_id=game_id,
+            numbers=numbers,
+            demo=item.demo
+        ) for numbers in item.numbers
+    ]
+
+    db.add_all(tickets)
     await db.commit()
-    await db.refresh(ticket)
+
+    # Refresh each ticket individually
+    for ticket in tickets:
+        await db.refresh(ticket)
 
     return JSONResponse(
         status_code=status.HTTP_201_CREATED,
@@ -215,6 +240,41 @@ async def buy_ticket(
     )
 
 
-@public.get("/tickets")
-async def get_tickets(skip: int = 0, limit: int = 10, db: AsyncSession = Depends(get_db)):
-    pass
+@public.get(
+    "/tickets",
+    responses={400: {"model": BadResponse}, 200: {"model": Tickets}}
+)
+async def get_tickets(
+    db: Annotated[AsyncSession, Depends(get_db)],
+    user: Annotated[User, Depends(get_user)],
+    skip: int = 0,
+    limit: int = 10,
+):
+    """
+    Получение билетов пользователя
+    """
+    tickets = await db.execute(
+        select(Ticket)
+        .filter(Ticket.user_id == user.id)
+        .offset(skip).limit(limit)
+    )
+    tickets = tickets.scalars().all()
+
+    data = [{
+        "id": t.id,
+        "game_instance_id": t.game_instance_id,
+        "numbers": t.numbers,
+        "demo": t.demo,
+        "created": t.created_at.timestamp()
+    } for t in tickets]
+
+    count_result = await db.execute(
+        select(func.count(Ticket.id))
+        .filter(Ticket.user_id == user.id)
+    )
+    count = count_result.scalar()
+
+    return JSONResponse(
+        status_code=status.HTTP_200_OK,
+        content=Tickets(tickets=data, count=count).model_dump()
+    )
