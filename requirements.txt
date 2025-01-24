@@ -12,6 +12,7 @@ redis
 pycryptodome
 python-jose
 passlib[bcrypt]
+phonenumbers
 
 # test
 httpx

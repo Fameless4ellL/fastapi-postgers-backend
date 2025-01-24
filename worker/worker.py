@@ -45,13 +45,15 @@ def process(max_workers: int):
         while True:
             try:
 
-                _, task = redis.brpop(
+                task = redis.brpop(
                     WORKER_TASK_KEY,
                     timeout=60
                 )
 
                 if not task:
                     continue
+
+                _, task = task
 
                 task_obj = marshal.loads(task)
 

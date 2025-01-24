@@ -1,12 +1,15 @@
-from fastapi import Depends
+import random
+from fastapi import Depends, Request
 from models.db import get_db
 from models.user import User
 from typing import Annotated
 from routers import public
 from fastapi.responses import JSONResponse
-from sqlalchemy import select, or_, and_
+from sqlalchemy import select, or_
+from pydantic_extra_types.phone_numbers import PhoneNumber
 from sqlalchemy.ext.asyncio import AsyncSession
 from schemes.auth import UserCreate, UserLogin
+from globals import aredis
 
 from utils.signature import (
     create_access_token,
@@ -19,7 +22,11 @@ from utils.signature import (
     "/register",
     tags=["auth"]
 )
-async def register(user: UserCreate, db: AsyncSession = Depends(get_db)):
+async def register(
+    request: Request,
+    user: UserCreate,
+    db: Annotated[AsyncSession, Depends(get_db)]
+):
     user_in_db = await db.execute(
         select(User)
         .filter(or_(
@@ -33,6 +40,13 @@ async def register(user: UserCreate, db: AsyncSession = Depends(get_db)):
             status_code=400,
             content={"message": "User with this phone number or username already exists"}
         )
+    if not await aredis.exists(f"SMS:{request.client.host}:{user.code}"):
+        return JSONResponse(
+            status_code=400,
+            content={"message": "Invalid code"}
+        )
+
+    await aredis.delete(f"SMS:{request.client.host}:{user.code}")
 
     hashed_password = get_password_hash(user.password.get_secret_value())
     new_user = User(
@@ -43,6 +57,7 @@ async def register(user: UserCreate, db: AsyncSession = Depends(get_db)):
     db.add(new_user)
     await db.commit()
     await db.refresh(new_user)
+
     return JSONResponse(
         status_code=201,
         content={"message": "User registered successfully"}
@@ -55,7 +70,7 @@ async def register(user: UserCreate, db: AsyncSession = Depends(get_db)):
 )
 async def login(
     user: UserLogin,
-    db: AsyncSession = Depends(get_db)
+    db: Annotated[AsyncSession, Depends(get_db)]
 ):
     userdb = await db.execute(
         select(User)
@@ -84,4 +99,34 @@ async def login(
     return JSONResponse(
         status_code=200,
         content={"access_token": access_token, "token_type": "bearer"}
+    )
+
+
+@public.post(
+    "/send_code"
+)
+async def send_code(
+    request: Request,
+    phone_number: PhoneNumber
+):
+    """
+    Send sms code on choose phone number 1 min per request from ip
+    """
+    ip = request.client.host
+    if await aredis.exists(ip):
+        return JSONResponse(
+            status_code=429,
+            content={"message": "Too many requests"}
+        )
+
+    # TODO sent sms code
+    code = random.randint(100000, 999999)
+
+    await aredis.set(f"SMS:{ip}:{code}", 1, expire=60)
+    return JSONResponse(
+        status_code=200,
+        content={
+            "message": "Code sent successfully",
+            "code": code  # TODO TEMP
+        }
     )

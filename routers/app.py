@@ -117,7 +117,10 @@ async def game_instances(
     "/game/{game_id}",
     responses={404: {"model": BadResponse}, 200: {"model": GameInstanceModel}}
 )
-async def read_game(game_id: int, db: Annotated[AsyncSession, Depends(get_db)]):
+async def read_game(
+    game_id: int,
+    db: Annotated[AsyncSession, Depends(get_db)]
+):
     """
     Получение доп. информации по игре
     """
