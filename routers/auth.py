@@ -33,11 +33,11 @@ async def register(
             status_code=400,
             content={"message": "Phone number or username is required"}
         )
-        
+
     # get country from phone_number
     country_code = parse(user.phone_number).country_code
     country = geocoder.region_code_for_number(country_code)
-        
+
     user_in_db = await db.execute(
         select(User)
         .filter(or_(
@@ -51,13 +51,19 @@ async def register(
             status_code=400,
             content={"message": "User with this phone number or username already exists"}
         )
-    if not await aredis.exists(f"SMS:{request.client.host}:{user.code}"):
+    if not await aredis.exists(f"SMS:{request.client.host}"):
+        return JSONResponse(
+            status_code=400,
+            content={"message": "Invalid code"}
+        )
+    code = await aredis.get(f"SMS:{request.client.host}")
+    if code != user.code:
         return JSONResponse(
             status_code=400,
             content={"message": "Invalid code"}
         )
 
-    await aredis.delete(f"SMS:{request.client.host}:{user.code}")
+    await aredis.delete(f"SMS:{request.client.host}")
 
     hashed_password = get_password_hash(user.password.get_secret_value())
     new_user = User(
@@ -125,7 +131,8 @@ async def send_code(
     Send sms code on choose phone number 1 min per request from ip
     """
     ip = request.client.host
-    if await aredis.exists(ip):
+    print(ip)
+    if await aredis.exists(f"SMS:{ip}"):
         return JSONResponse(
             status_code=429,
             content={"message": "Too many requests"}
@@ -134,7 +141,7 @@ async def send_code(
     # TODO sent sms code
     code = random.randint(100000, 999999)
 
-    await aredis.set(f"SMS:{ip}:{code}", 1, expire=60)
+    await aredis.set(f"SMS:{ip}", code, ex=60)
     return JSONResponse(
         status_code=200,
         content={
