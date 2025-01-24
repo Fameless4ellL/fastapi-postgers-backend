@@ -35,7 +35,7 @@ async def register(
         )
 
     # get country from phone_number
-    country_code = parse(user.phone_number).country_code
+    country_code = parse(user.phone_number)
     country = geocoder.region_code_for_number(country_code)
 
     user_in_db = await db.execute(
@@ -56,8 +56,8 @@ async def register(
             status_code=400,
             content={"message": "Invalid code"}
         )
-    code = await aredis.get(f"SMS:{request.client.host}")
-    if code != user.code:
+    code: str = await aredis.get(f"SMS:{request.client.host}")
+    if code.decode("utf-8") != user.code:
         return JSONResponse(
             status_code=400,
             content={"message": "Invalid code"}
@@ -67,7 +67,7 @@ async def register(
 
     hashed_password = get_password_hash(user.password.get_secret_value())
     new_user = User(
-        phone_number=user.phone_number,
+        phone_number=f"{country_code.country_code}{country_code.national_number}",
         password=hashed_password,
         username=user.username,
         country=country
@@ -90,6 +90,12 @@ async def login(
     user: UserLogin,
     db: Annotated[AsyncSession, Depends(get_db)]
 ):
+    if not user.phone_number and not user.username:
+        return JSONResponse(
+            status_code=400,
+            content={"message": "Phone number or username is required"}
+        )
+
     userdb = await db.execute(
         select(User)
         .filter(or_(
@@ -110,8 +116,8 @@ async def login(
 
     access_token = create_access_token(
         data={
-            "username": user.username,
-            "sub": user.phone_number
+            "username": userdb.username,
+            "sub": userdb.phone_number
         })
 
     return JSONResponse(
@@ -121,7 +127,8 @@ async def login(
 
 
 @public.post(
-    "/send_code"
+    "/send_code",
+    tags=["auth"]
 )
 async def send_code(
     request: Request,
@@ -131,7 +138,6 @@ async def send_code(
     Send sms code on choose phone number 1 min per request from ip
     """
     ip = request.client.host
-    print(ip)
     if await aredis.exists(f"SMS:{ip}"):
         return JSONResponse(
             status_code=429,

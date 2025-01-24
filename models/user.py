@@ -21,7 +21,7 @@ class User(Base):
     telegram_id = Column(Integer, unique=True, nullable=True)
     username = Column(String(64), unique=True)
     language_code = Column(String(8), nullable=True)
-    phone_number = Column(String(16), unique=True)
+    phone_number = Column(String(32), unique=True)
     country = Column(String(32), nullable=True)
     email = Column(String(64), nullable=True)
     password = Column(String(128))
@@ -35,7 +35,6 @@ class Balance(Base):
 
     id = Column(Integer, primary_key=True, index=True)
     user_id = Column(Integer, ForeignKey('users.id', ondelete="CASCADE"), nullable=True)
-    currency_id = Column(Integer, ForeignKey('currencies.id'), nullable=False)
     balance = Column(Integer, default=0)
     created_at = Column(DateTime, default=datetime.datetime.utcnow)
     updated_at = Column(DateTime, default=datetime.datetime.utcnow, onupdate=datetime.datetime.utcnow)

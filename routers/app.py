@@ -3,7 +3,7 @@ from fastapi import Depends, Path, status
 from fastapi.responses import JSONResponse
 from sqlalchemy import func, select, exists
 from models.db import get_db
-from models.user import Balance, User
+from models.user import Balance, BalanceChangeHistory, User
 from models.other import Game, GameInstance, GameStatus, GameType, Ticket
 from routers import public
 from routers.utils import generate_game, get_user
@@ -154,6 +154,7 @@ async def read_game(
         "id": game.id,
         "name": game.game.name,
         "description": game.game.description,
+        "status": game.status.value,
         "game_type": game.game.game_type.value,
         "limit_by_ticket": game.game.limit_by_ticket,
         "min_ticket_count": game.game.min_ticket_count,
@@ -221,25 +222,32 @@ async def buy_tickets(
         )
 
     if not item.demo:
-        balance_result = await db.execute(
-            select(func.sum(Balance.balance))
-            .filter(Balance.user_id == user.id)
-        )
-        total_balance = balance_result.scalar() or 0
-        total_price = game.price * len(item.numbers)
-
-        # check if the user has enough balance
-        if total_balance < total_price:
-            return JSONResponse(
-                status_code=status.HTTP_400_BAD_REQUEST,
-                content=BadResponse(message="Insufficient balance").model_dump()
+        async with db.begin():
+            balance_result = await db.execute(
+                select(Balance)
+                .with_for_update()
+                .filter(Balance.user_id == user.id)
             )
-        # deduct the balance
-        await db.execute(
-            Balance.__table__.update()
-            .where(Balance.user_id == user.id)
-            .values(balance=Balance.balance - total_price)
-        )
+            user_balance = balance_result.scalar()
+            total_price = game.price * len(item.numbers)
+
+            # check if the user has enough balance
+            if user_balance.balance < total_price:
+                return JSONResponse(
+                    status_code=status.HTTP_400_BAD_REQUEST,
+                    content=BadResponse(message="Insufficient balance").model_dump()
+                )
+            # deduct the balance and log in balance change history
+            user_balance.balance -= total_price
+            balance_change = BalanceChangeHistory(
+                user_id=user.id,
+                change_amount=-total_price,
+                change_type="ticket purchase",
+                previous_balance=user_balance.balance + total_price,
+                new_balance=user_balance.balance
+            )
+            db.add(balance_change)
+        await db.commit()
     else:
         # if user already has a demo ticket on this game, use exists()
         ticket = await db.execute(
