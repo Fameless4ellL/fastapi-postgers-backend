@@ -1,4 +1,5 @@
 import random
+from phonenumbers import geocoder, parse
 from fastapi import Depends, Request
 from models.db import get_db
 from models.user import User
@@ -27,6 +28,16 @@ async def register(
     user: UserCreate,
     db: Annotated[AsyncSession, Depends(get_db)]
 ):
+    if not user.phone_number and not user.username:
+        return JSONResponse(
+            status_code=400,
+            content={"message": "Phone number or username is required"}
+        )
+        
+    # get country from phone_number
+    country_code = parse(user.phone_number).country_code
+    country = geocoder.region_code_for_number(country_code)
+        
     user_in_db = await db.execute(
         select(User)
         .filter(or_(
@@ -52,7 +63,8 @@ async def register(
     new_user = User(
         phone_number=user.phone_number,
         password=hashed_password,
-        username=user.username
+        username=user.username,
+        country=country
     )
     db.add(new_user)
     await db.commit()

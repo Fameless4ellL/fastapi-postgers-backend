@@ -58,7 +58,7 @@ async def get_admin(
     return user
 
 
-async def generate_game(db: AsyncSession):
+async def generate_game(db: AsyncSession, _type: GameType = GameType.GLOBAL):
     """
     creating a new game instance based on Game
     """
@@ -70,7 +70,7 @@ async def generate_game(db: AsyncSession):
     if not game:
         game = Game(
             name=f"game #{str(uuid.uuid4())}",
-            game_type=GameType.GLOBAL,
+            game_type=_type,
             description="Default game",
             as_default=True
         )

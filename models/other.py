@@ -38,6 +38,7 @@ class Currency(Base):
     id = Column(Integer, primary_key=True, index=True)
     code = Column(String(8), unique=True, nullable=False, doc="e.g., USDT, TON")
     name = Column(String(64), nullable=False, doc="e.g., Tether, TON Crystal")
+    conversion_rate = Column(DECIMAL(10, 2), nullable=False, default=1, doc="The conversion rate to the base currency")
 
     created_at = Column(DateTime, default=datetime.datetime.utcnow)
     updated_at = Column(DateTime, default=datetime.datetime.utcnow, onupdate=datetime.datetime.utcnow)
@@ -58,10 +59,10 @@ class Game(Base):
     country = Column(String(32), nullable=True)
     min_ticket_count = Column(Integer, default=1, doc="Minimum number of tickets per user")
     as_default = Column(Boolean, default=False, doc="Is the game default")
-    
+
     scheduled_datetime = Column(DateTime, default=datetime.datetime.utcnow, doc="The date and time when the game instance will be held")
     timezone = Column(String(50), default="UTC", doc="The timezone of the game instance in UTC format")
-    
+
     repeat = Column(Boolean, default=False, doc="Indicates if the game instance is repeated")
     repeat_days = Column(ARRAY(Integer), nullable=True, doc="The days of the week when the game instance is repeated, required if repeat is True")
 

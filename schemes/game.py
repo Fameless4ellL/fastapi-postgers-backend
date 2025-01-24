@@ -8,6 +8,7 @@ CommaList = Annotated[str, AfterValidator(lambda x: set(x.split(",")))]
 class Game(BaseModel):
     id: int
     name: str
+    status: str
     created: float
 
 

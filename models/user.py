@@ -22,6 +22,7 @@ class User(Base):
     username = Column(String(64), unique=True)
     language_code = Column(String(8), nullable=True)
     phone_number = Column(String(16), unique=True)
+    country = Column(String(32), nullable=True)
     email = Column(String(64), nullable=True)
     password = Column(String(128))
     role = Column(String(64), default=Role.USER.value)

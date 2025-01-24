@@ -4,7 +4,7 @@ from fastapi.responses import JSONResponse
 from sqlalchemy import func, select, exists
 from models.db import get_db
 from models.user import Balance, User
-from models.other import Game, GameInstance, GameStatus, Ticket
+from models.other import Game, GameInstance, GameStatus, GameType, Ticket
 from routers import public
 from routers.utils import generate_game, get_user
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -71,14 +71,25 @@ async def withdraw(user: User = Depends(get_user)):
 )
 async def game_instances(
     db: AsyncSession = Depends(get_db),
+    _type: GameType = GameType.GLOBAL,
     offset: int = 0,
     limit: int = 10
 ):
+    """
+    Получение списка доступных игр
+    """
     result = await db.execute(
         select(GameInstance)
         .options(joinedload(GameInstance.game).load_only(Game.name))
-        .filter(GameInstance.status == GameStatus.PENDING)
-        .add_columns(GameInstance.created_at, GameInstance.id)
+        .filter(
+            GameInstance.status == GameStatus.PENDING,
+            GameInstance.game.has(game_type=_type)
+        )
+        .add_columns(
+            GameInstance.created_at,
+            GameInstance.id,
+            GameInstance.status
+        )
         .offset(offset).limit(limit)
     )
     game = result.scalars().all()
@@ -86,18 +97,20 @@ async def game_instances(
     _game = None
     if not game:
         # create a new game
-        game_inst, _game = await generate_game(db)
+        game_inst, _game = await generate_game(db, _type)
 
     if _game:
         data = [{
             "id": game_inst.id,
             "name": _game.name,
+            "status": game_inst.status.value,
             "created": game_inst.created_at.timestamp()
         }]
     else:
         data = [{
             "id": g.id,
             "name": g.game.name,
+            "status": g.status.value,
             "created": g.created_at.timestamp()
         } for g in game]
 

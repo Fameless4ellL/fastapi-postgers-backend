@@ -72,9 +72,7 @@ def proceed_game():
 
             # Разыграно будет 80%
             total_prize_pool = 0.8 * len(tickets) * float(game.price)
-            # 800 USDT будет разыграно, 8 призов по 100 USDT
-            prize_per_winner = 100
-            prize_per_winner = int(total_prize_pool // prize_per_winner)
+            prize_per_winner = total_prize_pool // game.max_win_amount
 
             winners = []
             while len(winners) == prize_per_winner:
@@ -130,5 +128,6 @@ def proceed_game():
 
             game_inst.status = GameStatus.COMPLETED
     db.commit()
+    generate_game()
 
     return True
