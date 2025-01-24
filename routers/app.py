@@ -45,10 +45,17 @@ async def balance(
     Получение баланса пользователя
     """
     balance_result = await db.execute(
-        select(func.sum(Balance.balance))
+        select(Balance)
         .filter(Balance.user_id == user.id)
     )
-    total_balance = balance_result.scalar() or 0
+    balance = balance_result.scalar()
+    if not balance:
+        balance = Balance(user_id=user.id)
+        db.add(balance)
+        await db.commit()
+
+    total_balance = balance.balance
+
     return JSONResponse(
         status_code=status.HTTP_200_OK,
         content={"balance": total_balance}
@@ -56,7 +63,25 @@ async def balance(
 
 
 @public.post("/deposit")
-async def deposit(user: User = Depends(get_user)):
+async def deposit(
+    user: Annotated[User, Depends(get_user)],
+    db: Annotated[AsyncSession, Depends(get_db)]
+):
+    # TODO TEMP
+    balance_result = await db.execute(
+        select(Balance)
+        .with_for_update()
+        .filter(Balance.user_id == user.id)
+    )
+    balance = balance_result.scalar()
+    if not balance:
+        balance = Balance(user_id=user.id)
+        db.add(balance)
+        await db.commit()
+    else:
+        balance.balance += 100
+        await db.commit()
+
     return JSONResponse(status_code=status.HTTP_200_OK, content="OK")
 
 
@@ -222,31 +247,30 @@ async def buy_tickets(
         )
 
     if not item.demo:
-        async with db.begin():
-            balance_result = await db.execute(
-                select(Balance)
-                .with_for_update()
-                .filter(Balance.user_id == user.id)
-            )
-            user_balance = balance_result.scalar()
-            total_price = game.price * len(item.numbers)
+        balance_result = await db.execute(
+            select(Balance)
+            .with_for_update()
+            .filter(Balance.user_id == user.id)
+        )
+        user_balance = balance_result.scalar() or Balance(balance=0)
+        total_price = game.price * len(item.numbers)
 
-            # check if the user has enough balance
-            if user_balance.balance < total_price:
-                return JSONResponse(
-                    status_code=status.HTTP_400_BAD_REQUEST,
-                    content=BadResponse(message="Insufficient balance").model_dump()
-                )
-            # deduct the balance and log in balance change history
-            user_balance.balance -= total_price
-            balance_change = BalanceChangeHistory(
-                user_id=user.id,
-                change_amount=-total_price,
-                change_type="ticket purchase",
-                previous_balance=user_balance.balance + total_price,
-                new_balance=user_balance.balance
+        # check if the user has enough balance
+        if user_balance.balance < total_price:
+            return JSONResponse(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                content=BadResponse(message="Insufficient balance").model_dump()
             )
-            db.add(balance_change)
+        # deduct the balance and log in balance change history
+        user_balance.balance -= total_price
+        balance_change = BalanceChangeHistory(
+            user_id=user.id,
+            change_amount=-total_price,
+            change_type="ticket purchase",
+            previous_balance=user_balance.balance + total_price,
+            new_balance=user_balance.balance
+        )
+        db.add(balance_change)
         await db.commit()
     else:
         # if user already has a demo ticket on this game, use exists()

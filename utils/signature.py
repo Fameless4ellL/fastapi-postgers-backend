@@ -93,14 +93,14 @@ def decrypt_credential_secret(
             credential_secret = str.encode(credential_secret)
         credential_secret = base64.decodebytes(credential_secret)
         # Import key and decrypt secret
-        private_key = RSA.import_key(settings.bot_private_key)
+        private_key = RSA.import_key(open("./private.key").read())
         cipher_rsa = PKCS1_OAEP.new(private_key)
         decrypted_secret = cipher_rsa.decrypt(credential_secret)
     except (ValueError, IndexError, TypeError):
         traceback.print_exc()
         return "", "INVALID_SECRET"
-    finally:
-        return base64.encodebytes(decrypted_secret), ""
+
+    return base64.encodebytes(decrypted_secret), ""
 
 
 def create_access_token(data: dict, expires_delta: Optional[timedelta] = None):
