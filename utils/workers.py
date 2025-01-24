@@ -103,6 +103,7 @@ def proceed_game():
                         .filter(Ticket.id == ticket.id)
                     ).scalars().first()
                     ticket.won = True
+                    ticket.amount = prize_per_ticket
 
                     user_balance = db.execute(
                         select(Balance)

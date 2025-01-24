@@ -91,6 +91,7 @@ class Ticket(Base):
     game_instance_id = Column(Integer, ForeignKey('game_instances.id'), nullable=False)
     numbers = Column(ARRAY(Integer), nullable=False)
     won = Column(Boolean, default=False)
+    amount = Column(DECIMAL(9, 2), default=0)
     demo = Column(Boolean, default=False)
     created_at = Column(DateTime, default=datetime.datetime.utcnow)
     updated_at = Column(DateTime, default=datetime.datetime.utcnow, onupdate=datetime.datetime.utcnow)

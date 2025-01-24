@@ -1,4 +1,4 @@
-from typing import Annotated
+from typing import Annotated, Optional
 from pydantic import BaseModel, Field, AfterValidator
 
 
@@ -35,7 +35,9 @@ class Ticket(BaseModel):
     id: int
     game_instance_id: int
     numbers: list[int]
-    demo: bool
+    won: Optional[bool]
+    amount: float = 0
+    demo: Optional[bool]
     created: float
 
 

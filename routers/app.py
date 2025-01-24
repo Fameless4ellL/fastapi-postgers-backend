@@ -292,12 +292,57 @@ async def get_tickets(
         "game_instance_id": t.game_instance_id,
         "numbers": t.numbers,
         "demo": t.demo,
+        "won": t.won,
+        "amount": float(t.amount),
         "created": t.created_at.timestamp()
     } for t in tickets]
 
     count_result = await db.execute(
         select(func.count(Ticket.id))
         .filter(Ticket.user_id == user.id)
+    )
+    count = count_result.scalar()
+
+    return JSONResponse(
+        status_code=status.HTTP_200_OK,
+        content=Tickets(tickets=data, count=count).model_dump()
+    )
+
+
+@public.get(
+    "/game/{game_id}/leaderboard",
+    responses={400: {"model": BadResponse}, 200: {"model": Tickets}}
+)
+async def get_leaderboard(
+    game_id: int,
+    db: Annotated[AsyncSession, Depends(get_db)],
+    skip: int = 0,
+    limit: int = 10,
+):
+    """
+    Получение лидерборда по игре
+    """
+    tickets = await db.execute(
+        select(Ticket)
+        .filter(Ticket.game_instance_id == game_id)
+        .order_by(Ticket.won.desc())
+        .offset(skip).limit(limit)
+    )
+    tickets = tickets.scalars().all()
+
+    data = [{
+        "id": t.id,
+        "game_instance_id": t.game_instance_id,
+        "numbers": t.numbers,
+        "demo": t.demo,
+        "won": t.won,
+        "amount": float(t.amount) if t.amount is not None else 0,
+        "created": t.created_at.timestamp()
+    } for t in tickets]
+
+    count_result = await db.execute(
+        select(func.count(Ticket.id))
+        .filter(Ticket.game_instance_id == game_id)
     )
     count = count_result.scalar()
 
