@@ -78,6 +78,7 @@ class GameInstance(Base):
     id = Column(Integer, primary_key=True, index=True)
     game_id = Column(Integer, ForeignKey('games.id'), nullable=False)
     status = Column(SqlEnum(GameStatus), default=GameStatus.PENDING)
+    image = Column(String(255), nullable=True, default="default_image.png", doc="The image of the game instance")
     created_at = Column(DateTime, default=datetime.datetime.utcnow)
     updated_at = Column(DateTime, default=datetime.datetime.utcnow, onupdate=datetime.datetime.utcnow)
 

@@ -14,6 +14,7 @@ class TicketMode(str, Enum):
 class Game(BaseModel):
     id: int
     name: str
+    image: Optional[str] = None
     status: str
     created: float
 

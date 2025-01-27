@@ -1,7 +1,7 @@
 import datetime
 import random
 from typing import Annotated
-from fastapi import Depends, Path, status
+from fastapi import Depends, Path, Request, status
 from fastapi.responses import JSONResponse
 from sqlalchemy import func, select, exists
 from models.db import get_db
@@ -122,7 +122,8 @@ async def withdraw(
     responses={404: {"model": BadResponse}, 200: {"model": Games}}
 )
 async def game_instances(
-    db: AsyncSession = Depends(get_db),
+    request: Request,
+    db: Annotated[AsyncSession, Depends(get_db)],
     _type: GameType = GameType.GLOBAL,
     offset: int = 0,
     limit: int = 10
@@ -155,6 +156,7 @@ async def game_instances(
         data = [{
             "id": game_inst.id,
             "name": _game.name,
+            "image": str(request.url_for("static", path=str(game_inst.image))),
             "status": game_inst.status.value,
             "created": game_inst.created_at.timestamp()
         }]
@@ -162,6 +164,7 @@ async def game_instances(
         data = [{
             "id": g.id,
             "name": g.game.name,
+            "image": str(request.url_for("static", path=str(g.image))),
             "status": g.status.value,
             "created": g.created_at.timestamp()
         } for g in game]

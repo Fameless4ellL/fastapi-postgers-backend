@@ -1,9 +1,11 @@
 import random
+
+from fastapi.security import OAuth2PasswordRequestForm
 from phonenumbers import geocoder, parse
 from fastapi import Depends, Request
 from models.db import get_db
 from models.user import User
-from typing import Annotated
+from typing import Annotated, Optional
 from routers import public
 from fastapi.responses import JSONResponse
 from sqlalchemy import select, or_
@@ -87,10 +89,10 @@ async def register(
     tags=["auth"]
 )
 async def login(
-    user: UserLogin,
-    db: Annotated[AsyncSession, Depends(get_db)]
+    db: Annotated[AsyncSession, Depends(get_db)],
+    user: Optional[UserLogin],
 ):
-    if not user.phone_number and not user.username:
+    if not user.phone_number and not user.username and not user.password:
         return JSONResponse(
             status_code=400,
             content={"message": "Phone number or username is required"}
@@ -107,6 +109,50 @@ async def login(
 
     if not user or not verify_password(
         user.password.get_secret_value(),
+        userdb.password
+    ):
+        return JSONResponse(
+            status_code=400,
+            content={"message": "Invalid phone number or password"}
+        )
+
+    access_token = create_access_token(
+        data={
+            "username": userdb.username,
+            "sub": userdb.phone_number
+        })
+
+    return JSONResponse(
+        status_code=200,
+        content={"access_token": access_token, "token_type": "bearer"}
+    )
+
+
+@public.post(
+    "/token",
+    include_in_schema=False
+)
+async def login(
+    db: Annotated[AsyncSession, Depends(get_db)],
+    form: Annotated[OAuth2PasswordRequestForm, Depends(OAuth2PasswordRequestForm)],
+):
+    if not form.username and not form.password:
+        return JSONResponse(
+            status_code=400,
+            content={"message": "Phone number or username is required"}
+        )
+
+    userdb = await db.execute(
+        select(User)
+        .filter(or_(
+            User.phone_number == form.username,
+            User.username == form.username
+        ))
+    )
+    userdb = userdb.scalar()
+
+    if not verify_password(
+        form.password,
         userdb.password
     ):
         return JSONResponse(

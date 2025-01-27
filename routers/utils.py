@@ -9,7 +9,7 @@ from models.other import Game, GameInstance, GameStatus, GameType
 from utils.signature import decode_access_token
 
 
-oauth2_scheme = security.OAuth2PasswordBearer(tokenUrl="/v1/login")
+oauth2_scheme = security.OAuth2PasswordBearer(tokenUrl="/v1/token")
 
 
 async def get_user(
@@ -73,7 +73,7 @@ async def generate_game(db: AsyncSession, _type: GameType = GameType.GLOBAL):
             name=f"game #{str(uuid.uuid4())}",
             game_type=_type,
             description="Default game",
-            as_default=True
+            as_default=True,
         )
 
         db.add(game)
