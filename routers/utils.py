@@ -1,3 +1,4 @@
+from itertools import islice
 import uuid
 from fastapi import Depends, HTTPException, status, security
 from sqlalchemy import select, and_
@@ -88,3 +89,8 @@ async def generate_game(db: AsyncSession, _type: GameType = GameType.GLOBAL):
     await db.refresh(game_inst)
 
     return game_inst, game
+
+
+def nth(iterable, n, default=None):
+    "Returns the nth item or a default value."
+    return next(islice(iterable, n, None), default)

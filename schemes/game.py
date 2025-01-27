@@ -1,8 +1,14 @@
 from typing import Annotated, Optional
 from pydantic import BaseModel, Field, AfterValidator
+from enum import Enum
 
 
 CommaList = Annotated[str, AfterValidator(lambda x: set(x.split(",")))]
+
+
+class TicketMode(str, Enum):
+    AUTO = "auto"
+    MANUAL = "manual"
 
 
 class Game(BaseModel):
@@ -30,6 +36,23 @@ class Games(BaseModel):
 class BuyTicket(BaseModel):
     numbers: list[set[int]]
     demo: bool = False
+
+
+class EditTicket(BaseModel):
+    numbers: list[set[int]]
+    edited_numbers: set[int]
+
+
+class GenTicket:
+    def __init__(
+        self,
+        mode: TicketMode = TicketMode.AUTO,
+        quantity: int = 1,
+        numbers: Optional[list[set[int]]] = None
+    ):
+        self.mode = mode
+        self.quantity = quantity
+        self.numbers = numbers
 
 
 class Ticket(BaseModel):

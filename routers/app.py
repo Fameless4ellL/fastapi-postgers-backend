@@ -1,3 +1,5 @@
+import datetime
+import random
 from typing import Annotated
 from fastapi import Depends, Path, status
 from fastapi.responses import JSONResponse
@@ -6,22 +8,25 @@ from models.db import get_db
 from models.user import Balance, BalanceChangeHistory, User
 from models.other import Game, GameInstance, GameStatus, GameType, Ticket
 from routers import public
-from routers.utils import generate_game, get_user
+from routers.utils import generate_game, get_user, nth
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import joinedload
 from schemes.base import BadResponse
 from schemes.game import (
     BuyTicket,
+    EditTicket,
     Games,
     GameInstance as GameInstanceModel,
-    Tickets
+    Tickets,
+    GenTicket,
+    TicketMode
 )
 from schemes.tg import WidgetLogin
 from utils.signature import TgAuth
 from settings import settings
 
 
-@public.post("/tg/login")
+@public.post("/tg/login", deprecated=True)
 async def tg_login(item: WidgetLogin):
     """
         Для логина в telegram mini app через seamless auth
@@ -42,7 +47,7 @@ async def balance(
     db: Annotated[AsyncSession, Depends(get_db)]
 ):
     """
-    Получение баланса пользователя
+    Получение информации о пользователе
     """
     balance_result = await db.execute(
         select(Balance)
@@ -55,17 +60,20 @@ async def balance(
         await db.commit()
 
     total_balance = balance.balance
-
     return JSONResponse(
         status_code=status.HTTP_200_OK,
-        content={"balance": total_balance}
+        content={
+            "balance": total_balance,
+            "locale": user.language_code or "EN"
+        }
     )
 
 
 @public.post("/deposit")
 async def deposit(
     user: Annotated[User, Depends(get_user)],
-    db: Annotated[AsyncSession, Depends(get_db)]
+    db: Annotated[AsyncSession, Depends(get_db)],
+    amount: float
 ):
     # TODO TEMP
     balance_result = await db.execute(
@@ -79,14 +87,33 @@ async def deposit(
         db.add(balance)
         await db.commit()
     else:
-        balance.balance += 100
+        balance.balance += amount
         await db.commit()
 
     return JSONResponse(status_code=status.HTTP_200_OK, content="OK")
 
 
 @public.post("/withdraw")
-async def withdraw(user: User = Depends(get_user)):
+async def withdraw(
+    user: Annotated[User, Depends(get_user)],
+    db: Annotated[AsyncSession, Depends(get_db)],
+    amount: float
+):
+    # TODO TEMP
+    balance_result = await db.execute(
+        select(Balance)
+        .with_for_update()
+        .filter(Balance.user_id == user.id)
+    )
+    balance = balance_result.scalar()
+    if not balance:
+        balance = Balance(user_id=user.id)
+        db.add(balance)
+        await db.commit()
+    else:
+        balance.balance -= amount
+        await db.commit()
+
     return JSONResponse(status_code=status.HTTP_200_OK, content="OK")
 
 
@@ -205,7 +232,7 @@ async def buy_tickets(
     db: Annotated[AsyncSession, Depends(get_db)],
 ):
     """
-        Для покупки билетов
+    Для покупки билетов frame:20
     """
     game_inst = await db.execute(
         select(GameInstance)
@@ -309,6 +336,160 @@ async def buy_tickets(
     return JSONResponse(
         status_code=status.HTTP_201_CREATED,
         content="OK"
+    )
+
+
+@public.get(
+    "/game/{game_id}/tickets",
+    responses={400: {"model": BadResponse}, 200: {"model": Tickets}}
+)
+async def gen_tickets(
+    game_id: Annotated[int, Path()],
+    item: Annotated[GenTicket, Depends(GenTicket)],
+    user: Annotated[User, Depends(get_user)],
+    db: Annotated[AsyncSession, Depends(get_db)],
+):
+    """
+    generate tickets
+    """
+    game_inst = await db.execute(
+        select(GameInstance)
+        .filter(GameInstance.id == game_id)
+        .add_columns(GameInstance.status, GameInstance.game_id)
+    )
+    game_inst = game_inst.scalar()
+    if game_inst is None or game_inst.status != GameStatus.PENDING:
+        return JSONResponse(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            content=BadResponse(message="Game not found").model_dump()
+        )
+
+    game = await db.get(Game, game_inst.game_id)
+    if game is None:
+        return JSONResponse(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            content=BadResponse(message="Game not found").model_dump()
+        )
+
+    tickets = []
+
+    if item.mode == TicketMode.AUTO:
+        count = 1
+        while len(tickets) < item.quantity:
+            numbers = random.sample(range(1, game.max_limit_grid + 1), game.limit_by_ticket)
+
+            if len(set(numbers)) != game.limit_by_ticket:
+                continue
+
+            tickets.append(
+                dict(
+                    id=count,
+                    user_id=user.id,
+                    game_instance_id=game_id,
+                    won=False,
+                    numbers=numbers,
+                    demo=False,
+                    created=datetime.datetime.utcnow().timestamp()
+                )
+            )
+            count += 1
+
+    if item.mode == TicketMode.MANUAL:
+        if any(len(n) != game.limit_by_ticket for n in item.numbers):
+            return JSONResponse(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                content=BadResponse(
+                    message=f"Invalid ticket numbers, need {game.limit_by_ticket} per ticket"
+                ).model_dump()
+            )
+
+        if game.min_ticket_count < len(item.numbers):
+            return JSONResponse(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                content=BadResponse(
+                    message=f"Not enough tickets to participate, need {game.min_ticket_count}"
+                ).model_dump()
+            )
+
+        tickets = [
+            dict(
+                id=i,
+                user_id=user.id,
+                game_instance_id=game_id,
+                numbers=numbers,
+                demo=False,
+                won=False,
+                created=datetime.datetime.utcnow().timestamp()
+            ) for i, numbers in enumerate(item.numbers)
+        ]
+
+    return JSONResponse(
+        status_code=status.HTTP_200_OK,
+        content=Tickets(tickets=tickets, count=item.quantity).model_dump()
+    )
+
+
+@public.patch(
+    "/game/{game_id}/tickets/{ticket_id}",
+    responses={400: {"model": BadResponse}, 200: {"model": Tickets}}
+)
+async def edit_ticket(
+    ticket_id: Annotated[int, Path()],
+    game_id: Annotated[int, Path()],
+    item: EditTicket,
+    user: Annotated[User, Depends(get_user)],
+    db: Annotated[AsyncSession, Depends(get_db)],
+):
+    game_inst = await db.execute(
+        select(GameInstance)
+        .filter(GameInstance.id == game_id)
+        .add_columns(GameInstance.status, GameInstance.game_id)
+    )
+    game_inst = game_inst.scalar()
+    if game_inst is None or game_inst.status != GameStatus.PENDING:
+        return JSONResponse(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            content=BadResponse(message="Game not found").model_dump()
+        )
+
+    game = await db.get(Game, game_inst.game_id)
+    if game is None:
+        return JSONResponse(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            content=BadResponse(message="Game not found").model_dump()
+        )
+
+    if len(item.edited_numbers) != game.limit_by_ticket:
+        return JSONResponse(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            content=BadResponse(
+                message=f"Invalid ticket numbers, need {game.limit_by_ticket} per ticket"
+            ).model_dump()
+        )
+
+    ticket = nth(item.numbers, ticket_id - 1, None)
+    if not ticket:
+        return JSONResponse(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            content=BadResponse(message="Ticket not found").model_dump()
+        )
+
+    item.numbers[ticket_id - 1] = item.edited_numbers
+    tickets = [
+        dict(
+            id=i,
+            user_id=user.id,
+            game_instance_id=game_id,
+            numbers=numbers,
+            demo=False,
+            won=False,
+            created=datetime.datetime.utcnow().timestamp()
+        ) for i, numbers in enumerate(item.numbers)
+    ]
+
+    return JSONResponse(
+        status_code=status.HTTP_200_OK,
+        content=Tickets(tickets=tickets, count=len(item.numbers)).model_dump()
     )
 
 
