@@ -85,7 +85,7 @@ def proceed_game():
             ]
             if sub_winners:
                 winners.append(sub_winners)
-        
+
         for _tickets in winners:
             # Если комбинация совпала на нескольких билетах,
             # то все билеты исключаются, а приз делится пропорционально.
