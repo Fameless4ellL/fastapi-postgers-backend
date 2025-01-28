@@ -39,4 +39,5 @@ from .app import *  # noqa
 from .tg import *  # noqa
 from .admin import *  # noqa
 from .auth import *  # noqa
-from .cron import *
+from .cron import *  # noqa
+from .user import *  # noqa
