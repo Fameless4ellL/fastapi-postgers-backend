@@ -57,7 +57,7 @@ def process(max_workers: int):
 
                 task_obj = marshal.loads(task)
 
-                if task_obj["func_name"] not in worker:
+                if task_obj["func"] not in worker:
                     raise TypeError(
                         f"Task `{task_obj['func']}` not in whitelist"
                     )

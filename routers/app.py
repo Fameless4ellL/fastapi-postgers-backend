@@ -189,7 +189,7 @@ async def buy_tickets(
             ).model_dump()
         )
 
-    if game.min_ticket_count < len(item.numbers):
+    if game.min_ticket_count > len(item.numbers):
         return JSONResponse(
             status_code=status.HTTP_400_BAD_REQUEST,
             content=BadResponse(
@@ -268,7 +268,7 @@ async def buy_tickets(
     )
 
 
-@public.get(
+@public.put(
     "/game/{game_id}/tickets", tags=["game"],
     responses={400: {"model": BadResponse}, 200: {"model": Tickets}}
 )

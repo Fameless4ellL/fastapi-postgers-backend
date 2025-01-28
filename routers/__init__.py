@@ -29,7 +29,7 @@ dp.update.outer_middleware(DBSessionMiddleware())
 public = APIRouter(prefix="/v1", tags=["v1"], lifespan=lifespan_tg)
 _cron = APIRouter(
     prefix="/v1",
-    include_in_schema=False,
+    include_in_schema=True,
     dependencies=[Depends(cron_key)]
 )
 admin = APIRouter(prefix="/v1/admin", tags=["admin"])

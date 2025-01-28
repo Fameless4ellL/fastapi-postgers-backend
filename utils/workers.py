@@ -1,11 +1,8 @@
 import random
 import uuid
-from sqlalchemy import select
 from models.db import get_sync_db
 from models.other import Game, GameInstance, GameStatus, GameType, Ticket
 from utils import worker
-from sqlalchemy import select
-from models.other import Game, GameInstance, GameStatus
 from models.user import Balance, BalanceChangeHistory
 
 
@@ -15,10 +12,7 @@ def generate_game():
     creating a new game instance based on Game
     """
     db = get_sync_db()
-    game = db.execute(
-        select(Game).filter(Game.as_default is True)
-    )
-    game = game.scalars().first()
+    game = db.query(Game).filter(Game.as_default is True).first()
 
     if not game:
         game = Game(
@@ -50,83 +44,80 @@ def proceed_game():
     """
     db = get_sync_db()
 
-    with db.begin():
-        # Find all PENDING GameInstance records and lock them for update
-        pending_games = db.execute(
-            select(GameInstance)
-            .with_for_update()
-            .filter(GameInstance.status == GameStatus.PENDING)
-        ).scalars().all()
+    # Find all PENDING GameInstance records and lock them for update
+    pending_games = db.query(GameInstance).filter(
+        GameInstance.status == GameStatus.PENDING
+    ).with_for_update().all()
 
-        for game_inst in pending_games:
-            game = db.execute(
-                select(Game).filter(Game.id == game_inst.game_id)
-            ).scalars().first()
+    for game_inst in pending_games:
+        game_inst.status = GameStatus.COMPLETED
+        db.add(game_inst)
 
-            if not game:
-                continue
+        game = db.query(Game).filter(Game.id == game_inst.game_id).first()
 
-            tickets = db.execute(
-                select(Ticket).filter(Ticket.game_instance_id == game_inst.id)
-            ).scalars().all()
+        if not game:
+            continue
 
-            # Разыграно будет 80%
-            total_prize_pool = 0.8 * len(tickets) * float(game.price)
-            prize_per_winner = total_prize_pool // game.max_win_amount
+        tickets = db.query(Ticket).filter(
+            Ticket.game_instance_id == game_inst.id
+        ).all()
 
-            winners = []
-            while len(winners) == prize_per_winner:
-                # генератор случ. числел
-                winning_numbers = random.sample(
-                    [ticket.numbers for ticket in tickets],
-                    1
-                )[0]
-                # проверка на наличие победителей
-                sub_winners = [
-                    ticket
-                    for ticket in tickets
-                    if set(ticket.numbers).issubset(set(winning_numbers))
-                ]
-                if sub_winners:
-                    winners.append(sub_winners)
+        # Разыграно будет 80%
+        total_prize_pool = 0.8 * len(tickets) * float(game.price)
+        prize_per_winner = total_prize_pool // float(game.max_win_amount or 8)
 
-            for _tickets in winners:
-                # Если комбинация совпала на нескольких билетах,
-                # то все билеты исключаются, а приз делится пропорционально.
-                prize_per_ticket = prize_per_winner / len(_tickets)
-                for ticket in _tickets:
-                    ticket = db.execute(
-                        select(Ticket)
-                        .with_for_update()
-                        .filter(Ticket.id == ticket.id)
-                    ).scalars().first()
-                    ticket.won = True
-                    ticket.amount = prize_per_ticket
+        winners = []
+        _tickets = [ticket.numbers for ticket in tickets]
 
-                    user_balance = db.execute(
-                        select(Balance)
-                        .with_for_update()
-                        .filter(Balance.user_id == ticket.user_id)
-                    ).scalars().first()
+        while len(winners) != prize_per_winner:
+            if not _tickets:
+                break
+            # генератор случ. числел
+            winning_numbers = random.sample(
+                _tickets,
+                1
+            )[0]
+            # проверка на наличие победителей
+            sub_winners = [
+                ticket
+                for ticket in tickets
+                if set(ticket.numbers).issubset(set(winning_numbers))
+            ]
+            if sub_winners:
+                winners.append(sub_winners)
+        
+        for _tickets in winners:
+            # Если комбинация совпала на нескольких билетах,
+            # то все билеты исключаются, а приз делится пропорционально.
+            prize_per_ticket = prize_per_winner / len(_tickets)
+            for ticket in _tickets:
+                ticket = db.query(Ticket).with_for_update().filter(
+                    Ticket.id == ticket.id
+                ).first()
+                ticket.won = True
+                ticket.amount = prize_per_ticket
+                db.add(ticket)
 
-                    if not user_balance:
-                        continue
+                user_balance = db.query(Balance).with_for_update().filter(
+                    Balance.user_id == ticket.user_id
+                ).first()
 
-                    previous_balance = user_balance.balance
-                    user_balance.balance += prize_per_ticket
+                if not user_balance:
+                    continue
 
-                    balance_change = BalanceChangeHistory(
-                        user_id=ticket.user_id,
-                        balance_id=user_balance.id,
-                        change_amount=prize_per_ticket,
-                        change_type="win",
-                        previous_balance=previous_balance,
-                        new_balance=user_balance.balance
-                    )
+                previous_balance = user_balance.balance
+                user_balance.balance += prize_per_ticket
+                db.add(user_balance)
 
-                    db.add(balance_change)
-
-            game_inst.status = GameStatus.COMPLETED
+                balance_change = BalanceChangeHistory(
+                    user_id=ticket.user_id,
+                    balance_id=user_balance.id,
+                    change_amount=prize_per_ticket,
+                    change_type="win",
+                    previous_balance=previous_balance,
+                    new_balance=user_balance.balance
+                )
+                db.add(balance_change)
     db.commit()
     generate_game()
 
