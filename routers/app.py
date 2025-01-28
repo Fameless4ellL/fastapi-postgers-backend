@@ -46,7 +46,6 @@ async def tg_login(item: WidgetLogin):
     responses={404: {"model": BadResponse}, 200: {"model": Games}}
 )
 async def game_instances(
-    request: Request,
     db: Annotated[AsyncSession, Depends(get_db)],
     _type: GameType = GameType.GLOBAL,
     offset: int = 0,
@@ -106,12 +105,53 @@ async def game_instances(
 
 
 @public.get(
+    "/game/{game_id}/calc",
+    tags=["game"],
+    responses={404: {"model": BadResponse}, 200: {"description": "OK"}}
+)
+async def calc_balance(
+    game_id: Annotated[int, Path()],
+    user: Annotated[User, Depends(get_user)],
+    db: Annotated[AsyncSession, Depends(get_db)],
+    quantity: int = 1
+):
+    balance_result = await db.execute(
+        select(Balance)
+        .filter(Balance.user_id == user.id)
+    )
+    balance = balance_result.scalar()
+    if not balance:
+        balance = Balance(user_id=user.id)
+        db.add(balance)
+        await db.commit()
+
+    result = await db.execute(
+        select(GameInstance)
+        .options(joinedload(GameInstance.game).load_only(Game.price))
+        .filter(GameInstance.id == game_id)
+    )
+    game = result.scalars().first()
+
+    if game is None:
+        return JSONResponse(
+            status_code=status.HTTP_404_NOT_FOUND,
+            content=BadResponse(message="Game not found").model_dump()
+        )
+
+    total_balance = balance.balance - (game.game.price * quantity)
+
+    return JSONResponse(
+        status_code=status.HTTP_200_OK if total_balance >= 0 else status.HTTP_400_BAD_REQUEST,
+        content="OK" if total_balance >= 0 else "Insufficient balance"
+    )
+
+
+@public.get(
     "/game/{game_id}", tags=["game"],
     responses={404: {"model": BadResponse}, 200: {"model": GameInstanceModel}}
 )
 async def read_game(
-    request: Request,
-    game_id: int,
+    game_id: Annotated[int, Path()],
     db: Annotated[AsyncSession, Depends(get_db)]
 ):
     """

@@ -14,7 +14,7 @@ from schemes.game import (
 )
 
 
-@public.get("/balance", tags=["user"])
+@public.get("/profile", tags=["user"])
 async def balance(
     user: Annotated[User, Depends(get_user)],
     db: Annotated[AsyncSession, Depends(get_db)]
