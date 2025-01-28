@@ -8,7 +8,7 @@ from models.db import get_db
 from models.user import Balance, BalanceChangeHistory, User
 from models.other import Game, GameInstance, GameStatus, GameType, Ticket
 from routers import public
-from routers.utils import generate_game, get_user, nth
+from routers.utils import generate_game, get_user, nth, url_for
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import joinedload
 from schemes.base import BadResponse
@@ -41,84 +41,8 @@ async def tg_login(item: WidgetLogin):
     return JSONResponse(status_code=status.HTTP_200_OK, content="OK")
 
 
-@public.get("/balance")
-async def balance(
-    user: Annotated[User, Depends(get_user)],
-    db: Annotated[AsyncSession, Depends(get_db)]
-):
-    """
-    Получение информации о пользователе
-    """
-    balance_result = await db.execute(
-        select(Balance)
-        .filter(Balance.user_id == user.id)
-    )
-    balance = balance_result.scalar()
-    if not balance:
-        balance = Balance(user_id=user.id)
-        db.add(balance)
-        await db.commit()
-
-    total_balance = balance.balance
-    return JSONResponse(
-        status_code=status.HTTP_200_OK,
-        content={
-            "balance": total_balance,
-            "locale": user.language_code or "EN"
-        }
-    )
-
-
-@public.post("/deposit")
-async def deposit(
-    user: Annotated[User, Depends(get_user)],
-    db: Annotated[AsyncSession, Depends(get_db)],
-    amount: float
-):
-    # TODO TEMP
-    balance_result = await db.execute(
-        select(Balance)
-        .with_for_update()
-        .filter(Balance.user_id == user.id)
-    )
-    balance = balance_result.scalar()
-    if not balance:
-        balance = Balance(user_id=user.id)
-        db.add(balance)
-        await db.commit()
-    else:
-        balance.balance += amount
-        await db.commit()
-
-    return JSONResponse(status_code=status.HTTP_200_OK, content="OK")
-
-
-@public.post("/withdraw")
-async def withdraw(
-    user: Annotated[User, Depends(get_user)],
-    db: Annotated[AsyncSession, Depends(get_db)],
-    amount: float
-):
-    # TODO TEMP
-    balance_result = await db.execute(
-        select(Balance)
-        .with_for_update()
-        .filter(Balance.user_id == user.id)
-    )
-    balance = balance_result.scalar()
-    if not balance:
-        balance = Balance(user_id=user.id)
-        db.add(balance)
-        await db.commit()
-    else:
-        balance.balance -= amount
-        await db.commit()
-
-    return JSONResponse(status_code=status.HTTP_200_OK, content="OK")
-
-
 @public.get(
-    "/games",
+    "/games", tags=["game"],
     responses={404: {"model": BadResponse}, 200: {"model": Games}}
 )
 async def game_instances(
@@ -156,7 +80,7 @@ async def game_instances(
         data = [{
             "id": game_inst.id,
             "name": _game.name,
-            "image": str(request.url_for("static", path=str(game_inst.image))),
+            "image": url_for("static", path=game_inst.image),
             "status": game_inst.status.value,
             "created": game_inst.created_at.timestamp()
         }]
@@ -164,7 +88,7 @@ async def game_instances(
         data = [{
             "id": g.id,
             "name": g.game.name,
-            "image": str(request.url_for("static", path=str(g.image))),
+            "image": url_for("static", path=g.image),
             "status": g.status.value,
             "created": g.created_at.timestamp()
         } for g in game]
@@ -182,10 +106,11 @@ async def game_instances(
 
 
 @public.get(
-    "/game/{game_id}",
+    "/game/{game_id}", tags=["game"],
     responses={404: {"model": BadResponse}, 200: {"model": GameInstanceModel}}
 )
 async def read_game(
+    request: Request,
     game_id: int,
     db: Annotated[AsyncSession, Depends(get_db)]
 ):
@@ -210,6 +135,7 @@ async def read_game(
         "name": game.game.name,
         "description": game.game.description,
         "status": game.status.value,
+        "image": url_for("static", path=game.image),
         "game_type": game.game.game_type.value,
         "limit_by_ticket": game.game.limit_by_ticket,
         "min_ticket_count": game.game.min_ticket_count,
@@ -225,7 +151,7 @@ async def read_game(
 
 
 @public.post(
-    "/game/{game_id}/tickets",
+    "/game/{game_id}/tickets", tags=["game"],
     responses={400: {"model": BadResponse}, 201: {"description": "OK"}}
 )
 async def buy_tickets(
@@ -343,7 +269,7 @@ async def buy_tickets(
 
 
 @public.get(
-    "/game/{game_id}/tickets",
+    "/game/{game_id}/tickets", tags=["game"],
     responses={400: {"model": BadResponse}, 200: {"model": Tickets}}
 )
 async def gen_tickets(
@@ -433,7 +359,7 @@ async def gen_tickets(
 
 
 @public.patch(
-    "/game/{game_id}/tickets/{ticket_id}",
+    "/game/{game_id}/tickets/{ticket_id}", tags=["game"],
     responses={400: {"model": BadResponse}, 200: {"model": Tickets}}
 )
 async def edit_ticket(
@@ -497,49 +423,7 @@ async def edit_ticket(
 
 
 @public.get(
-    "/tickets",
-    responses={400: {"model": BadResponse}, 200: {"model": Tickets}}
-)
-async def get_tickets(
-    db: Annotated[AsyncSession, Depends(get_db)],
-    user: Annotated[User, Depends(get_user)],
-    skip: int = 0,
-    limit: int = 10,
-):
-    """
-    Получение билетов пользователя
-    """
-    tickets = await db.execute(
-        select(Ticket)
-        .filter(Ticket.user_id == user.id)
-        .offset(skip).limit(limit)
-    )
-    tickets = tickets.scalars().all()
-
-    data = [{
-        "id": t.id,
-        "game_instance_id": t.game_instance_id,
-        "numbers": t.numbers,
-        "demo": t.demo,
-        "won": t.won,
-        "amount": float(t.amount),
-        "created": t.created_at.timestamp()
-    } for t in tickets]
-
-    count_result = await db.execute(
-        select(func.count(Ticket.id))
-        .filter(Ticket.user_id == user.id)
-    )
-    count = count_result.scalar()
-
-    return JSONResponse(
-        status_code=status.HTTP_200_OK,
-        content=Tickets(tickets=data, count=count).model_dump()
-    )
-
-
-@public.get(
-    "/game/{game_id}/leaderboard",
+    "/game/{game_id}/leaderboard", tags=["game"],
     responses={400: {"model": BadResponse}, 200: {"model": Tickets}}
 )
 async def get_leaderboard(

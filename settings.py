@@ -18,6 +18,7 @@ class Settings(BaseSettings):
     jwt_secret: str = "thisisatest"
     """Cron key for cron jobs"""
     cron_key: str = "thisisatest"
+    back_url: str = "http://localhost:8100"
 
 
 settings = Settings()

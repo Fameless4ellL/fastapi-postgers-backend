@@ -1,4 +1,5 @@
 from itertools import islice
+from typing import Any
 import uuid
 from fastapi import Depends, HTTPException, status, security
 from sqlalchemy import select, and_
@@ -7,6 +8,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from models.user import User
 from models.other import Game, GameInstance, GameStatus, GameType
 from utils.signature import decode_access_token
+from settings import settings
 
 
 oauth2_scheme = security.OAuth2PasswordBearer(tokenUrl="/v1/token")
@@ -94,3 +96,12 @@ async def generate_game(db: AsyncSession, _type: GameType = GameType.GLOBAL):
 def nth(iterable, n, default=None):
     "Returns the nth item or a default value."
     return next(islice(iterable, n, None), default)
+
+
+def url_for(name: str, **path_params: Any) -> str:
+    """
+    Generate a URL for the given endpoint name and path parameters.
+    """
+    return f"{settings.back_url}/{name}/" + "/".join(
+        str(value) for value in path_params.values()
+    )
