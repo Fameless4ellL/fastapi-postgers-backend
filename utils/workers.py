@@ -15,7 +15,7 @@ def generate_game(
     """
     creating a new game instance based on Game
     """
-    db = get_sync_db()
+    db = next(get_sync_db())
     game = db.query(Game).filter(
         Game.repeat.is_(True),
         Game.id == game_id
@@ -67,7 +67,7 @@ def proceed_game(game_id: Optional[int] = None):
     """
     Proceed the game instance and distribute the prize money
     """
-    db = get_sync_db()
+    db = next(get_sync_db())
 
     if game_id:
         pending_games = db.query(GameInstance).filter(

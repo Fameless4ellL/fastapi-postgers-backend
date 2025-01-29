@@ -13,3 +13,7 @@ class UserCreate(BaseModel):
     phone_number: PhoneNumber
     code: str = Field(..., min_length=6, max_length=6, description="SMS code")
     password: SecretStr
+
+
+class SendCode(BaseModel):
+    phone_number: PhoneNumber

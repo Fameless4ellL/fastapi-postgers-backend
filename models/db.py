@@ -34,7 +34,8 @@ async def get_db():
 
 def get_sync_db():
     session = sessionmaker(bind=sync_engine)
-    return session()
+    with session() as session:
+        yield session
 
 
 class DBSessionMiddleware(BaseMiddleware):
