@@ -2,6 +2,7 @@ from itertools import islice
 from typing import Any
 import uuid
 from fastapi import Depends, HTTPException, status, security
+from datetime import datetime, timedelta
 from sqlalchemy import select, and_
 from models.db import get_db
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -9,6 +10,8 @@ from models.user import User
 from models.other import Game, GameInstance, GameStatus, GameType
 from utils.signature import decode_access_token
 from settings import settings
+from globals import scheduler
+from worker.worker import add_to_queue
 
 
 oauth2_scheme = security.OAuth2PasswordBearer(tokenUrl="/v1/token")
@@ -75,7 +78,9 @@ async def generate_game(db: AsyncSession, _type: GameType = GameType.GLOBAL):
             name=f"game #{str(uuid.uuid4())}",
             game_type=_type,
             description="Default game",
-            as_default=True,
+            repeat=True,
+            repeat_days=[0, 1, 2, 3, 4, 5, 6],
+            scheduled_datetime=datetime.now() + timedelta(days=1)
         )
 
         db.add(game)
@@ -85,10 +90,18 @@ async def generate_game(db: AsyncSession, _type: GameType = GameType.GLOBAL):
     game_inst = GameInstance(
         game_id=game.id,
         status=GameStatus.PENDING,
+        scheduled_datetime=game.scheduled_datetime
     )
     db.add(game_inst)
     await db.commit()
     await db.refresh(game_inst)
+
+    scheduler.add_job(
+        add_to_queue,
+        "date",
+        args=["proceed_game", game.id],
+        run_date=game.scheduled_datetime
+    )
 
     return game_inst, game
 

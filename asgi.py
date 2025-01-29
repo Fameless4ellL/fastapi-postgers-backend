@@ -1,10 +1,21 @@
 from fastapi import FastAPI
+from contextlib import asynccontextmanager
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
 from routers import public, admin, _cron
+from globals import scheduler
 
 
-fastapp = FastAPI()
+@asynccontextmanager
+async def lifespan(*args, **kwargs):
+    try:
+        scheduler.start()
+        yield
+    finally:
+        scheduler.shutdown()
+
+
+fastapp = FastAPI(lifespan=lifespan)
 
 fastapp.include_router(public)
 fastapp.include_router(admin)

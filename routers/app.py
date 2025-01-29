@@ -1,7 +1,7 @@
 import datetime
 import random
 from typing import Annotated
-from fastapi import Depends, Path, Request, status
+from fastapi import Depends, Path, status
 from fastapi.responses import JSONResponse
 from sqlalchemy import func, select, exists
 from models.db import get_db
@@ -64,7 +64,8 @@ async def game_instances(
         .add_columns(
             GameInstance.created_at,
             GameInstance.id,
-            GameInstance.status
+            GameInstance.status,
+            GameInstance.scheduled_datetime
         )
         .offset(offset).limit(limit)
     )
@@ -81,6 +82,7 @@ async def game_instances(
             "name": _game.name,
             "image": url_for("static", path=game_inst.image),
             "status": game_inst.status.value,
+            "endtime": game_inst.scheduled_datetime.timestamp(),
             "created": game_inst.created_at.timestamp()
         }]
     else:
@@ -89,6 +91,7 @@ async def game_instances(
             "name": g.game.name,
             "image": url_for("static", path=g.image),
             "status": g.status.value,
+            "endtime": g.scheduled_datetime.timestamp(),
             "created": g.created_at.timestamp()
         } for g in game]
 
@@ -181,6 +184,7 @@ async def read_game(
         "min_ticket_count": game.game.min_ticket_count,
         "max_limit_grid": game.game.max_limit_grid,
         "price": float(game.game.price),
+        "endtime": g.scheduled_datetime.timestamp(),
         "created": game.created_at.timestamp()
     }
 

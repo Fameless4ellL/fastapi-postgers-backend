@@ -1,58 +1,85 @@
 import random
-import uuid
+from typing import Optional
+from datetime import datetime, timedelta
 from models.db import get_sync_db
-from models.other import Game, GameInstance, GameStatus, GameType, Ticket
+from models.other import Game, GameInstance, GameStatus, Ticket
 from utils import worker
+from worker.worker import add_to_queue
 from models.user import Balance, BalanceChangeHistory
+from globals import scheduler
 
 
 @worker.register
-def generate_game():
+def generate_game(
+    game_id: int,
+) -> bool:
     """
     creating a new game instance based on Game
     """
     db = get_sync_db()
-    game = db.query(Game).filter(Game.as_default is True).first()
+    game = db.query(Game).filter(
+        Game.repeat.is_(True),
+        Game.id == game_id
+    ).first()
 
     if not game:
-        game = Game(
-            name=f"game #{str(uuid.uuid4())}",
-            game_type=GameType.GLOBAL,
-            description="Default game",
-            as_default=True
-        )
+        return False
 
-        db.add(game)
-        db.commit()
-        db.refresh(game)
+    tz = timedelta(hours=game.zone)
+    now = datetime.now() + tz
+    next_day = now + timedelta(days=1)
+
+    while True:
+        next_day += timedelta(days=1)
+
+        if next_day.weekday() in game.repeat_days:
+            break
+
+        if next_day - now > timedelta(days=14):
+            return False
+
+    scheduled_datetime = next_day.replace(
+        hour=game.scheduled_datetime.hour,
+        minute=game.scheduled_datetime.minute,
+    )
 
     game_inst = GameInstance(
         game_id=game.id,
         status=GameStatus.PENDING,
+        scheduled_datetime=scheduled_datetime
     )
     db.add(game_inst)
     db.commit()
     db.refresh(game_inst)
 
+    scheduler.add_job(
+        add_to_queue,
+        "date",
+        args=["proceed_game", game_inst.id],
+        run_date=game.scheduled_datetime
+    )
+
     return True
 
 
 @worker.register
-def proceed_game():
+def proceed_game(game_id: Optional[int] = None):
     """
     Proceed the game instance and distribute the prize money
     """
     db = get_sync_db()
 
-    # Find all PENDING GameInstance records and lock them for update
-    pending_games = db.query(GameInstance).filter(
-        GameInstance.status == GameStatus.PENDING
-    ).with_for_update().all()
+    if game_id:
+        game_inst = db.query(GameInstance).filter(
+            GameInstance.status == GameStatus.PENDING,
+            GameInstance.id == game_id
+        ).with_for_update().all()
+    else:
+        pending_games = db.query(GameInstance).filter(
+            GameInstance.status == GameStatus.PENDING
+        ).with_for_update().all()
 
     for game_inst in pending_games:
-        game_inst.status = GameStatus.COMPLETED
-        db.add(game_inst)
-
         game = db.query(Game).filter(Game.id == game_inst.game_id).first()
 
         if not game:
@@ -118,7 +145,12 @@ def proceed_game():
                     new_balance=user_balance.balance
                 )
                 db.add(balance_change)
+        game_inst.status = GameStatus.COMPLETED
+        db.add(game_inst)
+
+        if game.repeat:
+            generate_game(game.id)
+
     db.commit()
-    generate_game()
 
     return True
