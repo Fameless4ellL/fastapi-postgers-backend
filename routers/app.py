@@ -97,7 +97,10 @@ async def game_instances(
 
     count_result = await db.execute(
         select(func.count(GameInstance.id))
-        .filter(GameInstance.status == GameStatus.PENDING)
+        .filter(
+            GameInstance.status == GameStatus.PENDING,
+            GameInstance.game.has(game_type=_type)
+        )
     )
     count = count_result.scalar()
 

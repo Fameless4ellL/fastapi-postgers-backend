@@ -4,7 +4,6 @@ from datetime import datetime, timedelta
 from models.db import get_sync_db
 from models.other import Game, GameInstance, GameStatus, Ticket
 from utils import worker
-from worker.worker import add_to_queue
 from models.user import Balance, BalanceChangeHistory
 from globals import scheduler
 
@@ -52,6 +51,7 @@ def generate_game(
     db.commit()
     db.refresh(game_inst)
 
+    from worker.worker import add_to_queue
     scheduler.add_job(
         add_to_queue,
         "date",
@@ -70,7 +70,7 @@ def proceed_game(game_id: Optional[int] = None):
     db = get_sync_db()
 
     if game_id:
-        game_inst = db.query(GameInstance).filter(
+        pending_games = db.query(GameInstance).filter(
             GameInstance.status == GameStatus.PENDING,
             GameInstance.id == game_id
         ).with_for_update().all()
