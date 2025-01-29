@@ -15,4 +15,5 @@ passlib[bcrypt]
 phonenumbers
 
 # test
+pytest
 httpx
