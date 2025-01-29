@@ -1,20 +1,20 @@
-pydantic
+pydantic==2.10.6
 fastapi[all]
-aiogram
-alembic
-sqlalchemy
-asyncpg
-uvicorn
-psycopg2
-redis
-apscheduler
+aiogram==3.17.0
+alembic==1.14.1
+sqlalchemy==2.0.37
+asyncpg==0.30.0
+uvicorn==0.34.0
+psycopg2==2.9.10
+redis==5.2.1
+apscheduler==3.11.0
 
 # utils
-pycryptodome
-python-jose
+pycryptodome==3.21.0
+python-jose==3.3.0
 passlib[bcrypt]
-phonenumbers
+phonenumbers==8.13.53
 
 # test
-pytest
-httpx
+pytest==8.3.4
+httpx==0.28.1
