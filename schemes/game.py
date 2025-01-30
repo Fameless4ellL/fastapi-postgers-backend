@@ -1,3 +1,4 @@
+from decimal import Decimal
 from typing import Annotated, Optional
 from pydantic import BaseModel, Field, AfterValidator
 from enum import Enum
@@ -27,6 +28,7 @@ class GameInstance(Game):
     min_ticket_count: int
     max_limit_grid: int
     price: float
+    prize: Optional[Decimal]
     min_ticket_count: int
 
 

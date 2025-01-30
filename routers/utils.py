@@ -69,7 +69,10 @@ async def generate_game(db: AsyncSession, _type: GameType = GameType.GLOBAL):
     creating a new game instance based on Game
     """
     game = await db.execute(
-        select(Game).filter(Game.as_default is True)
+        select(Game).filter(
+            Game.repeat.is_(True),
+            Game.game_type == _type
+        )
     )
     game = game.scalars().first()
 
