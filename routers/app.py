@@ -71,12 +71,19 @@ async def game_instances(
     )
     game = result.scalars().all()
 
-    _game = None
-    if not game:
+    data = [{
+        "id": g.id,
+        "name": g.game.name,
+        "image": url_for("static", path=g.image),
+        "status": g.status.value,
+        "endtime": g.scheduled_datetime.timestamp(),
+        "created": g.created_at.timestamp()
+    } for g in game]
+
+    if not data:
         # create a new game
         game_inst, _game = await generate_game(db, _type)
 
-    if _game:
         data = [{
             "id": game_inst.id,
             "name": _game.name,
@@ -85,15 +92,6 @@ async def game_instances(
             "endtime": game_inst.scheduled_datetime.timestamp(),
             "created": game_inst.created_at.timestamp()
         }]
-    else:
-        data = [{
-            "id": g.id,
-            "name": g.game.name,
-            "image": url_for("static", path=g.image),
-            "status": g.status.value,
-            "endtime": g.scheduled_datetime.timestamp(),
-            "created": g.created_at.timestamp()
-        } for g in game]
 
     count_result = await db.execute(
         select(func.count(GameInstance.id))
