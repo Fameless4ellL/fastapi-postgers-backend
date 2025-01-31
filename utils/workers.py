@@ -89,9 +89,7 @@ def proceed_game(game_id: Optional[int] = None):
             Ticket.game_instance_id == game_inst.id
         ).all()
 
-        # Разыграно будет 80%
-        total_prize_pool = 0.8 * len(tickets) * float(game.price)
-        prize_per_winner = total_prize_pool // float(game.max_win_amount or 8)
+        prize_per_winner = game.prize // float(game.max_win_amount or 8)
 
         winners = []
         _tickets = [ticket.numbers for ticket in tickets]
@@ -99,7 +97,7 @@ def proceed_game(game_id: Optional[int] = None):
         while len(winners) != prize_per_winner:
             if not _tickets:
                 break
-            # генератор случ. числел
+            # генератор случ. числел # TODO: добавить в RNG и использовать его
             winning_numbers = random.sample(
                 _tickets,
                 1
