@@ -80,7 +80,16 @@ async def game_instances(
         "created": g.created_at.timestamp()
     } for g in game]
 
-    if not data:
+    count_result = await db.execute(
+        select(func.count(GameInstance.id))
+        .filter(
+            GameInstance.status == GameStatus.PENDING,
+            GameInstance.game.has(game_type=_type)
+        )
+    )
+    count = count_result.scalar()
+
+    if not data and count == 0:
         # create a new game
         game_inst, _game = await generate_game(db, _type)
 
@@ -92,15 +101,6 @@ async def game_instances(
             "endtime": game_inst.scheduled_datetime.timestamp(),
             "created": game_inst.created_at.timestamp()
         }]
-
-    count_result = await db.execute(
-        select(func.count(GameInstance.id))
-        .filter(
-            GameInstance.status == GameStatus.PENDING,
-            GameInstance.game.has(game_type=_type)
-        )
-    )
-    count = count_result.scalar()
 
     return JSONResponse(
         status_code=status.HTTP_200_OK,
