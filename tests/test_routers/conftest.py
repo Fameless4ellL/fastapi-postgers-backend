@@ -2,7 +2,7 @@ from fastapi.testclient import TestClient
 import pytest
 from sqlalchemy.orm.session import Session
 from models.other import Game, GameType
-from models.user import User
+from models.user import User, Balance
 from globals import redis
 from utils.signature import get_password_hash
 
@@ -59,7 +59,6 @@ def token(
     yield response.json()["access_token"]
 
 
-
 @pytest.fixture
 def game(db: Session):
     game = Game(
@@ -74,5 +73,23 @@ def game(db: Session):
 
     db.query(Game).filter(
         Game.name == "Test Game"
+    ).delete()
+    db.commit()
+
+
+@pytest.fixture
+def balance(db: Session, user: User):
+
+    balance = Balance(
+        user_id=user.id,
+        balance=0
+    )
+    db.add(balance)
+    db.commit()
+
+    yield balance
+
+    db.query(Balance).filter(
+        Balance.user_id == user.id
     ).delete()
     db.commit()
