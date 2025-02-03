@@ -40,8 +40,8 @@ class Currency(Base):
     name = Column(String(64), nullable=False, doc="e.g., Tether, TON Crystal")
     conversion_rate = Column(DECIMAL(10, 2), nullable=False, default=1, doc="The conversion rate to the base currency")
 
-    created_at = Column(DateTime, default=datetime.datetime.utcnow)
-    updated_at = Column(DateTime, default=datetime.datetime.utcnow, onupdate=datetime.datetime.utcnow)
+    created_at = Column(DateTime, default=datetime.datetime.now)
+    updated_at = Column(DateTime, default=datetime.datetime.now, onupdate=datetime.datetime.now)
 
 
 class Game(Base):
@@ -102,4 +102,4 @@ class Ticket(Base):
     amount = Column(DECIMAL(9, 2), default=0)
     demo = Column(Boolean, default=False)
     created_at = Column(DateTime, default=datetime.datetime.now)
-    updated_at = Column(DateTime, default=datetime.datetime.now, onupdate=datetime.datetime.utcnow)
+    updated_at = Column(DateTime, default=datetime.datetime.now, onupdate=datetime.datetime.now)

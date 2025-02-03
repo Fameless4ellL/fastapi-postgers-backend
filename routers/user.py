@@ -10,7 +10,7 @@ from routers.utils import get_user
 from sqlalchemy.ext.asyncio import AsyncSession
 from schemes.base import BadResponse
 from schemes.game import (
-    Tickets,
+    Tickets, Deposit, Withdraw
 )
 
 
@@ -46,7 +46,7 @@ async def balance(
 async def deposit(
     user: Annotated[User, Depends(get_user)],
     db: Annotated[AsyncSession, Depends(get_db)],
-    amount: float
+    item: Deposit
 ):
     # TODO TEMP
     balance_result = await db.execute(
@@ -60,7 +60,7 @@ async def deposit(
         db.add(balance)
         await db.commit()
     else:
-        balance.balance += amount
+        balance.balance += item.amount
         await db.commit()
 
     return JSONResponse(status_code=status.HTTP_200_OK, content="OK")
@@ -70,7 +70,7 @@ async def deposit(
 async def withdraw(
     user: Annotated[User, Depends(get_user)],
     db: Annotated[AsyncSession, Depends(get_db)],
-    amount: float
+    item: Withdraw
 ):
     # TODO TEMP
     balance_result = await db.execute(
@@ -84,7 +84,7 @@ async def withdraw(
         db.add(balance)
         await db.commit()
     else:
-        balance.balance -= amount
+        balance.balance -= item.amount
         await db.commit()
 
     return JSONResponse(status_code=status.HTTP_200_OK, content="OK")

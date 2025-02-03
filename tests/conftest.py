@@ -7,7 +7,7 @@ from models.user import User
 from globals import redis
 
 
-@pytest.fixture(scope="class")
+@pytest.fixture(scope="session")
 def api():
     with TestClient(
         fastapp, base_url="http://api:8100",

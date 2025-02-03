@@ -72,3 +72,11 @@ class Ticket(BaseModel):
 class Tickets(BaseModel):
     tickets: list[Ticket] = Field(default=[])
     count: int = 0
+
+
+class Deposit(BaseModel):
+    amount: float = 0
+
+
+class Withdraw(Deposit):
+    pass

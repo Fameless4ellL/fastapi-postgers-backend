@@ -26,7 +26,6 @@ class TestAuth:
                 "code": "123456",
             }
         )
-        print(response.json())
         assert response.status_code == status.HTTP_200_OK
         assert "access_token" in response.json()
 
@@ -44,7 +43,6 @@ class TestAuth:
                 "code": "123456",
             }
         )
-        print(response.json())
         assert response.status_code == status.HTTP_200_OK
         assert "access_token" in response.json()
 
