@@ -1,11 +1,16 @@
+import json
+import requests
+import marshal
 import random
 from typing import Optional
 from datetime import datetime, timedelta
+
 from models.db import get_sync_db
 from models.other import Game, GameInstance, GameStatus, Ticket
 from utils import worker
 from models.user import Balance, BalanceChangeHistory
-from globals import scheduler
+from globals import redis
+from settings import settings
 
 
 @worker.register
@@ -26,7 +31,7 @@ def generate_game(
 
     tz = timedelta(hours=game.zone)
     now = datetime.now() + tz
-    next_day = now + timedelta(days=1)
+    next_day = now
 
     while True:
         next_day += timedelta(days=1)
@@ -51,12 +56,10 @@ def generate_game(
     db.commit()
     db.refresh(game_inst)
 
-    from worker.worker import add_to_queue
-    scheduler.add_job(
-        add_to_queue,
-        "date",
-        args=["proceed_game", game_inst.id],
-        run_date=game.scheduled_datetime
+    add_job_to_scheduler(
+        "add_to_queue",
+        ["proceed_game", game_inst.id],
+        scheduled_datetime
     )
 
     return True
@@ -89,7 +92,8 @@ def proceed_game(game_id: Optional[int] = None):
             Ticket.game_instance_id == game_inst.id
         ).all()
 
-        prize_per_winner = game.prize // float(game.max_win_amount or 8)
+        prize = game.prize or 1000
+        prize_per_winner = prize // float(game.max_win_amount or 8)
 
         winners = []
         _tickets = [ticket.numbers for ticket in tickets]
@@ -152,3 +156,38 @@ def proceed_game(game_id: Optional[int] = None):
     db.commit()
 
     return True
+
+
+@worker.register
+def add_to_queue(func_name: str, *args, **kwargs):
+    try:
+        func_params = {
+            "args": args,
+            "kwargs": kwargs
+        }
+        json_params = json.dumps(func_params)
+
+        value = marshal.dumps({
+            "func": func_name,
+            **json.loads(json_params)
+        })
+
+        return redis.lpush(worker.WORKER_TASK_KEY, value)
+
+    except Exception as error:
+        print('add_to_queue ERROR:', error)
+
+
+def add_job_to_scheduler(func_name, args, run_date):
+    payload = {
+        "func_name": func_name,
+        "args": args,
+        "run_date": run_date.strftime("%Y-%m-%d %H:%M:%S")
+    }
+    response = requests.post(
+        f"http://api:8000/v1/cron/add_job/?key={settings.cron_key}",
+        json=payload
+    )
+    print(response.text)
+    if response.status_code != 200:
+        raise Exception(f"Failed to add job: {response.text}")

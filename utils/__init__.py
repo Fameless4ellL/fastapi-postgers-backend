@@ -6,6 +6,7 @@ class FuncRegister:
     register functions for worker
     """
     __slots__ = ('__dict__',)
+    WORKER_TASK_KEY = "WORKER:tasks"
 
     @property
     def register(self):

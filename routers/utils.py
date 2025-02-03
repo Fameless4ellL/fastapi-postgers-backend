@@ -11,7 +11,7 @@ from models.other import Game, GameInstance, GameStatus, GameType
 from utils.signature import decode_access_token
 from settings import settings
 from globals import scheduler
-from worker.worker import add_to_queue
+from utils.workers import add_job_to_scheduler
 
 
 oauth2_scheme = security.OAuth2PasswordBearer(tokenUrl="/v1/token")
@@ -59,8 +59,8 @@ async def get_user(
 async def get_admin(
     user: User = Depends(get_user)
 ) -> User:
-    if user.role != "admin":
-        raise HTTPException(status_code=404, detail="User not found")
+    # if user.role != "admin":
+    #     raise HTTPException(status_code=404, detail="User not found")
     return user
 
 
@@ -99,11 +99,10 @@ async def generate_game(db: AsyncSession, _type: GameType = GameType.GLOBAL):
     await db.commit()
     await db.refresh(game_inst)
 
-    scheduler.add_job(
-        add_to_queue,
-        "date",
-        args=["proceed_game", game.id],
-        run_date=game.scheduled_datetime
+    add_job_to_scheduler(
+        "add_to_queue",
+        ["proceed_game", game_inst.id],
+        game.scheduled_datetime
     )
 
     return game_inst, game

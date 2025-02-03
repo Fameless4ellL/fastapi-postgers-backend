@@ -47,6 +47,7 @@ services:
     environment:
       - PYTHONPATH=/app
     depends_on:
+      - api
       - db
       - redis
     restart: on-failure
@@ -61,5 +62,13 @@ services:
         - 6379
     command: redis-server /usr/local/etc/redis/redis.conf
 
+  redis-commander:
+    image: rediscommander/redis-commander:latest
+    restart: always
+    environment:
+      - REDIS_HOSTS=local:redis:6379
+      - URL_PREFIX=/redis_admin
+
 volumes:
   postgresql-data:
+  redis-data:

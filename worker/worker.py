@@ -1,6 +1,5 @@
 import os
 import traceback
-import json
 import marshal
 import logging
 from concurrent.futures import ThreadPoolExecutor
@@ -15,28 +14,6 @@ logger = logging.getLogger(__name__)
 logger.setLevel(logging.INFO)
 
 
-WORKER_TASK_KEY = "WORKER:tasks"
-
-
-def add_to_queue(func_name: str, *args, **kwargs):
-    try:
-        func_params = {
-            "args": args,
-            "kwargs": kwargs
-        }
-        json_params = json.dumps(func_params)
-
-        value = marshal.dumps({
-            "func": func_name,
-            **json.loads(json_params)
-        })
-
-        return redis.lpush(WORKER_TASK_KEY, value)
-
-    except Exception as error:
-        print('add_to_queue ERROR:', error)
-
-
 def process(max_workers: int):
     start_time = datetime.now()
     logger.info(f"Worker started at {start_time}")
@@ -46,7 +23,7 @@ def process(max_workers: int):
             try:
 
                 task = redis.brpop(
-                    WORKER_TASK_KEY,
+                    worker.WORKER_TASK_KEY,
                     timeout=60
                 )
 

@@ -60,7 +60,7 @@ class Game(Base):
     min_ticket_count = Column(Integer, default=1, doc="Minimum number of tickets per user")
     as_default = Column(Boolean, default=False, doc="Is the game default")
 
-    scheduled_datetime = Column(DateTime, default=datetime.datetime.utcnow, doc="The date and time when the game instance will be held")
+    scheduled_datetime = Column(DateTime, default=datetime.datetime.now, doc="The date and time when the game instance will be held")
     timezone = Column(String(50), default="UTC", doc="The timezone of the game instance in UTC format")
     zone = Column(Integer, default=1, doc="The timezone of the game instance in UTC format")
 
@@ -71,8 +71,8 @@ class Game(Base):
         doc="The days of the week when the game instance is repeated, required if repeat is True"
     )
 
-    created_at = Column(DateTime, default=datetime.datetime.utcnow)
-    updated_at = Column(DateTime, default=datetime.datetime.utcnow, onupdate=datetime.datetime.utcnow)
+    created_at = Column(DateTime, default=datetime.datetime.now)
+    updated_at = Column(DateTime, default=datetime.datetime.now, onupdate=datetime.datetime.now)
 
     game_instances = relationship("GameInstance", back_populates="game", uselist=False)
 
@@ -83,10 +83,10 @@ class GameInstance(Base):
     id = Column(Integer, primary_key=True, index=True)
     game_id = Column(Integer, ForeignKey('games.id'), nullable=False)
     status = Column(SqlEnum(GameStatus), default=GameStatus.PENDING)
-    scheduled_datetime = Column(DateTime, default=datetime.datetime.utcnow, doc="The date and time when the game instance will be held")
+    scheduled_datetime = Column(DateTime, default=datetime.datetime.now, doc="The date and time when the game instance will be held")
     image = Column(String(255), nullable=True, default="default_image.png", doc="The image of the game instance")
-    created_at = Column(DateTime, default=datetime.datetime.utcnow)
-    updated_at = Column(DateTime, default=datetime.datetime.utcnow, onupdate=datetime.datetime.utcnow)
+    created_at = Column(DateTime, default=datetime.datetime.now)
+    updated_at = Column(DateTime, default=datetime.datetime.now, onupdate=datetime.datetime.now)
 
     game = relationship("Game", back_populates="game_instances", uselist=False)
 
@@ -101,5 +101,5 @@ class Ticket(Base):
     won = Column(Boolean, default=False)
     amount = Column(DECIMAL(9, 2), default=0)
     demo = Column(Boolean, default=False)
-    created_at = Column(DateTime, default=datetime.datetime.utcnow)
-    updated_at = Column(DateTime, default=datetime.datetime.utcnow, onupdate=datetime.datetime.utcnow)
+    created_at = Column(DateTime, default=datetime.datetime.now)
+    updated_at = Column(DateTime, default=datetime.datetime.now, onupdate=datetime.datetime.utcnow)

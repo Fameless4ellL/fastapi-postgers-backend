@@ -27,6 +27,12 @@ dp.update.outer_middleware(DBSessionMiddleware())
 
 public = APIRouter(prefix="/v1", tags=["v1"], lifespan=lifespan)
 admin = APIRouter(prefix="/v1/admin", tags=["admin"])
+_cron = APIRouter(
+    prefix="/v1/cron",
+    tags=["cron"],
+    dependencies=[Depends(cron_key)],
+    include_in_schema=True
+)
 
 
 from .app import *  # noqa
@@ -34,3 +40,4 @@ from .tg import *  # noqa
 from .admin import *  # noqa
 from .auth import *  # noqa
 from .user import *  # noqa
+from .cron import *  # noqa
