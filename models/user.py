@@ -24,10 +24,10 @@ class User(Base):
     phone_number = Column(String(32), unique=True)
     country = Column(String(32), nullable=True)
     email = Column(String(64), nullable=True)
-    password = Column(String(128))
+    password = Column(String(128), nullable=True)
     role = Column(String(64), default=Role.USER.value)
-    created_at = Column(DateTime, default=datetime.datetime.utcnow)
-    updated_at = Column(DateTime, default=datetime.datetime.utcnow, onupdate=datetime.datetime.utcnow)
+    created_at = Column(DateTime, default=datetime.datetime.now)
+    updated_at = Column(DateTime, default=datetime.datetime.now, onupdate=datetime.datetime.now)
 
 
 class Balance(Base):
@@ -36,8 +36,8 @@ class Balance(Base):
     id = Column(Integer, primary_key=True, index=True)
     user_id = Column(Integer, ForeignKey('users.id', ondelete="CASCADE"), nullable=True)
     balance = Column(Integer, default=0)
-    created_at = Column(DateTime, default=datetime.datetime.utcnow)
-    updated_at = Column(DateTime, default=datetime.datetime.utcnow, onupdate=datetime.datetime.utcnow)
+    created_at = Column(DateTime, default=datetime.datetime.now)
+    updated_at = Column(DateTime, default=datetime.datetime.now, onupdate=datetime.datetime.now)
 
 
 class BalanceChangeHistory(Base):
@@ -50,4 +50,4 @@ class BalanceChangeHistory(Base):
     change_type = Column(String(64), nullable=False)
     previous_balance = Column(Integer, nullable=False)
     new_balance = Column(Integer, nullable=False)
-    created_at = Column(DateTime, default=datetime.datetime.utcnow)
+    created_at = Column(DateTime, default=datetime.datetime.now)
