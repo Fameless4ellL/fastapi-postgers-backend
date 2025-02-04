@@ -28,7 +28,7 @@ class GameInstance(Game):
     min_ticket_count: int
     max_limit_grid: int
     price: float
-    prize: Optional[Decimal]
+    prize: float
     min_ticket_count: int
 
 

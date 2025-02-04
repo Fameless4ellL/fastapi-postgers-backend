@@ -184,8 +184,8 @@ async def read_game(
         "limit_by_ticket": game.game.limit_by_ticket,
         "min_ticket_count": game.game.min_ticket_count,
         "max_limit_grid": game.game.max_limit_grid,
-        "price": float(game.game.price),
-        "prize": game.game.prize,
+        "price": float(game.game.price or 0),
+        "prize": float(game.game.prize or 0),
         "endtime": game.scheduled_datetime.timestamp(),
         "created": game.created_at.timestamp()
     }

@@ -5,7 +5,7 @@ from phonenumbers import geocoder, parse
 from fastapi import Depends, Request, status
 from models.db import get_db
 from models.user import User
-from typing import Annotated, Optional
+from typing import Annotated
 from routers import public
 from fastapi.responses import JSONResponse
 from sqlalchemy import select, or_
