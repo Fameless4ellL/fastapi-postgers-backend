@@ -31,3 +31,13 @@ class UserInfo(User):
     updated_at: str
     tickets: Ticket = Field(default=Ticket())
     winnings: Winnings = Field(default=Winnings())
+
+
+class Admin(User):
+    email: Optional[str]
+    role: str
+
+
+class Admins(BaseModel):
+    admins: list[Admin] = []
+    count: int = 0

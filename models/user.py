@@ -5,7 +5,12 @@ from sqlalchemy import Column, DateTime, ForeignKey, Integer, String
 
 
 class Role(Enum):
-    ADMIN = "admin"
+    SUPER_ADMIN = "super_admin"
+    GLOBAL_ADMIN = "global_admin"
+    LOCAL_ADMIN = "local_admin"
+    SMM = "smm"
+    FINANCIER = "financier"
+    SUPPORT = "support"
     USER = "user"
 
 
@@ -20,6 +25,8 @@ class User(Base):
     id = Column(Integer, primary_key=True, index=True)
     telegram_id = Column(Integer, unique=True, nullable=True)
     username = Column(String(64), unique=True)
+    firtname = Column(String(64), nullable=True)
+    lastname = Column(String(64), nullable=True)
     language_code = Column(String(8), nullable=True)
     phone_number = Column(String(32), unique=True)
     country = Column(String(32), nullable=True)

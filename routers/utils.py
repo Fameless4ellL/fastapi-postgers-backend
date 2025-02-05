@@ -1,12 +1,13 @@
+from functools import wraps
 from itertools import islice
-from typing import Any
+from typing import Annotated, Any
 import uuid
 from fastapi import Depends, HTTPException, status, security
 from datetime import datetime, timedelta
 from sqlalchemy import select, and_
 from models.db import get_db
 from sqlalchemy.ext.asyncio import AsyncSession
-from models.user import User
+from models.user import User, Role
 from models.other import Game, GameInstance, GameStatus, GameType
 from utils.signature import decode_access_token
 from settings import settings
@@ -18,8 +19,8 @@ oauth2_scheme = security.OAuth2PasswordBearer(tokenUrl="/v1/token")
 
 
 async def get_user(
-    token: str = Depends(oauth2_scheme),
-    db: AsyncSession = Depends(get_db)
+    token: Annotated[str, Depends(oauth2_scheme)],
+    db: Annotated[AsyncSession, Depends(get_db)]
 ):
     payload = decode_access_token(token)
 
@@ -57,7 +58,7 @@ async def get_user(
 
 
 async def get_admin(
-    user: User = Depends(get_user)
+    user: Annotated[User, Depends(get_user)]
 ) -> User:
     # if user.role != "admin":
     #     raise HTTPException(status_code=404, detail="User not found")
@@ -120,3 +121,14 @@ def url_for(name: str, **path_params: Any) -> str:
     return f"{settings.back_url}/{name}/" + "/".join(
         str(value) for value in path_params.values()
     )
+
+
+def permission(allowed_roles: list[Role]):
+    async def dependency(user: Annotated[User, Depends(get_admin)]):
+        if user.role not in allowed_roles + [Role.SUPER_ADMIN.value]:
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail="Permission denied"
+            )
+        return user
+    return dependency
