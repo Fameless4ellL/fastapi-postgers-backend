@@ -92,7 +92,7 @@ def proceed_game(game_id: Optional[int] = None):
             Ticket.game_instance_id == game_inst.id
         ).all()
 
-        prize = game.prize or 1000
+        prize = float(game.prize or 1000)
         prize_per_winner = prize // float(game.max_win_amount or 8)
 
         winners = []
