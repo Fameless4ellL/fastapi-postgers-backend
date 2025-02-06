@@ -37,7 +37,8 @@ async def balance(
         status_code=status.HTTP_200_OK,
         content={
             "balance": total_balance,
-            "locale": user.language_code or "EN"
+            "locale": user.language_code or "EN",
+            "country": user.country
         }
     )
 

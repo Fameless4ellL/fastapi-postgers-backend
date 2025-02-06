@@ -1,7 +1,7 @@
 import random
 
 from fastapi.security import OAuth2PasswordRequestForm
-from phonenumbers import geocoder, parse
+from phonenumbers import parse
 from fastapi import Depends, Request, status
 from models.db import get_db
 from models.user import User
@@ -10,7 +10,7 @@ from routers import public
 from fastapi.responses import JSONResponse
 from sqlalchemy import select, or_
 from sqlalchemy.ext.asyncio import AsyncSession
-from schemes.auth import SendCode, UserCreate, UserLogin, AccessToken
+from schemes.auth import CheckCode, SendCode, UserCreate, UserLogin, AccessToken
 from schemes.base import BadResponse
 from globals import aredis
 
@@ -38,7 +38,7 @@ async def register(
 
     # get country from phone_number
     country_code = parse(user.phone_number)
-    country = geocoder.region_code_for_number(country_code)
+    # country = geocoder.region_code_for_number(country_code)
     phone_number = f"{country_code.country_code}{country_code.national_number}"
 
     user_in_db = await db.execute(
@@ -75,7 +75,7 @@ async def register(
         phone_number=phone_number,
         # password=hashed_password,
         username=user.username,
-        country=country,
+        country=user.country,
     )
     db.add(new_user)
     await db.commit()
@@ -204,4 +204,31 @@ async def send_code(
     return JSONResponse(
         status_code=200,
         content={"message": "Code sent successfully", "code": code},  # TODO TEMP
+    )
+
+
+@public.post("/check_code", tags=["auth"])
+async def check_code(
+    request: Request,
+    item: CheckCode,
+):
+    """
+    Check sms code
+    """
+    if not await aredis.exists(f"SMS:{request.client.host}"):
+        return JSONResponse(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            content={"message": "Invalid code"})
+
+    code: bytes = await aredis.get(f"SMS:{request.client.host}")
+
+    if code.decode("utf-8") != item.code:
+        return JSONResponse(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            content={"message": "Invalid code"}
+        )
+
+    return JSONResponse(
+        status_code=200,
+        content={"message": "Code is correct"}
     )
