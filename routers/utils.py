@@ -12,7 +12,7 @@ from models.other import Game, GameInstance, GameStatus, GameType
 from utils.signature import decode_access_token
 from settings import settings
 from globals import scheduler
-from utils.workers import add_job_to_scheduler
+from utils.workers import add_to_queue
 
 
 oauth2_scheme = security.OAuth2PasswordBearer(tokenUrl="/v1/token")
@@ -65,14 +65,19 @@ async def get_admin(
     return user
 
 
-async def generate_game(db: AsyncSession, _type: GameType = GameType.GLOBAL):
+async def generate_game(
+    db: AsyncSession,
+    _type: GameType = GameType.GLOBAL,
+    country: str = None
+):
     """
     creating a new game instance based on Game
     """
     game = await db.execute(
         select(Game).filter(
             Game.repeat.is_(True),
-            Game.game_type == _type
+            Game.game_type == _type,
+            Game.country == country
         )
     )
     game = game.scalars().first()
@@ -82,6 +87,7 @@ async def generate_game(db: AsyncSession, _type: GameType = GameType.GLOBAL):
             name=f"game #{str(uuid.uuid4())}",
             game_type=_type,
             description="Default game",
+            country=country,
             repeat=True,
             repeat_days=[0, 1, 2, 3, 4, 5, 6],
             scheduled_datetime=datetime.now() + timedelta(days=1)
@@ -100,10 +106,11 @@ async def generate_game(db: AsyncSession, _type: GameType = GameType.GLOBAL):
     await db.commit()
     await db.refresh(game_inst)
 
-    add_job_to_scheduler(
-        "add_to_queue",
-        ["proceed_game", game_inst.id],
-        game.scheduled_datetime
+    scheduler.add_job(
+        func=add_to_queue,
+        trigger="date",
+        args=["proceed_game", game_inst.id],
+        run_date=game.scheduled_datetime
     )
 
     return game_inst, game

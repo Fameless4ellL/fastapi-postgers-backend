@@ -21,7 +21,6 @@ async def add_job(request: JobRequest):
         if not func:
             raise ValueError(f"Function {request.func_name} not found")
 
-        print(request.run_date.strftime("%Y-%m-%d %H:%M:%S"))
         scheduler.add_job(
             func=func,
             trigger="date",

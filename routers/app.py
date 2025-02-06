@@ -46,6 +46,7 @@ async def tg_login(item: WidgetLogin):
     responses={404: {"model": BadResponse}, 200: {"model": Games}}
 )
 async def game_instances(
+    user: Annotated[User, Depends(get_user)],
     db: Annotated[AsyncSession, Depends(get_db)],
     _type: GameType = GameType.GLOBAL,
     offset: int = 0,
@@ -54,21 +55,22 @@ async def game_instances(
     """
     Получение списка доступных игр
     """
-    result = await db.execute(
-        select(GameInstance)
-        .options(joinedload(GameInstance.game).load_only(Game.name))
-        .filter(
-            GameInstance.status == GameStatus.PENDING,
-            GameInstance.game.has(game_type=_type)
-        )
-        .add_columns(
-            GameInstance.created_at,
-            GameInstance.id,
-            GameInstance.status,
-            GameInstance.scheduled_datetime
-        )
-        .offset(offset).limit(limit)
-    )
+    stmt = select(GameInstance).options(
+        joinedload(GameInstance.game).load_only(Game.name)
+    ).filter(
+        GameInstance.status == GameStatus.PENDING,
+        GameInstance.game.has(game_type=_type)
+    ).add_columns(
+        GameInstance.created_at,
+        GameInstance.id,
+        GameInstance.status,
+        GameInstance.scheduled_datetime
+    ).offset(offset).limit(limit)
+
+    if _type is GameType.LOCAL:
+        stmt = stmt.filter(GameInstance.game.has(country=user.country))
+
+    result = await db.execute(stmt)
     game = result.scalars().all()
 
     data = [{
@@ -80,18 +82,20 @@ async def game_instances(
         "created": g.created_at.timestamp()
     } for g in game]
 
-    count_result = await db.execute(
-        select(func.count(GameInstance.id))
-        .filter(
-            GameInstance.status == GameStatus.PENDING,
-            GameInstance.game.has(game_type=_type)
-        )
+    stmt = select(func.count(GameInstance.id)).filter(
+        GameInstance.status == GameStatus.PENDING,
+        GameInstance.game.has(game_type=_type)
     )
+
+    if _type is GameType.LOCAL:
+        stmt = stmt.filter(GameInstance.game.has(country=user.country))
+
+    count_result = await db.execute(stmt)
     count = count_result.scalar()
 
     if not data and count == 0:
         # create a new game
-        game_inst, _game = await generate_game(db, _type)
+        game_inst, _game = await generate_game(db, _type, user.country)
 
         data = [{
             "id": game_inst.id,
@@ -155,6 +159,7 @@ async def calc_balance(
     responses={404: {"model": BadResponse}, 200: {"model": GameInstanceModel}}
 )
 async def read_game(
+    user: Annotated[User, Depends(get_user)],
     game_id: Annotated[int, Path()],
     db: Annotated[AsyncSession, Depends(get_db)]
 ):
@@ -169,6 +174,14 @@ async def read_game(
     game = result.scalars().first()
 
     if game is None:
+        return JSONResponse(
+            status_code=status.HTTP_404_NOT_FOUND,
+            content=BadResponse(message="Game not found").model_dump()
+        )
+    if (
+        game.game.game_type == GameType.LOCAL
+        and str(game.game.country) != user.country
+    ):
         return JSONResponse(
             status_code=status.HTTP_404_NOT_FOUND,
             content=BadResponse(message="Game not found").model_dump()
@@ -227,6 +240,16 @@ async def buy_tickets(
             status_code=status.HTTP_400_BAD_REQUEST,
             content=BadResponse(message="Game not found").model_dump()
         )
+
+    if (
+        game.game.game_type == GameType.LOCAL
+        and str(game.game.country) != user.country
+    ):
+        return JSONResponse(
+            status_code=status.HTTP_404_NOT_FOUND,
+            content=BadResponse(message="Game not found").model_dump()
+        )
+
     if any(len(n) != game.limit_by_ticket for n in item.numbers):
         return JSONResponse(
             status_code=status.HTTP_400_BAD_REQUEST,

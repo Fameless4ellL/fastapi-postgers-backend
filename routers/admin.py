@@ -173,6 +173,8 @@ async def get_admins(
             "id": admin.id,
             "username": admin.username,
             "phone_number": admin.phone_number,
+            "email": admin.email,
+            "role": admin.role,
             "country": admin.country
         }
         for admin in admins
