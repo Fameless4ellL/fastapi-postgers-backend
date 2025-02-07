@@ -1,8 +1,9 @@
-from fastapi import Depends, Path, status
+from fastapi import Depends, Path, Query, status
 from fastapi.responses import JSONResponse
 from typing import Annotated, Optional
+from pydantic_extra_types.country import CountryAlpha3
 
-from sqlalchemy import func, select
+from sqlalchemy import func, select, or_
 from models.user import User, Role
 from models.other import Ticket
 from routers import admin
@@ -154,6 +155,8 @@ async def get_user(
 async def get_admins(
     admin: Annotated[User, Depends(permission([Role.GLOBAL_ADMIN.value]))],
     db: Annotated[AsyncSession, Depends(get_db)],
+    query: Annotated[Optional[str], Query(...)] = None,
+    country: Annotated[Optional[CountryAlpha3], Query(...)] = None,
     role: Optional[Role] = None
 ):
     """
@@ -164,6 +167,15 @@ async def get_admins(
     )
     if role:
         stmt = stmt.filter(User.role == role.value)
+
+    if country:
+        stmt = stmt.filter(User.country == country)
+
+    if query:
+        stmt = stmt.filter(or_(
+            User.username.ilike(f"%{query}%"),
+            User.phone_number.ilike(f"%{query}%"),
+        ))
 
     admins = await db.execute(stmt)
     admins = admins.scalars().all()
