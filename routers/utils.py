@@ -16,12 +16,13 @@ from utils.workers import add_to_queue
 
 
 oauth2_scheme = security.OAuth2PasswordBearer(tokenUrl="/v1/token")
+admin_oauth2_scheme = security.OAuth2PasswordBearer(tokenUrl="/v1/admin/token")
 
 
 async def get_user(
     token: Annotated[str, Depends(oauth2_scheme)],
     db: Annotated[AsyncSession, Depends(get_db)]
-):
+) -> User:
     payload = decode_access_token(token)
 
     if payload is None:
@@ -58,10 +59,38 @@ async def get_user(
 
 
 async def get_admin(
-    user: Annotated[User, Depends(get_user)]
-) -> User:
-    # if user.role != "admin":
-    #     raise HTTPException(status_code=404, detail="User not found")
+    token: Annotated[str, Depends(admin_oauth2_scheme)],
+    db: Annotated[AsyncSession, Depends(get_db)]
+):
+    payload = decode_access_token(token)
+
+    if payload is None:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Invalid token"
+        )
+
+    password = payload.get("password", "")
+    username = payload.get("username", "")
+
+    if password is None:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Invalid token"
+        )
+
+    user = await db.execute(
+        select(User)
+        .filter(User.username == username)
+    )
+    user = user.scalar()
+
+    if user is None:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="User not found"
+        )
+
     return user
 
 

@@ -29,8 +29,22 @@ class UserInfo(User):
     role: str
     created_at: str
     updated_at: str
+    balance: int
     tickets: Ticket = Field(default=Ticket())
     winnings: Winnings = Field(default=Winnings())
+
+
+class UserGame(BaseModel):
+    game_instance_id: int
+    game_name: str
+    scheduled_datetime: Optional[str] = None
+    tickets_purchased: int
+    amount: float = 0.0
+
+
+class UserGames(BaseModel):
+    games: list[UserGame] = []
+    count: int = 0
 
 
 class Admin(User):
