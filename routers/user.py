@@ -136,7 +136,7 @@ async def get_tickets(
 
 @public.get(
     "/countries", tags=["settings"],
-    responses={400: {"model": BadResponse}, 200: {"model": list(Country)}}
+    responses={400: {"model": BadResponse}, 200: {"model": Country}}
 )
 async def get_countries():
     """
