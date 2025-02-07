@@ -142,9 +142,13 @@ async def get_countries():
     """
     Получение список стран
     """
+    data = [{
+        "alpha_3": country.alpha_3,
+        "name": country.name
+    } for country in pycountry.countries]
 
     # по запросу фронта, ага
     return JSONResponse(
         status_code=status.HTTP_200_OK,
-        content=list(pycountry.countries)
+        content=data
     )
