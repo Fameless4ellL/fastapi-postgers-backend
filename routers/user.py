@@ -1,3 +1,4 @@
+import pycountry
 from typing import Annotated
 from fastapi import Depends, status
 from fastapi.responses import JSONResponse
@@ -8,7 +9,7 @@ from models.other import Ticket
 from routers import public
 from routers.utils import get_user
 from sqlalchemy.ext.asyncio import AsyncSession
-from schemes.base import BadResponse
+from schemes.base import BadResponse, Country
 from schemes.game import (
     Tickets, Deposit, Withdraw
 )
@@ -130,4 +131,20 @@ async def get_tickets(
     return JSONResponse(
         status_code=status.HTTP_200_OK,
         content=Tickets(tickets=data, count=count).model_dump()
+    )
+
+
+@public.get(
+    "/countries", tags=["settings"],
+    responses={400: {"model": BadResponse}, 200: {"model": list(Country)}}
+)
+async def get_countries():
+    """
+    Получение список стран
+    """
+
+    # по запросу фронта, ага
+    return JSONResponse(
+        status_code=status.HTTP_200_OK,
+        content=list(pycountry.countries)
     )

@@ -20,12 +20,24 @@ class GameType(Enum):
     LOCAL = "Local"
 
 
+class JackpotType(Enum):
+    GLOBAL = "Global"
+    LOCAL = "Local"
+
+
 class GameView(Enum):
     MONETARY = "monetary"
     MATERIAL = "material"
 
 
 class GameStatus(Enum):
+    PENDING = "pending"
+    ACTIVE = "active"
+    COMPLETED = "completed"
+    CANCELLED = "cancelled"
+
+
+class JackpotStatus(Enum):
     PENDING = "pending"
     ACTIVE = "active"
     COMPLETED = "completed"
@@ -44,6 +56,44 @@ class Currency(Base):
     updated_at = Column(DateTime, default=datetime.datetime.now, onupdate=datetime.datetime.now)
 
 
+class Jackpot(Base):
+    __tablename__ = "jackpots"
+
+    id = Column(Integer, primary_key=True, index=True)
+    name = Column(String(100), nullable=False)
+    _type = Column(SqlEnum(JackpotType), nullable=False)
+    percentage = Column(DECIMAL(5, 2), default=10, doc="Percentage of deductions from daily money games")
+    image = Column(String(255), nullable=True, default="default_image.png", doc="The image of the instance")
+    country = Column(String(32), nullable=True)
+
+    scheduled_datetime = Column(DateTime, default=datetime.datetime.now, doc="The date and time when the game instance will be held")
+    tzone = Column(Integer, default=1, doc="The timezone of the game instance in UTC format")
+    repeat = Column(Boolean, default=False, doc="Indicates if the instance is repeated")
+    repeat_days = Column(
+        ARRAY(Integer),
+        default=[0, 1, 2, 3, 4, 5, 6],
+        doc="The days of the week when the instance is repeated, required if repeat is True"
+    )
+
+    created_at = Column(DateTime, default=datetime.datetime.now)
+    updated_at = Column(DateTime, default=datetime.datetime.now, onupdate=datetime.datetime.now)
+
+    jackpot_instances = relationship("JackpotInstance", back_populates="jackpot", uselist=False)
+
+
+class JackpotInstance(Base):
+    __tablename__ = "jackpot_instances"
+
+    id = Column(Integer, primary_key=True, index=True)
+    jackpot_id = Column(Integer, ForeignKey('jackpots.id'), nullable=False)
+    status = Column(SqlEnum(JackpotStatus), default=JackpotStatus.PENDING)
+    scheduled_datetime = Column(DateTime, default=datetime.datetime.now, doc="The date and time when the game instance will be held")
+    created_at = Column(DateTime, default=datetime.datetime.now)
+    updated_at = Column(DateTime, default=datetime.datetime.now, onupdate=datetime.datetime.now)
+
+    jackpot = relationship("Jackpot", back_populates="jackpot_instances", uselist=False)
+
+
 class Game(Base):
     __tablename__ = "games"
 
@@ -58,10 +108,8 @@ class Game(Base):
     prize = Column(DECIMAL(9, 2), nullable=True, default=1000)
     country = Column(String(32), nullable=True)
     min_ticket_count = Column(Integer, default=1, doc="Minimum number of tickets per user")
-    as_default = Column(Boolean, default=False, doc="Is the game default")
 
     scheduled_datetime = Column(DateTime, default=datetime.datetime.now, doc="The date and time when the game instance will be held")
-    timezone = Column(String(50), default="UTC", doc="The timezone of the game instance in UTC format")
     zone = Column(Integer, default=1, doc="The timezone of the game instance in UTC format")
 
     repeat = Column(Boolean, default=False, doc="Indicates if the game instance is repeated")
@@ -97,6 +145,7 @@ class Ticket(Base):
     id = Column(Integer, primary_key=True, index=True)
     user_id = Column(Integer, ForeignKey('users.id'), nullable=False)
     game_instance_id = Column(Integer, ForeignKey('game_instances.id'), nullable=False)
+    jackpot_id = Column(Integer, ForeignKey('jackpots.id'), nullable=True)
     numbers = Column(ARRAY(Integer), nullable=False)
     won = Column(Boolean, default=False)
     amount = Column(DECIMAL(9, 2), default=0)

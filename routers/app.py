@@ -6,7 +6,16 @@ from fastapi.responses import JSONResponse
 from sqlalchemy import func, select, exists
 from models.db import get_db
 from models.user import Balance, BalanceChangeHistory, User
-from models.other import Game, GameInstance, GameStatus, GameType, Ticket
+from models.other import (
+    Game,
+    GameInstance,
+    GameStatus,
+    GameType,
+    Ticket,
+    JackpotInstance,
+    JackpotType,
+    JackpotStatus,
+)
 from routers import public
 from routers.utils import generate_game, get_user, nth, url_for
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -19,7 +28,8 @@ from schemes.game import (
     GameInstance as GameInstanceModel,
     Tickets,
     GenTicket,
-    TicketMode
+    TicketMode,
+    Jackpot as JackpotModel,
 )
 from schemes.tg import WidgetLogin
 from utils.signature import TgAuth
@@ -327,10 +337,6 @@ async def buy_tickets(
     db.add_all(tickets)
     await db.commit()
 
-    # Refresh each ticket individually
-    for ticket in tickets:
-        await db.refresh(ticket)
-
     return JSONResponse(
         status_code=status.HTTP_201_CREATED,
         content="OK"
@@ -531,4 +537,46 @@ async def get_leaderboard(
     return JSONResponse(
         status_code=status.HTTP_200_OK,
         content=Tickets(tickets=data, count=count).model_dump()
+    )
+
+
+@public.get(
+    "/jackpots", tags=["Jackpot"],
+    responses={400: {"model": BadResponse}, 200: {"model": JackpotModel}}
+)
+async def get_jackpots(
+    user: Annotated[User, Depends(get_user)],
+    db: Annotated[AsyncSession, Depends(get_db)],
+):
+    """
+    Получение списка джекпотов
+    """
+    stmt = select(JackpotInstance).filter(
+        JackpotInstance.status == JackpotStatus.PENDING,
+        JackpotInstance.jackpot.has(_type=JackpotType.LOCAL),
+        JackpotInstance.jackpot.has(country=user.country)
+    ).offset(0).limit(5)
+    local = await db.execute(stmt)
+    local = local.scalars().all() or []
+
+    stmt = select(JackpotInstance).filter(
+        JackpotInstance.status == JackpotStatus.PENDING,
+        JackpotInstance.jackpot.has(_type=JackpotType.GLOBAL)
+    ).offset(0).limit(5)
+    global_ = await db.execute(stmt)
+    global_ = global_.scalars().all() or []
+
+    data = [
+        {
+            "id": j.id,
+            "jackpot_id": j.game_id,
+            "status": j.status.value,
+            "endtime": j.scheduled_datetime.timestamp(),
+            "created": j.created_at.timestamp()
+        } for j in local + global_
+    ]
+
+    return JSONResponse(
+        status_code=status.HTTP_200_OK,
+        content=data
     )

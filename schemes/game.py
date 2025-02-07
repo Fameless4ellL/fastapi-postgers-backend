@@ -80,3 +80,11 @@ class Deposit(BaseModel):
 
 class Withdraw(Deposit):
     pass
+
+
+class Jackpot(BaseModel):
+    id: int
+    jackpot_id: int
+    status: str
+    endtime: float
+    created: float
