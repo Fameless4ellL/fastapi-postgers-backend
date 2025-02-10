@@ -36,6 +36,21 @@ async def register(
             content={"message": "Phone number or username is required"}
         )
 
+    if not await aredis.exists(f"SMS:{request.client.host}"):
+        return JSONResponse(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            content={"message": "Invalid code"})
+
+    code: bytes = await aredis.get(f"SMS:{request.client.host}")
+
+    if code.decode("utf-8") != user.code:
+        return JSONResponse(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            content={"message": "Invalid code"}
+        )
+
+    await aredis.delete(f"SMS:{request.client.host}")
+
     # get country from phone_number
     country_code = parse(user.phone_number)
     # country = geocoder.region_code_for_number(country_code)
@@ -55,31 +70,18 @@ async def register(
                 "message": "User with this phone number or username already exists"
             },
         )
-    if not await aredis.exists(f"SMS:{request.client.host}"):
-        return JSONResponse(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            content={"message": "Invalid code"})
-
-    code: bytes = await aredis.get(f"SMS:{request.client.host}")
-
-    if code.decode("utf-8") != user.code:
-        return JSONResponse(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            content={"message": "Invalid code"}
-        )
-
-    await aredis.delete(f"SMS:{request.client.host}")
 
     # hashed_password = get_password_hash(user.password.get_secret_value())
-    new_user = User(
-        phone_number=phone_number,
-        # password=hashed_password,
-        username=user.username,
-        country=user.country,
-    )
-    db.add(new_user)
-    await db.commit()
-    await db.refresh(new_user)
+    if not user_in_db:
+        new_user = User(
+            phone_number=phone_number,
+            # password=hashed_password,
+            username=user.username,
+            country=user.country,
+        )
+        db.add(new_user)
+        await db.commit()
+        await db.refresh(new_user)
 
     access_token = create_access_token(
         data={"username": new_user.username, "sub": new_user.phone_number}
@@ -188,6 +190,7 @@ async def token(
 @public.post("/send_code", tags=["auth"])
 async def send_code(
     request: Request,
+    db: Annotated[AsyncSession, Depends(get_db)],
     item: SendCode,
 ):
     """
@@ -201,9 +204,21 @@ async def send_code(
     code = random.randint(100000, 999999)
 
     await aredis.set(f"SMS:{ip}", code, ex=60)
+
+    user_in_db = await db.execute(
+        select(User).filter(User.phone_number == item.phone_number)
+    )
+    user_in_db = user_in_db.scalar()
+
+    if user_in_db:
+        return JSONResponse(
+            status_code=status.HTTP_200_OK,
+            content={"type": "Login", "code": code},
+        )
+
     return JSONResponse(
         status_code=200,
-        content={"message": "Code sent successfully", "code": code},  # TODO TEMP
+        content={"type": "Register", "code": code},
     )
 
 
