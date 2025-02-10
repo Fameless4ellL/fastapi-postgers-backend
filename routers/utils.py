@@ -16,7 +16,7 @@ from utils.workers import add_to_queue
 
 
 oauth2_scheme = security.OAuth2PasswordBearer(tokenUrl="/v1/token")
-admin_oauth2_scheme = security.OAuth2PasswordBearer(tokenUrl="/v1/admin/token")
+admin_oauth2_scheme = security.OAuth2PasswordBearer(tokenUrl="/v1/token")
 
 
 async def get_user(

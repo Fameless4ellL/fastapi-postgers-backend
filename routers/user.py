@@ -13,9 +13,14 @@ from schemes.base import BadResponse, Country
 from schemes.game import (
     Tickets, Deposit, Withdraw
 )
+from schemes.user import Profile
 
 
-@public.get("/profile", tags=["user"])
+@public.get(
+    "/profile",
+    tags=["user"],
+    responses={400: {"model": BadResponse}, 200: {"model": Profile}}
+)
 async def balance(
     user: Annotated[User, Depends(get_user)],
     db: Annotated[AsyncSession, Depends(get_db)]
@@ -36,11 +41,12 @@ async def balance(
     total_balance = balance.balance
     return JSONResponse(
         status_code=status.HTTP_200_OK,
-        content={
-            "balance": total_balance,
-            "locale": user.language_code or "EN",
-            "country": user.country
-        }
+        content=Profile(
+            balance=total_balance,
+            locale=user.language_code or "EN",
+            country=user.country,
+            username=user.username
+        ).model_dump()
     )
 
 
