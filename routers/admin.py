@@ -1,21 +1,31 @@
-from fastapi import Depends, Path, Query, Request, status
+import random
+from fastapi import Depends, Path, Query, Request, background, status
 from fastapi.responses import JSONResponse
 from typing import Annotated, Optional
 from pydantic_extra_types.country import CountryAlpha3
 
 from sqlalchemy import func, select, or_
 from models.user import Balance, User, Role
-from models.other import Game, Ticket, GameInstance
+from models.other import Game, Ticket, GameInstance, JackpotInstance, Jackpot
 from routers import admin
-from routers.utils import get_admin, permission
-from globals import scheduler
+from routers.utils import get_admin, permission, send_mail
+from globals import scheduler, aredis
 from sqlalchemy.ext.asyncio import AsyncSession
 from models.db import get_db
-from schemes.admin import Admin, Admins, Users, UserInfo as UserScheme, UserGames
-from schemes.auth import AccessToken, AdminLogin
+from schemes.admin import (
+    Admin,
+    Admins,
+    ResetPassword,
+    UserJackpots,
+    UserTickets,
+    Users,
+    UserInfo as UserScheme,
+    UserGames,
+    AdminLogin
+)
+from schemes.auth import AccessToken
 from schemes.base import BadResponse
-from globals import aredis
-from utils.signature import create_access_token, verify_password
+from utils.signature import create_access_token, get_password_hash, verify_password
 
 
 @admin.get("/jobs")
@@ -29,14 +39,11 @@ async def get_jobs(admin: Annotated[User, Depends(get_admin)]):
             "id": job.id,
             "name": job.name,
             "next_run_time": job.next_run_time.strftime("%Y-%m-%d %H:%M:%S"),
-            "args": job.args
+            "args": job.args,
         }
         for job in jobs
     ]
-    return JSONResponse(
-        status_code=status.HTTP_200_OK,
-        content=data
-    )
+    return JSONResponse(status_code=status.HTTP_200_OK, content=data)
 
 
 @admin.post(
@@ -44,16 +51,21 @@ async def get_jobs(admin: Annotated[User, Depends(get_admin)]):
     responses={
         400: {"model": BadResponse},
         200: {"model": AccessToken},
-    }
+    },
 )
 async def login(
     request: Request,
     db: Annotated[AsyncSession, Depends(get_db)],
     user: AdminLogin,
 ):
-    userdb = await db.execute(
-        select(User).filter(User.username == user.username)
-    )
+    """
+    Admin login
+    """
+    stmt = select(User).filter(or_(
+        User.email == user.login,
+        User.username == user.login
+    ))
+    userdb = await db.execute(stmt)
     userdb = userdb.scalar()
     if not userdb:
         return JSONResponse(
@@ -81,7 +93,7 @@ async def login(
     responses={
         400: {"model": BadResponse},
         200: {"model": Users},
-    }
+    },
 )
 async def get_users(
     admin: Annotated[User, Depends(get_admin)],
@@ -89,7 +101,7 @@ async def get_users(
     query: Annotated[Optional[str], Query(...)] = None,
     country: Annotated[Optional[CountryAlpha3], Query(...)] = None,
     offset: int = 0,
-    limit: int = 10
+    limit: int = 10,
 ):
     """
     Get all users
@@ -99,10 +111,12 @@ async def get_users(
         stmt = stmt.filter(User.country == country)
 
     if query:
-        stmt = stmt.filter(or_(
-            User.username.ilike(f"%{query}%"),
-            User.phone_number.ilike(f"%{query}%"),
-        ))
+        stmt = stmt.filter(
+            or_(
+                User.username.ilike(f"%{query}%"),
+                User.phone_number.ilike(f"%{query}%"),
+            )
+        )
 
     users = await db.execute(stmt.offset(offset).limit(limit))
     users = users.scalars().all()
@@ -115,13 +129,13 @@ async def get_users(
             "id": user.id,
             "username": user.username,
             "phone_number": user.phone_number,
-            "country": user.country
+            "country": user.country,
         }
         for user in users
     ]
     return JSONResponse(
         status_code=status.HTTP_200_OK,
-        content=Users(users=data, count=count).model_dump()
+        content=Users(users=data, count=count).model_dump(),
     )
 
 
@@ -130,7 +144,7 @@ async def get_users(
     responses={
         400: {"model": BadResponse},
         200: {"model": UserScheme},
-    }
+    },
 )
 async def get_user(
     admin: Annotated[User, Depends(get_admin)],
@@ -140,35 +154,26 @@ async def get_user(
     """
     Get all users
     """
-    stmt = select(User).filter(
-        User.id == user_id,
-        User.role == "user"
-    )
+    stmt = select(User).filter(User.id == user_id, User.role == "user")
     user = await db.execute(stmt)
     user = user.scalars().first()
 
     if not user:
         return JSONResponse(
             status_code=status.HTTP_400_BAD_REQUEST,
-            content={"message": "User not found"}
+            content={"message": "User not found"},
         )
 
-    tickets = await db.execute(
-        select(func.count(Ticket.id))
-        .filter(User.id == user_id)
-    )
+    tickets = await db.execute(select(func.count(Ticket.id)).filter(User.id == user_id))
     tickets = tickets.scalar()
     winnings = await db.execute(
-        select(func.sum(Ticket.amount))
-        .filter(
-            Ticket.id == user_id,
-            Ticket.won.is_(True)
+        select(func.sum(Ticket.amount)).filter(
+            Ticket.id == user_id, Ticket.won.is_(True)
         )
     )
     winnings = winnings.scalar()
     balance_result = await db.execute(
-        select(Balance)
-        .filter(Balance.user_id == user.id)
+        select(Balance).filter(Balance.user_id == user.id)
     )
     balance = balance_result.scalar()
 
@@ -192,11 +197,10 @@ async def get_user(
         "updated_at": user.updated_at.strftime("%Y-%m-%d %H:%M:%S"),
         "balance": total_balance,
         "tickets": {"purchased": tickets or 0},
-        "winnings": {"winnings": winnings or 0}
+        "winnings": {"winnings": winnings or 0},
     }
     return JSONResponse(
-        status_code=status.HTTP_200_OK,
-        content=UserScheme(**data).model_dump()
+        status_code=status.HTTP_200_OK, content=UserScheme(**data).model_dump()
     )
 
 
@@ -205,29 +209,26 @@ async def get_user(
     responses={
         400: {"model": BadResponse},
         200: {"model": UserGames},
-    }
+    },
 )
 async def get_user_games(
     admin: Annotated[User, Depends(get_admin)],
     db: Annotated[AsyncSession, Depends(get_db)],
     user_id: Annotated[int, Path()],
     offset: int = 0,
-    limit: int = 10
+    limit: int = 10,
 ):
     """
-    Get all users
+    Get all user's games
     """
-    stmt = select(User).filter(
-        User.id == user_id,
-        User.role == "user"
-    )
+    stmt = select(User).filter(User.id == user_id, User.role == "user")
     user = await db.execute(stmt)
     user = user.scalars().first()
 
     if not user:
         return JSONResponse(
             status_code=status.HTTP_400_BAD_REQUEST,
-            content={"message": "User not found"}
+            content={"message": "User not found"},
         )
 
     stmt = (
@@ -236,7 +237,9 @@ async def get_user_games(
             Game.name,
             GameInstance.scheduled_datetime,
             func.count(Ticket.id).label("tickets_purchased"),
-            func.sum(func.coalesce(Ticket.amount, 0)).filter(Ticket.won.is_(True)).label("won_amount")
+            func.sum(func.coalesce(Ticket.amount, 0))
+            .filter(Ticket.won.is_(True))
+            .label("won_amount"),
         )
         .join(Ticket, Ticket.game_instance_id == GameInstance.id)
         .join(Game, Game.id == GameInstance.game_id)
@@ -248,13 +251,17 @@ async def get_user_games(
     game_instances = result.fetchall()
 
     count = await db.execute(stmt.with_only_columns(func.count(GameInstance.id)))
-    count = count.scalar()
+    count = count.scalar() or 0
 
     data = [
         {
             "game_instance_id": game_instance.id,
             "game_name": game_instance.name,
-            "scheduled_datetime": game_instance.scheduled_datetime.strftime("%Y-%m-%d %H:%M:%S") if game_instance.scheduled_datetime else None,
+            "scheduled_datetime": (
+                game_instance.scheduled_datetime.strftime("%Y-%m-%d %H:%M:%S")
+                if game_instance.scheduled_datetime
+                else None
+            ),
             "tickets_purchased": game_instance.tickets_purchased,
             "amount": float(game_instance.won_amount),
         }
@@ -263,7 +270,189 @@ async def get_user_games(
 
     return JSONResponse(
         status_code=status.HTTP_200_OK,
-        content=UserGames(games=data, count=len(data)).model_dump()
+        content=UserGames(games=data, count=count).model_dump(),
+    )
+
+
+@admin.get(
+    "/users/{user_id}/games/{game_id}",
+    responses={
+        400: {"model": BadResponse},
+        200: {"model": UserTickets},
+    },
+)
+async def get_user_tickets(
+    admin: Annotated[User, Depends(get_admin)],
+    db: Annotated[AsyncSession, Depends(get_db)],
+    user_id: Annotated[int, Path()],
+    game_id: Annotated[int, Path()],
+    offset: int = 0,
+    limit: int = 10,
+):
+    """
+    Get user's tickets for a specific game
+    """
+    stmt = (
+        select(
+            Ticket.id,
+            Game.name.label("game_name"),
+            Ticket.numbers,
+            Ticket.created_at.label("date_and_time"),
+            Ticket.won,
+            Ticket.amount
+        )
+        .join(GameInstance, GameInstance.id == Ticket.game_instance_id)
+        .join(Game, Game.id == GameInstance.game_id)
+        .filter(
+            Ticket.user_id == user_id,
+            Game.id == game_id,
+        )
+    )
+
+    result = await db.execute(stmt.offset(offset).limit(limit))
+    tickets = result.fetchall()
+
+    count = await db.execute(stmt.with_only_columns(func.count(Ticket.id)))
+    count = count.scalar() or 0
+
+    data = [
+        {
+            "id": ticket.id,
+            "game_name": ticket.game_name,
+            "numbers": ticket.numbers,
+            "date_and_time": (
+                ticket.date_and_time.strftime("%Y-%m-%d %H:%M:%S")
+                if ticket.date_and_time
+                else None
+            ),
+            "won": ticket.won,
+            "amount": float(ticket.amount),
+        }
+        for ticket in tickets
+    ]
+
+    return JSONResponse(
+        status_code=status.HTTP_200_OK,
+        content={"tickets": data, "count": len(data)},
+    )
+
+
+@admin.get(
+    "/users/{user_id}/jackpots",
+    responses={
+        400: {"model": BadResponse},
+        200: {"model": UserJackpots},
+    },
+)
+async def get_user_jackpots(
+    admin: Annotated[User, Depends(get_admin)],
+    db: Annotated[AsyncSession, Depends(get_db)],
+    user_id: Annotated[int, Path()],
+    offset: int = 0,
+    limit: int = 10,
+):
+    """
+    Get user's jackpots for a specific game
+    """
+    stmt = (
+        select(
+            JackpotInstance.id,
+            Jackpot.name,
+            JackpotInstance.scheduled_datetime,
+            func.count(Ticket.id).label("tickets_purchased"),
+        )
+        .join(Ticket, Ticket.jackpot_id == JackpotInstance.id)
+        .join(Jackpot, Jackpot.id == JackpotInstance.jackpot_id)
+        .filter(Ticket.user_id == user_id)
+        .group_by(JackpotInstance.id, Jackpot.name)
+    )
+
+    result = await db.execute(stmt.offset(offset).limit(limit))
+    game_instances = result.fetchall()
+
+    count = await db.execute(stmt.with_only_columns(func.count(JackpotInstance.id)))
+    count = count.scalar() or 0
+
+    data = [
+        {
+            "game_instance_id": game_instance.id,
+            "game_name": game_instance.name,
+            "scheduled_datetime": (
+                game_instance.scheduled_datetime.strftime("%Y-%m-%d %H:%M:%S")
+                if game_instance.scheduled_datetime
+                else None
+            ),
+            "tickets_purchased": game_instance.tickets_purchased,
+        }
+        for game_instance in game_instances
+    ]
+
+    return JSONResponse(
+        status_code=status.HTTP_200_OK,
+        content=UserJackpots(games=data, count=count).model_dump(),
+    )
+
+
+@admin.get(
+    "/users/{user_id}/jackpots/{game_id}",
+    responses={
+        400: {"model": BadResponse},
+        200: {"model": UserTickets},
+    },
+)
+async def get_user_tickets_by_jackpots(
+    admin: Annotated[User, Depends(get_admin)],
+    db: Annotated[AsyncSession, Depends(get_db)],
+    user_id: Annotated[int, Path()],
+    game_id: Annotated[int, Path()],
+    offset: int = 0,
+    limit: int = 10,
+):
+    """
+    Get user's tickets for a specific jackpot
+    """
+    stmt = (
+        select(
+            Ticket.id,
+            Jackpot.name.label("game_name"),
+            Ticket.numbers,
+            Ticket.created_at.label("date_and_time"),
+            Ticket.won,
+            Ticket.amount
+        )
+        .join(JackpotInstance, JackpotInstance.id == Ticket.jackpot_id)
+        .join(Jackpot, Jackpot.id == JackpotInstance.jackpot_id)
+        .filter(
+            Ticket.user_id == user_id,
+            Jackpot.id == game_id,
+        )
+    )
+
+    result = await db.execute(stmt.offset(offset).limit(limit))
+    tickets = result.fetchall()
+
+    count = await db.execute(stmt.with_only_columns(func.count(Ticket.id)))
+    count = count.scalar() or 0
+
+    data = [
+        {
+            "id": ticket.id,
+            "game_name": ticket.game_name,
+            "numbers": ticket.numbers,
+            "date_and_time": (
+                ticket.date_and_time.strftime("%Y-%m-%d %H:%M:%S")
+                if ticket.date_and_time
+                else None
+            ),
+            "won": ticket.won,
+            "amount": float(ticket.amount),
+        }
+        for ticket in tickets
+    ]
+
+    return JSONResponse(
+        status_code=status.HTTP_200_OK,
+        content={"tickets": data, "count": len(data)},
     )
 
 
@@ -272,7 +461,7 @@ async def get_user_games(
     responses={
         400: {"model": BadResponse},
         200: {"model": Admins},
-    }
+    },
 )
 async def get_admins(
     admin: Annotated[User, Depends(permission([Role.GLOBAL_ADMIN.value]))],
@@ -281,14 +470,12 @@ async def get_admins(
     country: Annotated[Optional[CountryAlpha3], Query(...)] = None,
     role: Optional[Role] = None,
     offset: int = 0,
-    limit: int = 10
+    limit: int = 10,
 ):
     """
     Get all admins
     """
-    stmt = select(User).filter(
-        User.role != "user"
-    )
+    stmt = select(User).filter(User.role != "user")
     if role:
         stmt = stmt.filter(User.role == role.value)
 
@@ -296,10 +483,12 @@ async def get_admins(
         stmt = stmt.filter(User.country == country)
 
     if query:
-        stmt = stmt.filter(or_(
-            User.username.ilike(f"%{query}%"),
-            User.phone_number.ilike(f"%{query}%"),
-        ))
+        stmt = stmt.filter(
+            or_(
+                User.username.ilike(f"%{query}%"),
+                User.phone_number.ilike(f"%{query}%"),
+            )
+        )
 
     admins = await db.execute(stmt.offset(offset).limit(limit))
     admins = admins.scalars().all()
@@ -314,13 +503,13 @@ async def get_admins(
             "phone_number": admin.phone_number,
             "email": admin.email,
             "role": admin.role,
-            "country": admin.country
+            "country": admin.country,
         }
         for admin in admins
     ]
     return JSONResponse(
         status_code=status.HTTP_200_OK,
-        content=Admins(admins=data, count=count).model_dump()
+        content=Admins(admins=data, count=count).model_dump(),
     )
 
 
@@ -329,7 +518,7 @@ async def get_admins(
     responses={
         400: {"model": BadResponse},
         200: {"model": Admin},
-    }
+    },
 )
 async def get_admin_(
     admin: Annotated[User, Depends(permission([Role.GLOBAL_ADMIN.value]))],
@@ -339,17 +528,14 @@ async def get_admin_(
     """
     Get all admins
     """
-    stmt = select(User).filter(
-        User.id == admin_id,
-        User.role != "user"
-    )
+    stmt = select(User).filter(User.id == admin_id, User.role != "user")
     admin = await db.execute(stmt)
     admin = admin.scalars().first()
 
     if not admin:
         return JSONResponse(
             status_code=status.HTTP_400_BAD_REQUEST,
-            content={"message": "Admin not found"}
+            content={"message": "Admin not found"},
         )
 
     data = {
@@ -360,11 +546,10 @@ async def get_admin_(
         "email": admin.email,
         "role": admin.role,
         "created_at": admin.created_at.strftime("%Y-%m-%d %H:%M:%S"),
-        "updated_at": admin.updated_at.strftime("%Y-%m-%d %H:%M:%S")
+        "updated_at": admin.updated_at.strftime("%Y-%m-%d %H:%M:%S"),
     }
     return JSONResponse(
-        status_code=status.HTTP_200_OK,
-        content=Admin(**data).model_dump()
+        status_code=status.HTTP_200_OK, content=Admin(**data).model_dump()
     )
 
 
@@ -373,12 +558,13 @@ async def get_admin_(
     responses={
         400: {"model": BadResponse},
         201: {"model": Admin},
-    }
+    },
 )
 async def create_admin(
     admin: Annotated[User, Depends(permission([Role.GLOBAL_ADMIN.value]))],
     db: Annotated[AsyncSession, Depends(get_db)],
     item: Admin,
+    bg: background.BackgroundTasks,
 ):
     """
     Create new admin
@@ -386,7 +572,71 @@ async def create_admin(
     new_admin = User(**item.model_dump(exclude={"id"}))
     db.add(new_admin)
     await db.commit()
-    return JSONResponse(
-        status_code=status.HTTP_201_CREATED,
-        content="created"
+
+    code = random.randint(100000, 999999)
+    await aredis.set(f"EMAIL:{new_admin.email}", code, ex=60*15)
+
+    bg.add_task(
+        send_mail,
+        "New Admin",
+        f"New admin {new_admin.username} has been created",
+        new_admin.email,
     )
+
+    return JSONResponse(
+        status_code=status.HTTP_201_CREATED, content="created", background=bg
+    )
+
+
+@admin.post(
+    "/reset",
+    responses={
+        400: {"model": BadResponse},
+    },
+)
+async def reset_password(
+    db: Annotated[AsyncSession, Depends(get_db)],
+    item: ResetPassword,
+    bg: background.BackgroundTasks,
+):
+    """
+    Reset password
+    """
+    stmt = select(User).filter(
+        User.email == item.email,
+        User.role != "user",
+    )
+    user = await db.execute(stmt)
+    user = user.scalar()
+
+    if not user:
+        return JSONResponse(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            content={"message": "User not found"},
+        )
+
+    if not await aredis.exists(f"EMAIL:{user.email}"):
+        return JSONResponse(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            content={"message": "Code expired"},
+        )
+
+    code = await aredis.get(f"EMAIL:{user.email}").decode('utf-8')
+    if code != item.code:
+        return JSONResponse(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            content={"message": "Invalid code"},
+        )
+
+    hashed_password = get_password_hash(item.password.get_secret_value())
+    user.password = hashed_password
+    await db.commit()
+
+    bg.add_task(
+        send_mail,
+        "Password Reset",
+        "Your password has been reset",
+        user.email,
+    )
+
+    return JSONResponse(status_code=status.HTTP_200_OK, content="OK")

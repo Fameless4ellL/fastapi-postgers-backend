@@ -1,4 +1,4 @@
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, SecretStr
 from typing import Optional
 
 
@@ -45,6 +45,27 @@ class UserGame(BaseModel):
 class UserGames(BaseModel):
     games: list[UserGame] = []
     count: int = 0
+    
+    
+class UserJackpot(BaseModel):
+    jackpot_instance_id: int
+    game_name: str
+    scheduled_datetime: Optional[str] = None
+    tickets_purchased: int
+    
+    
+class UserJackpots(BaseModel):
+    jackpots: list[UserJackpot] = []
+    count: int = 0
+
+
+class UserTickets(BaseModel):
+    id: int
+    game_name: str
+    numbers: list[int]
+    date_and_time: str
+    won: bool
+    amount: float
 
 
 class Admin(User):
@@ -55,3 +76,14 @@ class Admin(User):
 class Admins(BaseModel):
     admins: list[Admin] = []
     count: int = 0
+
+
+class AdminLogin(BaseModel):
+    login: str
+    password: SecretStr = Field(..., min_length=8, max_length=64, description="Password")
+
+
+class ResetPassword(BaseModel):
+    email: str
+    password: SecretStr
+    code: str = Field(..., min_length=6, max_length=6, description="email code")
