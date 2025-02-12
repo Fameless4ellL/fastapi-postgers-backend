@@ -1,5 +1,8 @@
-from functools import wraps
+import traceback
 from itertools import islice
+import smtplib
+from email.mime.multipart import MIMEMultipart
+from email.mime.text import MIMEText
 from typing import Annotated, Any
 import uuid
 from fastapi import Depends, HTTPException, status, security
@@ -9,8 +12,9 @@ from models.db import get_db
 from sqlalchemy.ext.asyncio import AsyncSession
 from models.user import User, Role
 from models.other import Game, GameInstance, GameStatus, GameType
+import settings
 from utils.signature import decode_access_token
-from settings import settings
+from settings import email
 from globals import scheduler
 from utils.workers import add_to_queue
 
@@ -21,14 +25,13 @@ admin_oauth2_scheme = security.OAuth2PasswordBearer(tokenUrl="/v1/token")
 
 async def get_user(
     token: Annotated[str, Depends(oauth2_scheme)],
-    db: Annotated[AsyncSession, Depends(get_db)]
+    db: Annotated[AsyncSession, Depends(get_db)],
 ) -> User:
     payload = decode_access_token(token)
 
     if payload is None:
         raise HTTPException(
-            status_code=status.HTTP_401_UNAUTHORIZED,
-            detail="Invalid token"
+            status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid token"
         )
 
     phone_number = payload.get("sub", "")
@@ -36,23 +39,19 @@ async def get_user(
 
     if phone_number is None:
         raise HTTPException(
-            status_code=status.HTTP_401_UNAUTHORIZED,
-            detail="Invalid token"
+            status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid token"
         )
 
     user = await db.execute(
-        select(User)
-        .filter(and_(
-            User.phone_number == phone_number,
-            User.username == username
-        ))
+        select(User).filter(
+            and_(User.phone_number == phone_number, User.username == username)
+        )
     )
     user = user.scalar()
 
     if user is None:
         raise HTTPException(
-            status_code=status.HTTP_401_UNAUTHORIZED,
-            detail="User not found"
+            status_code=status.HTTP_401_UNAUTHORIZED, detail="User not found"
         )
 
     return user
@@ -60,14 +59,13 @@ async def get_user(
 
 async def get_admin(
     token: Annotated[str, Depends(admin_oauth2_scheme)],
-    db: Annotated[AsyncSession, Depends(get_db)]
+    db: Annotated[AsyncSession, Depends(get_db)],
 ):
     payload = decode_access_token(token)
 
     if payload is None:
         raise HTTPException(
-            status_code=status.HTTP_401_UNAUTHORIZED,
-            detail="Invalid token"
+            status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid token"
         )
 
     password = payload.get("password", "")
@@ -75,29 +73,22 @@ async def get_admin(
 
     if password is None:
         raise HTTPException(
-            status_code=status.HTTP_401_UNAUTHORIZED,
-            detail="Invalid token"
+            status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid token"
         )
 
-    user = await db.execute(
-        select(User)
-        .filter(User.username == username)
-    )
+    user = await db.execute(select(User).filter(User.username == username))
     user = user.scalar()
 
     if user is None:
         raise HTTPException(
-            status_code=status.HTTP_401_UNAUTHORIZED,
-            detail="User not found"
+            status_code=status.HTTP_401_UNAUTHORIZED, detail="User not found"
         )
 
     return user
 
 
 async def generate_game(
-    db: AsyncSession,
-    _type: GameType = GameType.GLOBAL,
-    country: str = None
+    db: AsyncSession, _type: GameType = GameType.GLOBAL, country: str = None
 ):
     """
     creating a new game instance based on Game
@@ -119,7 +110,7 @@ async def generate_game(
             country=country,
             repeat=True,
             repeat_days=[0, 1, 2, 3, 4, 5, 6],
-            scheduled_datetime=datetime.now() + timedelta(days=1)
+            scheduled_datetime=datetime.now() + timedelta(days=1),
         )
 
         db.add(game)
@@ -129,7 +120,7 @@ async def generate_game(
     game_inst = GameInstance(
         game_id=game.id,
         status=GameStatus.PENDING,
-        scheduled_datetime=game.scheduled_datetime
+        scheduled_datetime=game.scheduled_datetime,
     )
     db.add(game_inst)
     await db.commit()
@@ -139,7 +130,7 @@ async def generate_game(
         func=add_to_queue,
         trigger="date",
         args=["proceed_game", game_inst.id],
-        run_date=game.scheduled_datetime
+        run_date=game.scheduled_datetime,
     )
 
     return game_inst, game
@@ -167,4 +158,32 @@ def permission(allowed_roles: list[Role]):
                 detail="Permission denied"
             )
         return user
+
     return dependency
+
+
+def send_mail(
+    subject: str,
+    body: str,
+    to_email: str,
+    use_code: bool = False
+):
+    msg = MIMEMultipart()
+    msg["From"] = email._from
+    msg["To"] = to_email
+    msg["subject"] = subject
+    msg.attach(MIMEText(body))
+
+    try:
+        server = smtplib.SMTP(email.host, email.port)
+        server.starttls()
+
+        server.login(email.login, email.password)
+
+        text = msg.as_string()
+
+        server.sendmail(email._from, to_email, text)
+
+        server.quit()
+    except smtplib.SMTPException:
+        traceback.print_exc()
