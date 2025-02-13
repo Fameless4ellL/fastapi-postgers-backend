@@ -6,7 +6,7 @@ from pydantic_extra_types.country import CountryAlpha3
 
 from sqlalchemy import func, select, or_
 from models.user import Balance, User, Role
-from models.other import Game, Ticket, GameInstance, JackpotInstance, Jackpot
+from models.other import Game, Network, Ticket, GameInstance, JackpotInstance, Jackpot, Currency
 from routers import admin
 from routers.utils import get_admin_token, send_mail
 from globals import scheduler, aredis
@@ -21,7 +21,9 @@ from schemes.admin import (
     Users,
     UserInfo as UserScheme,
     UserGames,
-    AdminLogin
+    AdminLogin,
+    NetworkSchema,
+    CurrencySchema
 )
 from schemes.auth import AccessToken
 from schemes.base import BadResponse
@@ -52,6 +54,116 @@ async def get_jobs():
         for job in jobs
     ]
     return JSONResponse(status_code=status.HTTP_200_OK, content=data)
+
+
+@admin.get(
+    "/networks",
+    dependencies=[Security(get_admin_token, scopes=[Role.GLOBAL_ADMIN.value])],
+    responses={
+        400: {"model": BadResponse},
+    },
+)
+async def get_networks(
+    db: Annotated[AsyncSession, Depends(get_db)],
+):
+    """
+    Get all networks
+    """
+    stmt = select(Network)
+    networks = await db.execute(stmt)
+    networks = networks.scalars().all()
+
+    data = [
+        {
+            "id": network.id,
+            "name": network.name,
+            "url": network.rpc_url,
+            "chain_id": network.chain_id,
+        }
+        for network in networks
+    ]
+    return JSONResponse(
+        status_code=status.HTTP_200_OK,
+        content=data,
+    )
+
+
+@admin.post(
+    "/networks/create",
+    dependencies=[Security(get_admin_token, scopes=[Role.GLOBAL_ADMIN.value])],
+    responses={
+        400: {"model": BadResponse},
+    },
+)
+async def create_network(
+    db: Annotated[AsyncSession, Depends(get_db)],
+    item: NetworkSchema,
+):
+    """
+    Create new network
+    """
+    new_network = Network(**item.model_dump())
+    db.add(new_network)
+    await db.commit()
+
+    return JSONResponse(
+        status_code=status.HTTP_201_CREATED, content="created"
+    )
+
+
+@admin.get(
+    "/currencies",
+    dependencies=[Security(get_admin_token, scopes=[Role.GLOBAL_ADMIN.value])],
+    responses={
+        400: {"model": BadResponse},
+    },
+)
+async def get_currencies(
+    db: Annotated[AsyncSession, Depends(get_db)],
+):
+    """
+    Get all currencies
+    """
+    stmt = select(Currency)
+    currencies = await db.execute(stmt)
+    currencies = currencies.scalars().all()
+
+    data = [
+        {
+            "id": currency.id,
+            "name": currency.name,
+            "code": currency.code,
+            "network": currency.network_id,
+        }
+        for currency in currencies
+    ]
+    return JSONResponse(
+        status_code=status.HTTP_200_OK,
+        content=data,
+    )
+
+
+@admin.post(
+    "/currencies/create",
+    dependencies=[Security(get_admin_token, scopes=[Role.GLOBAL_ADMIN.value])],
+    responses={
+        400: {"model": BadResponse},
+    },
+)
+async def create_currency(
+    db: Annotated[AsyncSession, Depends(get_db)],
+    item: CurrencySchema,
+):
+    """
+    Create new currency
+    """
+    new_network = Currency(**item.model_dump())
+    db.add(new_network)
+    await db.commit()
+
+    return JSONResponse(
+        status_code=status.HTTP_201_CREATED, content="created"
+    )
 
 
 @admin.post(

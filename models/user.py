@@ -1,7 +1,7 @@
 import datetime
 from enum import Enum
 from .db import Base
-from sqlalchemy import Boolean, Column, DateTime, ForeignKey, Integer, String
+from sqlalchemy import DECIMAL, Boolean, Column, DateTime, ForeignKey, Integer, String
 
 
 class Role(Enum):
@@ -38,12 +38,24 @@ class User(Base):
     updated_at = Column(DateTime, default=datetime.datetime.now, onupdate=datetime.datetime.now)
 
 
+class Wallet(Base):
+    __tablename__ = "wallet"
+
+    id = Column(Integer, primary_key=True, index=True)
+    user_id = Column(Integer, ForeignKey('users.id', ondelete="CASCADE"), nullable=True)
+    address = Column(String(256), unique=True)
+    private_key = Column(String(256), unique=True)
+    created_at = Column(DateTime, default=datetime.datetime.now)
+    updated_at = Column(DateTime, default=datetime.datetime.now, onupdate=datetime.datetime.now)
+
+
 class Balance(Base):
     __tablename__ = "balance"
 
     id = Column(Integer, primary_key=True, index=True)
     user_id = Column(Integer, ForeignKey('users.id', ondelete="CASCADE"), nullable=True)
-    balance = Column(Integer, default=0)
+    currency_id = Column(Integer, ForeignKey('currencies.id', ondelete="CASCADE"), nullable=True)
+    balance = Column(DECIMAL(20, 8), default=0)
     created_at = Column(DateTime, default=datetime.datetime.now)
     updated_at = Column(DateTime, default=datetime.datetime.now, onupdate=datetime.datetime.now)
 
@@ -54,6 +66,7 @@ class BalanceChangeHistory(Base):
     id = Column(Integer, primary_key=True, index=True)
     user_id = Column(Integer, ForeignKey('users.id', ondelete='CASCADE'), nullable=True)
     balance_id = Column(Integer, ForeignKey('balance.id', ondelete='CASCADE'), nullable=True)
+    currency_id = Column(Integer, ForeignKey('currencies.id', ondelete='CASCADE'), nullable=True)
     change_amount = Column(Integer, nullable=False)
     change_type = Column(String(64), nullable=False)
     previous_balance = Column(Integer, nullable=False)

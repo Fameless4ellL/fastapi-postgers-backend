@@ -8,6 +8,7 @@ uvicorn==0.34.0
 psycopg2==2.9.10
 redis==5.2.1
 apscheduler==3.11.0
+web3==7.8.0
 requests
 
 # utils

@@ -12,7 +12,8 @@ from sqlalchemy import select
 from models.db import get_db
 from sqlalchemy.ext.asyncio import AsyncSession
 from models.user import User, Role
-from models.other import Game, GameInstance, GameStatus, GameType
+from web3 import AsyncWeb3
+from models.other import Game, GameInstance, GameStatus, GameType, Network, Currency
 import settings
 from utils.signature import decode_access_token
 from settings import email, settings
@@ -103,6 +104,9 @@ async def get_admin_token(
     if payload is None:
         raise invalid_token
 
+    if not _token.scopes:
+        raise invalid_token
+
     for scope in security_scopes.scopes:
         if scope not in _token.scopes:
             raise invalid_token
@@ -134,6 +138,47 @@ async def get_admin(
         )
 
     return user
+
+
+async def get_network(
+    db: Annotated[AsyncSession, Depends(get_db)],
+    network: str
+) -> Network:
+    net = await db.execute(select(Network).filter(Network.symbol == network))
+    net = net.scalar()
+
+    if net is None:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND, detail="Network not found"
+        )
+
+    return net
+
+
+async def get_currency(
+    db: Annotated[AsyncSession, Depends(get_db)],
+    network: Annotated[Network, Depends(get_network)],
+    currency: str
+) -> Currency:
+    cur = await db.execute(select(Currency).filter(
+        Currency.code == currency,
+        Currency.network_id == network.id
+    ))
+    cur = cur.scalar()
+
+    if cur is None:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND, detail="Currency not found"
+        )
+
+    return cur
+
+
+async def get_w3(
+    network: Annotated[Network, Depends(get_network)],
+) -> AsyncWeb3:
+    w3 = AsyncWeb3(AsyncWeb3.AsyncHTTPProvider(network.rpc_url))
+    return w3
 
 
 async def generate_game(

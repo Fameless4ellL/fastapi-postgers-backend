@@ -45,15 +45,15 @@ class UserGame(BaseModel):
 class UserGames(BaseModel):
     games: list[UserGame] = []
     count: int = 0
-    
-    
+
+
 class UserJackpot(BaseModel):
     jackpot_instance_id: int
     game_name: str
     scheduled_datetime: Optional[str] = None
     tickets_purchased: int
-    
-    
+
+
 class UserJackpots(BaseModel):
     jackpots: list[UserJackpot] = []
     count: int = 0
@@ -80,10 +80,25 @@ class Admins(BaseModel):
 
 class AdminLogin(BaseModel):
     login: str
-    password: SecretStr = Field(..., min_length=8, max_length=64, description="Password")
+    password: SecretStr = Field(..., min_length=3, max_length=64, description="Password")
 
 
 class ResetPassword(BaseModel):
     email: str
     password: SecretStr
     code: str = Field(..., min_length=6, max_length=6, description="email code")
+
+
+class NetworkSchema(BaseModel):
+    chain_id: int
+    name: str
+    symbol: str
+    rpc_url: str
+    explorer_url: str
+
+
+class CurrencySchema(BaseModel):
+    code: str
+    name: str
+    address: str
+    network_id: int

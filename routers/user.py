@@ -3,11 +3,14 @@ from typing import Annotated
 from fastapi import Depends, status
 from fastapi.responses import JSONResponse
 from sqlalchemy import func, select
+from web3 import AsyncWeb3
 from models.db import get_db
-from models.user import Balance, User
+from models.user import Balance, User, Wallet
 from models.other import Ticket
 from routers import public
-from routers.utils import get_user
+from routers.utils import get_user, get_currency, get_w3
+from utils.signature import get_password_hash
+from eth_account.signers.local import LocalAccount
 from sqlalchemy.ext.asyncio import AsyncSession
 from schemes.base import BadResponse, Country
 from schemes.game import (
@@ -23,19 +26,46 @@ from schemes.user import Profile
 )
 async def balance(
     user: Annotated[User, Depends(get_user)],
-    db: Annotated[AsyncSession, Depends(get_db)]
+    db: Annotated[AsyncSession, Depends(get_db)],
+    currency: Annotated[str, Depends(get_currency)],
+    w3: Annotated[AsyncWeb3, Depends(get_w3)]
 ):
     """
     Получение информации о пользователе
     """
     balance_result = await db.execute(
         select(Balance)
-        .filter(Balance.user_id == user.id)
+        .filter(
+            Balance.user_id == user.id,
+            Balance.currency_id == currency.id
+        )
     )
     balance = balance_result.scalar()
     if not balance:
-        balance = Balance(user_id=user.id)
+        balance = Balance(
+            user_id=user.id,
+            currency_id=currency.id,
+        )
         db.add(balance)
+        await db.commit()
+
+    wallet_result = await db.execute(
+        select(Wallet)
+        .filter(Wallet.user_id == user.id)
+    )
+    wallet = wallet_result.scalar()
+    if not wallet:
+
+        acc: LocalAccount = w3.eth.account.create()
+
+        hash_password = get_password_hash(acc.key.hex())
+
+        wallet = Wallet(
+            user_id=user.id,
+            address=acc.address,
+            private_key=hash_password
+        )
+        db.add(wallet)
         await db.commit()
 
     total_balance = balance.balance
@@ -44,6 +74,7 @@ async def balance(
         content=Profile(
             balance=total_balance,
             locale=user.language_code or "EN",
+            address=wallet.address,
             country=user.country,
             username=user.username
         ).model_dump()
