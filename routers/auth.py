@@ -14,7 +14,7 @@ from schemes.auth import CheckCode, SendCode, UserCreate, UserLogin, AccessToken
 from schemes.base import BadResponse
 from globals import aredis
 
-from utils.signature import create_access_token, verify_password
+from utils.signature import ACCESS_TOKEN_EXPIRE_MINUTES, create_access_token, verify_password
 
 
 @public.post(
@@ -73,18 +73,28 @@ async def register(
 
     # hashed_password = get_password_hash(user.password.get_secret_value())
     if not user_in_db:
-        new_user = User(
+        user_in_db = User(
             phone_number=phone_number,
             # password=hashed_password,
             username=user.username,
             country=user.country,
         )
-        db.add(new_user)
+        db.add(user_in_db)
         await db.commit()
-        await db.refresh(new_user)
+        await db.refresh(user_in_db)
 
-    access_token = create_access_token(
-        data={"username": new_user.username, "sub": new_user.phone_number}
+    data = {
+        "id": user_in_db.id,
+        "username": user_in_db.username,
+        "country": user_in_db.country
+    }
+
+    access_token = create_access_token(data=data)
+
+    await aredis.set(
+        f"TOKEN:USERS:{user_in_db.id}",
+        access_token,
+        ex=ACCESS_TOKEN_EXPIRE_MINUTES
     )
 
     return JSONResponse(
@@ -143,8 +153,18 @@ async def login(
     #         status_code=400, content={"message": "Invalid phone number or password"}
     #     )
 
-    access_token = create_access_token(
-        data={"username": userdb.username, "sub": userdb.phone_number}
+    data = {
+        "id": userdb.id,
+        "username": userdb.username,
+        "country": userdb.country
+    }
+
+    access_token = create_access_token(data=data)
+
+    await aredis.set(
+        f"TOKEN:USERS:{userdb.id}",
+        access_token,
+        ex=ACCESS_TOKEN_EXPIRE_MINUTES
     )
 
     return JSONResponse(
@@ -178,8 +198,18 @@ async def token(
             status_code=400, content={"message": "Invalid phone number or password"}
         )
 
-    access_token = create_access_token(
-        data={"username": userdb.username, "sub": userdb.phone_number}
+    data = {
+        "id": userdb.id,
+        "username": userdb.username,
+        "country": userdb.country,
+    }
+
+    access_token = create_access_token(data=data)
+
+    await aredis.set(
+        f"TOKEN:USERS:{userdb.id}",
+        access_token,
+        ex=ACCESS_TOKEN_EXPIRE_MINUTES
     )
 
     return JSONResponse(

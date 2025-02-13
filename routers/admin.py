@@ -1,5 +1,5 @@
 import random
-from fastapi import Depends, Path, Query, Request, background, status
+from fastapi import Depends, Path, Query, background, status, Security
 from fastapi.responses import JSONResponse
 from typing import Annotated, Optional
 from pydantic_extra_types.country import CountryAlpha3
@@ -8,7 +8,7 @@ from sqlalchemy import func, select, or_
 from models.user import Balance, User, Role
 from models.other import Game, Ticket, GameInstance, JackpotInstance, Jackpot
 from routers import admin
-from routers.utils import get_admin, permission, send_mail
+from routers.utils import get_admin_token, send_mail
 from globals import scheduler, aredis
 from sqlalchemy.ext.asyncio import AsyncSession
 from models.db import get_db
@@ -25,11 +25,19 @@ from schemes.admin import (
 )
 from schemes.auth import AccessToken
 from schemes.base import BadResponse
-from utils.signature import create_access_token, get_password_hash, verify_password
+from utils.signature import (
+    create_access_token,
+    get_password_hash,
+    verify_password,
+    ACCESS_TOKEN_EXPIRE_MINUTES
+)
 
 
-@admin.get("/jobs")
-async def get_jobs(admin: Annotated[User, Depends(get_admin)]):
+@admin.get(
+    "/jobs",
+    dependencies=[Security(get_admin_token, scopes=[Role.GLOBAL_ADMIN.value])]
+)
+async def get_jobs():
     """
     Get active scheduler jobs after game creation(GameInstance)
     """
@@ -54,17 +62,19 @@ async def get_jobs(admin: Annotated[User, Depends(get_admin)]):
     },
 )
 async def login(
-    request: Request,
     db: Annotated[AsyncSession, Depends(get_db)],
     user: AdminLogin,
 ):
     """
     Admin login
     """
-    stmt = select(User).filter(or_(
-        User.email == user.login,
-        User.username == user.login
-    ))
+    stmt = select(User).filter(
+        or_(
+            User.email == user.login,
+            User.username == user.login
+        ),
+        User.role != "user"
+    )
     userdb = await db.execute(stmt)
     userdb = userdb.scalar()
     if not userdb:
@@ -79,8 +89,17 @@ async def login(
             status_code=400, content={"message": "Invalid phone number or password"}
         )
 
-    access_token = create_access_token(
-        data={"username": userdb.username, "password": userdb.password}
+    data = {
+        "id": userdb.id,
+        "scopes": [userdb.role],
+    }
+
+    access_token = create_access_token(data=data)
+
+    await aredis.set(
+        f"TOKEN:ADMINS:{userdb.id}",
+        access_token,
+        ex=ACCESS_TOKEN_EXPIRE_MINUTES
     )
 
     return JSONResponse(
@@ -90,13 +109,13 @@ async def login(
 
 @admin.get(
     "/users",
+    dependencies=[Security(get_admin_token, scopes=[Role.GLOBAL_ADMIN.value])],
     responses={
         400: {"model": BadResponse},
         200: {"model": Users},
     },
 )
 async def get_users(
-    admin: Annotated[User, Depends(get_admin)],
     db: Annotated[AsyncSession, Depends(get_db)],
     query: Annotated[Optional[str], Query(...)] = None,
     country: Annotated[Optional[CountryAlpha3], Query(...)] = None,
@@ -141,13 +160,13 @@ async def get_users(
 
 @admin.get(
     "/users/{user_id}",
+    dependencies=[Security(get_admin_token, scopes=[Role.GLOBAL_ADMIN.value])],
     responses={
         400: {"model": BadResponse},
         200: {"model": UserScheme},
     },
 )
 async def get_user(
-    admin: Annotated[User, Depends(get_admin)],
     db: Annotated[AsyncSession, Depends(get_db)],
     user_id: Annotated[int, Path()],
 ):
@@ -206,13 +225,13 @@ async def get_user(
 
 @admin.get(
     "/users/{user_id}/games",
+    dependencies=[Security(get_admin_token, scopes=[Role.GLOBAL_ADMIN.value])],
     responses={
         400: {"model": BadResponse},
         200: {"model": UserGames},
     },
 )
 async def get_user_games(
-    admin: Annotated[User, Depends(get_admin)],
     db: Annotated[AsyncSession, Depends(get_db)],
     user_id: Annotated[int, Path()],
     offset: int = 0,
@@ -276,13 +295,13 @@ async def get_user_games(
 
 @admin.get(
     "/users/{user_id}/games/{game_id}",
+    dependencies=[Security(get_admin_token, scopes=[Role.GLOBAL_ADMIN.value])],
     responses={
         400: {"model": BadResponse},
         200: {"model": UserTickets},
     },
 )
 async def get_user_tickets(
-    admin: Annotated[User, Depends(get_admin)],
     db: Annotated[AsyncSession, Depends(get_db)],
     user_id: Annotated[int, Path()],
     game_id: Annotated[int, Path()],
@@ -339,13 +358,13 @@ async def get_user_tickets(
 
 @admin.get(
     "/users/{user_id}/jackpots",
+    dependencies=[Security(get_admin_token, scopes=[Role.GLOBAL_ADMIN.value])],
     responses={
         400: {"model": BadResponse},
         200: {"model": UserJackpots},
     },
 )
 async def get_user_jackpots(
-    admin: Annotated[User, Depends(get_admin)],
     db: Annotated[AsyncSession, Depends(get_db)],
     user_id: Annotated[int, Path()],
     offset: int = 0,
@@ -395,13 +414,13 @@ async def get_user_jackpots(
 
 @admin.get(
     "/users/{user_id}/jackpots/{game_id}",
+    dependencies=[Security(get_admin_token, scopes=[Role.GLOBAL_ADMIN.value])],
     responses={
         400: {"model": BadResponse},
         200: {"model": UserTickets},
     },
 )
 async def get_user_tickets_by_jackpots(
-    admin: Annotated[User, Depends(get_admin)],
     db: Annotated[AsyncSession, Depends(get_db)],
     user_id: Annotated[int, Path()],
     game_id: Annotated[int, Path()],
@@ -458,13 +477,13 @@ async def get_user_tickets_by_jackpots(
 
 @admin.get(
     "/admins",
+    dependencies=[Security(get_admin_token, scopes=[Role.GLOBAL_ADMIN.value])],
     responses={
         400: {"model": BadResponse},
         200: {"model": Admins},
     },
 )
 async def get_admins(
-    admin: Annotated[User, Depends(permission([Role.GLOBAL_ADMIN.value]))],
     db: Annotated[AsyncSession, Depends(get_db)],
     query: Annotated[Optional[str], Query(...)] = None,
     country: Annotated[Optional[CountryAlpha3], Query(...)] = None,
@@ -515,13 +534,13 @@ async def get_admins(
 
 @admin.get(
     "/admins/{admin_id}",
+    dependencies=[Security(get_admin_token, scopes=[Role.GLOBAL_ADMIN.value])],
     responses={
         400: {"model": BadResponse},
         200: {"model": Admin},
     },
 )
 async def get_admin_(
-    admin: Annotated[User, Depends(permission([Role.GLOBAL_ADMIN.value]))],
     db: Annotated[AsyncSession, Depends(get_db)],
     admin_id: Annotated[int, Path()],
 ):
@@ -555,13 +574,13 @@ async def get_admin_(
 
 @admin.post(
     "/admins/create",
+    dependencies=[Security(get_admin_token, scopes=[Role.GLOBAL_ADMIN.value])],
     responses={
         400: {"model": BadResponse},
         201: {"model": Admin},
     },
 )
 async def create_admin(
-    admin: Annotated[User, Depends(permission([Role.GLOBAL_ADMIN.value]))],
     db: Annotated[AsyncSession, Depends(get_db)],
     item: Admin,
     bg: background.BackgroundTasks,

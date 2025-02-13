@@ -1,7 +1,7 @@
 import datetime
 from enum import Enum
 from .db import Base
-from sqlalchemy import Column, DateTime, ForeignKey, Integer, String
+from sqlalchemy import Boolean, Column, DateTime, ForeignKey, Integer, String
 
 
 class Role(Enum):
@@ -33,6 +33,7 @@ class User(Base):
     email = Column(String(64), nullable=True)
     password = Column(String(128), nullable=True)
     role = Column(String(64), default=Role.USER.value)
+    active = Column(Boolean, default=True)
     created_at = Column(DateTime, default=datetime.datetime.now)
     updated_at = Column(DateTime, default=datetime.datetime.now, onupdate=datetime.datetime.now)
 

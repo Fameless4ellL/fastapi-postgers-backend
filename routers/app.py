@@ -569,7 +569,7 @@ async def get_jackpots(
     data = [
         {
             "id": j.id,
-            "jackpot_id": j.game_id,
+            "jackpot_id": j.jackpot_id,
             "status": j.status.value,
             "endtime": j.scheduled_datetime.timestamp(),
             "created": j.created_at.timestamp()

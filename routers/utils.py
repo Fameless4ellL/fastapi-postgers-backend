@@ -1,3 +1,4 @@
+from dataclasses import dataclass
 import traceback
 from itertools import islice
 import smtplib
@@ -7,45 +8,76 @@ from typing import Annotated, Any
 import uuid
 from fastapi import Depends, HTTPException, status, security
 from datetime import datetime, timedelta
-from sqlalchemy import select, and_
+from sqlalchemy import select
 from models.db import get_db
 from sqlalchemy.ext.asyncio import AsyncSession
 from models.user import User, Role
 from models.other import Game, GameInstance, GameStatus, GameType
 import settings
 from utils.signature import decode_access_token
-from settings import email
-from globals import scheduler
+from settings import email, settings
+from globals import scheduler, aredis
 from utils.workers import add_to_queue
 
 
 oauth2_scheme = security.OAuth2PasswordBearer(tokenUrl="/v1/token")
-admin_oauth2_scheme = security.OAuth2PasswordBearer(tokenUrl="/v1/token")
+admin_oauth2_scheme = security.OAuth2PasswordBearer(
+    tokenUrl="/v1/token",
+    scopes={
+        Role.GLOBAL_ADMIN.value: "Global admin",
+        Role.LOCAL_ADMIN.value: "Local admin",
+        Role.SUPER_ADMIN.value: "Super admin",
+        Role.FINANCIER.value: "Financier",
+        Role.SMM.value: "SMM",
+        Role.SUPPORT.value: "Support",
+    }
+)
+
+invalid_token = HTTPException(
+    status_code=status.HTTP_401_UNAUTHORIZED,
+    detail="Invalid token",
+    headers={"WWW-Authenticate": "Bearer"},
+)
+
+
+@dataclass(frozen=True)
+class Token:
+    id: int
+    username: str = None
+    country: str = None
+    scopes: list[str] = None
+    exp: datetime = None
+
+
+async def get_user_token(
+    token: Annotated[str, Depends(oauth2_scheme)],
+) -> Token:
+    payload = decode_access_token(token)
+    try:
+        _token = Token(**payload)
+    except TypeError:
+        raise invalid_token
+
+    if payload is None:
+        raise invalid_token
+
+    if not await aredis.exists(f"TOKEN:USERS:{_token.id}"):
+        raise invalid_token
+
+    session = await aredis.get(f"TOKEN:USERS:{_token.id}")
+
+    if token != session.decode("utf-8"):
+        raise invalid_token
+
+    return _token
 
 
 async def get_user(
-    token: Annotated[str, Depends(oauth2_scheme)],
-    db: Annotated[AsyncSession, Depends(get_db)],
+    token: Annotated[Token, Depends(get_user_token)],
+    db: Annotated[AsyncSession, Depends(get_db)]
 ) -> User:
-    payload = decode_access_token(token)
-
-    if payload is None:
-        raise HTTPException(
-            status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid token"
-        )
-
-    phone_number = payload.get("sub", "")
-    username = payload.get("username", "")
-
-    if phone_number is None:
-        raise HTTPException(
-            status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid token"
-        )
-
     user = await db.execute(
-        select(User).filter(
-            and_(User.phone_number == phone_number, User.username == username)
-        )
+        select(User).filter(User.id == token.id)
     )
     user = user.scalar()
 
@@ -57,26 +89,43 @@ async def get_user(
     return user
 
 
-async def get_admin(
+async def get_admin_token(
     token: Annotated[str, Depends(admin_oauth2_scheme)],
-    db: Annotated[AsyncSession, Depends(get_db)],
-):
+    security_scopes: security.SecurityScopes
+) -> Token:
     payload = decode_access_token(token)
 
+    try:
+        _token = Token(**payload)
+    except TypeError:
+        raise invalid_token
+
     if payload is None:
-        raise HTTPException(
-            status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid token"
-        )
+        raise invalid_token
 
-    password = payload.get("password", "")
-    username = payload.get("username", "")
+    for scope in security_scopes.scopes:
+        if scope not in _token.scopes:
+            raise invalid_token
 
-    if password is None:
-        raise HTTPException(
-            status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid token"
-        )
+    if not await aredis.exists(f"TOKEN:ADMINS:{_token.id}"):
+        raise invalid_token
 
-    user = await db.execute(select(User).filter(User.username == username))
+    session = await aredis.get(f"TOKEN:ADMINS:{_token.id}")
+
+    if token != session.decode("utf-8"):
+        raise invalid_token
+
+    return _token
+
+
+async def get_admin(
+    token: Annotated[Token, Depends(get_admin_token)],
+    db: Annotated[AsyncSession, Depends(get_db)]
+) -> User:
+    user = await db.execute(select(User).filter(
+        User.id == token.id,
+        User.role != Role.USER.value
+    ))
     user = user.scalar()
 
     if user is None:
