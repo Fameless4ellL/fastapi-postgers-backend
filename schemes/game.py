@@ -75,11 +75,11 @@ class Tickets(BaseModel):
 
 
 class Deposit(BaseModel):
+    hash: str
+
+
+class Withdraw(BaseModel):
     amount: float = 0
-
-
-class Withdraw(Deposit):
-    pass
 
 
 class Jackpot(BaseModel):

@@ -1,18 +1,22 @@
 import pycountry
+import json
+from decimal import Decimal
 from typing import Annotated
 from fastapi import Depends, status
 from fastapi.responses import JSONResponse
 from sqlalchemy import func, select
 from web3 import AsyncWeb3
 from models.db import get_db
-from models.user import Balance, User, Wallet
-from models.other import Ticket
+from models.user import Balance, User, Wallet, BalanceChangeHistory
+from models.other import Currency, Ticket
 from routers import public
 from routers.utils import get_user, get_currency, get_w3
 from utils.signature import get_password_hash
 from eth_account.signers.local import LocalAccount
 from sqlalchemy.ext.asyncio import AsyncSession
 from schemes.base import BadResponse, Country
+from globals import aredis
+from web3.types import TxReceipt
 from schemes.game import (
     Tickets, Deposit, Withdraw
 )
@@ -68,7 +72,7 @@ async def balance(
         db.add(wallet)
         await db.commit()
 
-    total_balance = balance.balance
+    total_balance = float(balance.balance)
     return JSONResponse(
         status_code=status.HTTP_200_OK,
         content=Profile(
@@ -85,22 +89,117 @@ async def balance(
 async def deposit(
     user: Annotated[User, Depends(get_user)],
     db: Annotated[AsyncSession, Depends(get_db)],
+    w3: Annotated[AsyncWeb3, Depends(get_w3)],
     item: Deposit
 ):
-    # TODO TEMP
+    """
+    Пополнение баланса
+    """
+    # check if balance history exists with this hash
+    balance_change_history = await db.execute(
+        select(BalanceChangeHistory)
+        .filter(BalanceChangeHistory.proof == item.hash)
+    )
+    balance_change_history = balance_change_history.scalar()
+
+    if balance_change_history:
+        return JSONResponse(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            content="Transaction already processed"
+        )
+
+    wallet_result = await db.execute(
+        select(Wallet)
+        .filter(Wallet.user_id == user.id)
+    )
+    wallet = wallet_result.scalar()
+
+    if not wallet:
+        return JSONResponse(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            content="Wallet not found"
+        )
+
+    tx: TxReceipt = await w3.eth.wait_for_transaction_receipt(item.hash, timeout=60)
+
+    currency = await db.execute(
+        select(Currency)
+        .filter(Currency.code == "USDC")
+    )
+    currency = currency.scalar()
+    if not currency:
+        return JSONResponse(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            content="Currency not found"
+        )
+
+    contract = w3.eth.contract(
+        address=tx.contractAddress,
+        abi=json.loads(await aredis.get("abi"))
+    )
+
+    logs = contract.events.Transfer().process_receipt(tx)
+
+    transfer = {}
+    for log in logs:
+        if log.event != "Transfer":
+            continue
+
+        transfer = log.args
+        break
+
+    decimals = 18
+
+    if tx is None:
+        return JSONResponse(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            content="Transaction not found"
+        )
+
+    if (
+        tx.status != 1
+        or transfer.to.lower() != wallet.address.lower()
+    ):
+        return JSONResponse(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            content="Transaction failed"
+        )
+
     balance_result = await db.execute(
         select(Balance)
         .with_for_update()
-        .filter(Balance.user_id == user.id)
+        .filter(
+            Balance.user_id == user.id,
+            Balance.currency_id == currency.id
+        )
     )
     balance = balance_result.scalar()
+
+    amount = Decimal(transfer.value / 10 ** decimals)
+
     if not balance:
-        balance = Balance(user_id=user.id)
+        balance = Balance(
+            user_id=user.id,
+            currency_id=currency.id,
+            balance=amount
+        )
         db.add(balance)
-        await db.commit()
     else:
-        balance.balance += item.amount
-        await db.commit()
+        balance.balance += amount
+
+    history = BalanceChangeHistory(
+        user_id=user.id,
+        balance_id=balance.id,
+        currency_id=currency.id,
+        change_amount=amount,
+        change_type="deposit",
+        previous_balance=balance.balance - amount,
+        proof=item.hash,
+        new_balance=balance.balance
+    )
+
+    db.add(history)
+    await db.commit()
 
     return JSONResponse(status_code=status.HTTP_200_OK, content="OK")
 
@@ -109,9 +208,48 @@ async def deposit(
 async def withdraw(
     user: Annotated[User, Depends(get_user)],
     db: Annotated[AsyncSession, Depends(get_db)],
+    currency: Annotated[Currency, Depends(get_currency)],
+    w3: Annotated[AsyncWeb3, Depends(get_w3)],
     item: Withdraw
 ):
-    # TODO TEMP
+    """
+    Вывод средств
+    """
+    wallet_result = await db.execute(
+        select(Wallet)
+        .filter(Wallet.user_id == user.id)
+    )
+    wallet = wallet_result.scalar()
+
+    if not wallet:
+        return JSONResponse(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            content="Wallet not found"
+        )
+
+    abi = await aredis.get("abi")
+
+    contract = await w3.eth.contract(
+        address=currency.address,
+        abi=json.loads(abi)
+    )
+
+    _hash = contract.functions.transfer(wallet.address, item.amount).transact()
+
+    tx = await w3.eth.wait_for_transaction_receipt(_hash, timeout=60)
+
+    if tx is None:
+        return JSONResponse(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            content="Transaction not found"
+        )
+
+    if tx.status != 1:
+        return JSONResponse(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            content="Transaction failed"
+        )
+
     balance_result = await db.execute(
         select(Balance)
         .with_for_update()
@@ -121,12 +259,24 @@ async def withdraw(
     if not balance:
         balance = Balance(user_id=user.id)
         db.add(balance)
-        await db.commit()
     else:
-        balance.balance -= item.amount
-        await db.commit()
+        balance.balance -= Decimal(item.amount)
 
-    return JSONResponse(status_code=status.HTTP_200_OK, content="OK")
+    history = BalanceChangeHistory(
+        user_id=user.id,
+        balance_id=balance.id,
+        currency_id=currency.id,
+        change_amount=item.amount,
+        change_type="withdrawal",
+        previous_balance=balance.balance - Decimal(item.amount),
+        proof=_hash,
+        new_balance=balance.balance
+    )
+
+    db.add(history)
+    await db.commit()
+
+    return JSONResponse(status_code=status.HTTP_200_OK, content=tx)
 
 
 @public.get(

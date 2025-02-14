@@ -12,7 +12,8 @@ from sqlalchemy import select
 from models.db import get_db
 from sqlalchemy.ext.asyncio import AsyncSession
 from models.user import User, Role
-from web3 import AsyncWeb3
+from web3 import AsyncWeb3, middleware
+from web3.gas_strategies.time_based import fast_gas_price_strategy
 from models.other import Game, GameInstance, GameStatus, GameType, Network, Currency
 import settings
 from utils.signature import decode_access_token
@@ -178,6 +179,19 @@ async def get_w3(
     network: Annotated[Network, Depends(get_network)],
 ) -> AsyncWeb3:
     w3 = AsyncWeb3(AsyncWeb3.AsyncHTTPProvider(network.rpc_url))
+
+    if not w3.is_connected():
+        raise HTTPException(
+            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+            detail="Network is not available"
+        )
+
+    acct = w3.eth.account.from_key(settings.private_key)
+
+    w3.middleware_onion.inject(middleware.SignAndSendRawMiddlewareBuilder.build(acct), layer=0)
+    w3.eth.set_gas_price_strategy(fast_gas_price_strategy)
+    w3.eth.default_account = acct.address
+
     return w3
 
 
