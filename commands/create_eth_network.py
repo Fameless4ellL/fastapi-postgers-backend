@@ -26,6 +26,7 @@ def default_network():
     if cur is None:
         # create
         cur = Currency(
+            name="Tether",
             code="USDT",
             network_id=net.id,
             decimals=6,

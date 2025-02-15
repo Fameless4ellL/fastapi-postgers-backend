@@ -6,6 +6,7 @@ from email.mime.multipart import MIMEMultipart
 from email.mime.text import MIMEText
 from typing import Annotated, Any
 import uuid
+from aiohttp import client_exceptions
 from fastapi import Depends, HTTPException, status, security
 from datetime import datetime, timedelta
 from sqlalchemy import select
@@ -177,12 +178,18 @@ async def get_currency(
 async def get_w3(
     network: Annotated[Network, Depends(get_network)],
 ) -> AsyncWeb3:
-    w3 = AsyncWeb3(AsyncWeb3.AsyncHTTPProvider(network.rpc_url))
+    try:
+        w3 = AsyncWeb3(AsyncWeb3.AsyncHTTPProvider(network.rpc_url))
 
-    if not await w3.is_connected():
+        if not await w3.is_connected():
+            raise HTTPException(
+                status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+                detail="Network is not available"
+            )
+    except client_exceptions.ClientError:
         raise HTTPException(
             status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
-            detail="Network is not available"
+            detail="Network is not available
         )
 
     acct = w3.eth.account.from_key(settings.private_key)
