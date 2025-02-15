@@ -1,12 +1,15 @@
 import datetime
+import json
 import random
 from typing import Annotated
 from fastapi import Depends, Path, status
 from fastapi.responses import JSONResponse
 from sqlalchemy import func, select, exists
+from web3 import AsyncWeb3
 from models.db import get_db
 from models.user import Balance, BalanceChangeHistory, User
 from models.other import (
+    Currency,
     Game,
     GameInstance,
     GameStatus,
@@ -17,7 +20,7 @@ from models.other import (
     JackpotStatus,
 )
 from routers import public
-from routers.utils import generate_game, get_user, nth, url_for
+from routers.utils import generate_game, get_currency, get_user, get_w3, nth, url_for
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import joinedload
 from schemes.base import BadResponse
@@ -33,6 +36,7 @@ from schemes.game import (
 )
 from schemes.tg import WidgetLogin
 from utils.signature import TgAuth
+from globals import aredis
 from settings import settings
 
 
@@ -232,6 +236,8 @@ async def buy_tickets(
     item: BuyTicket,
     user: Annotated[User, Depends(get_user)],
     db: Annotated[AsyncSession, Depends(get_db)],
+    currency: Annotated[Currency, Depends(get_currency)],
+    w3: Annotated[AsyncWeb3, Depends(get_w3)],
 ):
     """
     Для покупки билетов frame:20
@@ -285,7 +291,20 @@ async def buy_tickets(
             content=BadResponse(message="Demo mode is available only for one ticket").model_dump()
         )
 
+    jackpot_id = None
+
     if not item.demo:
+        wallet = await db.execute(
+            select(User.wallet).filter(User.id == user.id)
+        )
+        wallet = wallet.scalar()
+
+        if wallet is None:
+            return JSONResponse(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                content=BadResponse(message="Wallet not found").model_dump()
+            )
+
         balance_result = await db.execute(
             select(Balance)
             .with_for_update()
@@ -293,6 +312,47 @@ async def buy_tickets(
         )
         user_balance = balance_result.scalar() or Balance(balance=0)
         total_price = game.price * len(item.numbers)
+
+        try:
+            contract = w3.eth.contract(
+                address=currency.address,
+                abi=json.loads(await aredis.get("abi"))
+            )
+            amount = int(total_price * 10 ** currency.decimals)
+
+            w3.eth.default_account = wallet.address
+            _hash = await contract.functions.transfer(settings.address, amount).transact()
+            tx = await w3.eth.wait_for_transaction_receipt(_hash, timeout=60)
+
+            if tx is None or tx.status != 1:
+                return JSONResponse(
+                    status_code=status.HTTP_400_BAD_REQUEST,
+                    content=BadResponse(message="Transaction failed").model_dump()
+                )
+        except Exception as e:
+            return JSONResponse(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                content=BadResponse(message=str(e)).model_dump()
+            )
+
+        # jackpots
+        jackpots = await db.execute(
+            select(JackpotInstance)
+            .filter(
+                JackpotInstance.status == JackpotStatus.PENDING
+            )
+        )
+        jackpots = jackpots.scalars().all()
+
+        for jackpot in jackpots:
+            if jackpot.jackpot._type == JackpotType.LOCAL and jackpot.jackpot.country != user.country:
+                continue
+
+            jackpot.amount += total_price * float(jackpot.jackpot.percentage) / 100
+            jackpot_id = jackpot.id
+            db.add(jackpot)
+
+            break
 
         # check if the user has enough balance
         if user_balance.balance < total_price:
@@ -334,7 +394,8 @@ async def buy_tickets(
             user_id=user.id,
             game_instance_id=game_id,
             numbers=numbers,
-            demo=item.demo
+            demo=item.demo,
+            jackpot_id=jackpot_id,
         ) for numbers in item.numbers
     ]
 
