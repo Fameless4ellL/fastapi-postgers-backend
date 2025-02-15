@@ -17,6 +17,8 @@ class Game(BaseModel):
     name: str
     image: Optional[str] = None
     status: str
+    price: float
+    prize: float
     endtime: float
     created: float
 

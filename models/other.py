@@ -66,6 +66,7 @@ class Currency(Base):
     name = Column(String(64), nullable=False, doc="e.g., Tether, TON Crystal")
     network_id = Column(Integer, ForeignKey('networks.id'), nullable=True, doc="The network ID of the currency")
     address = Column(String(255), nullable=False, doc="The address of the contract")
+    decimals = Column(Integer, nullable=True, default=18, doc="The number of decimals of the currency")
     conversion_rate = Column(DECIMAL(10, 2), nullable=False, default=1, doc="The conversion rate to the base currency")
 
     created_at = Column(DateTime, default=datetime.datetime.now)

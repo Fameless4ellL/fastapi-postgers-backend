@@ -227,16 +227,23 @@ async def withdraw(
             content="Wallet not found"
         )
 
-    abi = await aredis.get("abi")
+    try:
+        abi = await aredis.get("abi")
 
-    contract = await w3.eth.contract(
-        address=currency.address,
-        abi=json.loads(abi)
-    )
+        contract = w3.eth.contract(
+            address=currency.address,
+            abi=json.loads(abi)
+        )
 
-    _hash = contract.functions.transfer(wallet.address, item.amount).transact()
+        amount = int(item.amount * 10 ** currency.decimals)
+        _hash = await contract.functions.transfer(wallet.address, amount).transact()
 
-    tx = await w3.eth.wait_for_transaction_receipt(_hash, timeout=60)
+        tx = await w3.eth.wait_for_transaction_receipt(_hash, timeout=60)
+    except Exception as e:
+        return JSONResponse(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            content=str(e)
+        )
 
     if tx is None:
         return JSONResponse(

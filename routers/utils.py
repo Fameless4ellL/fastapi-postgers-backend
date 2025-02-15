@@ -13,7 +13,6 @@ from models.db import get_db
 from sqlalchemy.ext.asyncio import AsyncSession
 from models.user import User, Role
 from web3 import AsyncWeb3, middleware
-from web3.gas_strategies.time_based import fast_gas_price_strategy
 from models.other import Game, GameInstance, GameStatus, GameType, Network, Currency
 import settings
 from utils.signature import decode_access_token
@@ -143,7 +142,7 @@ async def get_admin(
 
 async def get_network(
     db: Annotated[AsyncSession, Depends(get_db)],
-    network: str
+    network: str = "ETH"
 ) -> Network:
     net = await db.execute(select(Network).filter(Network.symbol == network))
     net = net.scalar()
@@ -159,7 +158,7 @@ async def get_network(
 async def get_currency(
     db: Annotated[AsyncSession, Depends(get_db)],
     network: Annotated[Network, Depends(get_network)],
-    currency: str
+    currency: str = "USDT"
 ) -> Currency:
     cur = await db.execute(select(Currency).filter(
         Currency.code == currency,
@@ -180,7 +179,7 @@ async def get_w3(
 ) -> AsyncWeb3:
     w3 = AsyncWeb3(AsyncWeb3.AsyncHTTPProvider(network.rpc_url))
 
-    if not w3.is_connected():
+    if not await w3.is_connected():
         raise HTTPException(
             status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
             detail="Network is not available"
@@ -189,7 +188,6 @@ async def get_w3(
     acct = w3.eth.account.from_key(settings.private_key)
 
     w3.middleware_onion.inject(middleware.SignAndSendRawMiddlewareBuilder.build(acct), layer=0)
-    w3.eth.set_gas_price_strategy(fast_gas_price_strategy)
     w3.eth.default_account = acct.address
 
     return w3
@@ -274,7 +272,6 @@ def send_mail(
     subject: str,
     body: str,
     to_email: str,
-    use_code: bool = False
 ):
     msg = MIMEMultipart()
     msg["From"] = email._from
