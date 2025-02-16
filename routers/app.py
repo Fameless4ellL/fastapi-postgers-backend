@@ -70,7 +70,12 @@ async def game_instances(
     Получение списка доступных игр
     """
     stmt = select(GameInstance).options(
-        joinedload(GameInstance.game).load_only(Game.name, Game.price, Game.prize)
+        joinedload(GameInstance.game).load_only(
+            Game.name,
+            Game.price,
+            Game.prize,
+            Game.max_limit_grid,
+        )
     ).filter(
         GameInstance.status == GameStatus.PENDING,
         GameInstance.game.has(game_type=_type)
@@ -94,6 +99,7 @@ async def game_instances(
         "status": g.status.value,
         "price": float(g.game.price),
         "prize": float(g.game.prize),
+        "max_limit_grid": g.game.max_limit_grid,
         "endtime": g.scheduled_datetime.timestamp(),
         "created": g.created_at.timestamp()
     } for g in game]
@@ -118,8 +124,9 @@ async def game_instances(
             "name": _game.name,
             "image": url_for("static", path=game_inst.image),
             "status": game_inst.status.value,
-            "price": float(g.game.price),
-            "prize": float(g.game.prize),
+            "price": float(_game.price),
+            "prize": float(_game.prize),
+            "max_limit_grid": _game.max_limit_grid,
             "endtime": game_inst.scheduled_datetime.timestamp(),
             "created": game_inst.created_at.timestamp()
         }]

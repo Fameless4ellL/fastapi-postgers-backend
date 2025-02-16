@@ -19,6 +19,7 @@ class Game(BaseModel):
     status: str
     price: float
     prize: float
+    max_limit_grid: int
     endtime: float
     created: float
 
