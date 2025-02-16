@@ -189,7 +189,7 @@ async def get_w3(
     except client_exceptions.ClientError:
         raise HTTPException(
             status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
-            detail="Network is not available
+            detail="Network is not available"
         )
 
     acct = w3.eth.account.from_key(settings.private_key)

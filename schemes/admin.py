@@ -89,16 +89,57 @@ class ResetPassword(BaseModel):
     code: str = Field(..., min_length=6, max_length=6, description="email code")
 
 
-class NetworkSchema(BaseModel):
+class NetworkBase(BaseModel):
     chain_id: int
     name: str
     symbol: str
     rpc_url: str
     explorer_url: str
 
+    class Config:
+        from_attributes = True
 
-class CurrencySchema(BaseModel):
+
+class NetworkCreate(NetworkBase):
+    pass
+
+
+class NetworkUpdate(NetworkBase):
+    pass
+
+
+class NetworkSchema(NetworkBase):
+    id: int
+
+
+class Networks(BaseModel):
+    items: list[NetworkSchema] = []
+    count: int = 0
+
+
+class CurrencyBase(BaseModel):
     code: str
     name: str
-    address: str
     network_id: int
+    address: str
+    decimals: int
+
+    class Config:
+        from_attributes = True
+
+
+class CurrencyCreate(NetworkBase):
+    pass
+
+
+class CurrencyUpdate(NetworkBase):
+    pass
+
+
+class CurrencySchema(NetworkBase):
+    id: int
+
+
+class Currencies(BaseModel):
+    items: list[CurrencySchema] = []
+    count: int = 0
