@@ -14,7 +14,7 @@ from models.db import get_db
 from sqlalchemy.ext.asyncio import AsyncSession
 from models.user import User, Role
 from web3 import AsyncWeb3, middleware
-from models.other import Game, GameInstance, GameStatus, GameType, Network, Currency
+from models.other import Game, GameType, Network, Currency
 import settings
 from utils.signature import decode_access_token
 from settings import email, settings
@@ -230,23 +230,14 @@ async def generate_game(
         await db.commit()
         await db.refresh(game)
 
-    game_inst = GameInstance(
-        game_id=game.id,
-        status=GameStatus.PENDING,
-        scheduled_datetime=game.scheduled_datetime,
-    )
-    db.add(game_inst)
-    await db.commit()
-    await db.refresh(game_inst)
-
     scheduler.add_job(
         func=add_to_queue,
         trigger="date",
-        args=["proceed_game", game_inst.id],
+        args=["proceed_game", game.id],
         run_date=game.scheduled_datetime,
     )
 
-    return game_inst, game
+    return game
 
 
 def nth(iterable, n, default=None):

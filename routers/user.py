@@ -308,7 +308,7 @@ async def get_tickets(
 
     data = [{
         "id": t.id,
-        "game_instance_id": t.game_instance_id,
+        "game_instance_id": t.game_id,
         "numbers": t.numbers,
         "demo": t.demo,
         "won": t.won,

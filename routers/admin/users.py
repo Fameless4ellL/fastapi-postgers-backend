@@ -5,7 +5,7 @@ from pydantic_extra_types.country import CountryAlpha3
 
 from sqlalchemy import func, select, or_
 from models.user import Balance, User, Role
-from models.other import Game, Ticket, GameInstance, JackpotInstance, Jackpot
+from models.other import Game, Ticket, Jackpot
 from routers import admin
 from routers.utils import get_admin_token
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -166,25 +166,24 @@ async def get_user_games(
 
     stmt = (
         select(
-            GameInstance.id,
+            Game.id,
             Game.name,
-            GameInstance.scheduled_datetime,
+            Game.scheduled_datetime,
             func.count(Ticket.id).label("tickets_purchased"),
             func.sum(func.coalesce(Ticket.amount, 0))
             .filter(Ticket.won.is_(True))
             .label("won_amount"),
         )
-        .join(Ticket, Ticket.game_instance_id == GameInstance.id)
-        .join(Game, Game.id == GameInstance.game_id)
+        .join(Ticket, Ticket.game_id == Game.id)
         .filter(Ticket.user_id == user_id)
-        .group_by(GameInstance.id, Game.name)
+        .group_by(Game.id, Game.name)
     )
 
     result = await db.execute(stmt.offset(offset).limit(limit))
     game_instances = result.fetchall()
 
     count = await db.execute(
-        stmt.with_only_columns(func.count(GameInstance.id))
+        stmt.with_only_columns(func.count(Game.id))
     )
     count = count.scalar() or 0
 
@@ -236,8 +235,7 @@ async def get_user_tickets(
             Ticket.won,
             Ticket.amount
         )
-        .join(GameInstance, GameInstance.id == Ticket.game_instance_id)
-        .join(Game, Game.id == GameInstance.game_id)
+        .join(Game, Game.id == Ticket.game_id)
         .filter(
             Ticket.user_id == user_id,
             Game.id == game_id,
@@ -291,22 +289,21 @@ async def get_user_jackpots(
     """
     stmt = (
         select(
-            JackpotInstance.id,
+            Jackpot.id,
             Jackpot.name,
-            JackpotInstance.scheduled_datetime,
+            Jackpot.scheduled_datetime,
             func.count(Ticket.id).label("tickets_purchased"),
         )
-        .join(Ticket, Ticket.jackpot_id == JackpotInstance.id)
-        .join(Jackpot, Jackpot.id == JackpotInstance.jackpot_id)
+        .join(Ticket, Ticket.jackpot_id == Jackpot.id)
         .filter(Ticket.user_id == user_id)
-        .group_by(JackpotInstance.id, Jackpot.name)
+        .group_by(Jackpot.id, Jackpot.name)
     )
 
     result = await db.execute(stmt.offset(offset).limit(limit))
     game_instances = result.fetchall()
 
     count = await db.execute(
-        stmt.with_only_columns(func.count(JackpotInstance.id))
+        stmt.with_only_columns(func.count(Jackpot.id))
     )
     count = count.scalar() or 0
 
@@ -357,8 +354,7 @@ async def get_user_tickets_by_jackpots(
             Ticket.won,
             Ticket.amount
         )
-        .join(JackpotInstance, JackpotInstance.id == Ticket.jackpot_id)
-        .join(Jackpot, Jackpot.id == JackpotInstance.jackpot_id)
+        .join(Jackpot, Jackpot.id == Ticket.jackpot_id)
         .filter(
             Ticket.user_id == user_id,
             Jackpot.id == game_id,

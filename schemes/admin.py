@@ -1,5 +1,8 @@
-from pydantic import BaseModel, Field, SecretStr
+from pydantic import BaseModel, Field, SecretStr, ConfigDict
 from typing import Optional
+from datetime import datetime
+
+from models.other import GameType
 
 
 class User(BaseModel):
@@ -128,18 +131,115 @@ class CurrencyBase(BaseModel):
         from_attributes = True
 
 
-class CurrencyCreate(NetworkBase):
+class CurrencyCreate(CurrencyBase):
     pass
 
 
-class CurrencyUpdate(NetworkBase):
+class CurrencyUpdate(CurrencyBase):
     pass
 
 
-class CurrencySchema(NetworkBase):
+class CurrencySchema(CurrencyBase):
     id: int
 
 
 class Currencies(BaseModel):
     items: list[CurrencySchema] = []
+    count: int = 0
+
+
+class GameBase(BaseModel):
+    name: str
+    game_type: str
+    currency_id: Optional[int]
+    limit_by_ticket: int = 9
+    max_limit_grid: int = 90
+    price: float = 1.0
+    description: Optional[str]
+    max_win_amount: Optional[float] = 8.0
+    prize: Optional[float] = 1000.0
+    country: Optional[str]
+    min_ticket_count: int = 1
+    scheduled_datetime: Optional[datetime]
+    zone: Optional[int] = 1
+    repeat: Optional[bool] = False
+    repeat_days: Optional[list[int]]
+    updated_at: datetime
+    created_at: datetime
+
+    class Config:
+        from_attributes = True
+
+
+class GameCreate(BaseModel):
+    name: str
+    game_type: GameType
+    currency_id: Optional[int]
+    limit_by_ticket: int = 9
+    max_limit_grid: int = 90
+    price: float = 1.0
+    description: Optional[str]
+    max_win_amount: Optional[float] = 8.0
+    prize: Optional[float] = 1000.0
+    country: Optional[str]
+    min_ticket_count: int = 1
+    scheduled_datetime: Optional[datetime]
+    zone: Optional[int] = 1
+    repeat: Optional[bool] = False
+    repeat_days: Optional[list[int]]
+
+
+class GameUpdate(GameCreate):
+    pass
+
+
+class GameSchema(GameBase):
+    id: int
+
+
+class Games(BaseModel):
+    items: list[GameSchema] = []
+    count: int = 0
+
+
+class JackpotBase(BaseModel):
+    name: str
+    _type: GameType
+    percentage: float = 10.0
+    image: Optional[str] = "default_image.png"
+    country: Optional[str]
+    scheduled_datetime: datetime
+    tzone: int = 1
+    repeat: bool = False
+    repeat_days: list[int] = [0, 1, 2, 3, 4, 5, 6]
+
+    updated_at: datetime
+    created_at: datetime
+
+    class Config:
+        from_attributes = True
+
+
+class JackpotCreate(BaseModel):
+    name: str
+    _type: str
+    percentage: float = 10.0
+    image: Optional[str] = "default_image.png"
+    country: Optional[str]
+    scheduled_datetime: datetime
+    tzone: int = 1
+    repeat: bool = False
+    repeat_days: list[int] = [0, 1, 2, 3, 4, 5, 6]
+
+
+class JackpotUpdate(JackpotCreate):
+    pass
+
+
+class JackpotSchema(JackpotBase):
+    id: int
+
+
+class Jackpots(BaseModel):
+    items: list[JackpotSchema] = []
     count: int = 0

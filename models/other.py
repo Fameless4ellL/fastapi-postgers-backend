@@ -79,6 +79,7 @@ class Jackpot(Base):
     id = Column(Integer, primary_key=True, index=True)
     name = Column(String(100), nullable=False)
     _type = Column(SqlEnum(JackpotType), default=JackpotType.GLOBAL)
+    currency_id = Column(Integer, ForeignKey('currencies.id'), nullable=True)
     percentage = Column(DECIMAL(5, 2), default=10, doc="Percentage of deductions from daily money games")
     image = Column(String(255), nullable=True, default="default_image.png", doc="The image of the instance")
     country = Column(String(32), nullable=True)
@@ -92,6 +93,9 @@ class Jackpot(Base):
         doc="The days of the week when the instance is repeated, required if repeat is True"
     )
 
+    image = Column(String(255), nullable=True, default="default_image.png", doc="The image of the game instance")
+    status = Column(SqlEnum(GameStatus), default=GameStatus.PENDING)
+
     created_at = Column(DateTime, default=datetime.datetime.now)
     updated_at = Column(DateTime, default=datetime.datetime.now, onupdate=datetime.datetime.now)
 
@@ -102,7 +106,7 @@ class JackpotInstance(Base):
     __tablename__ = "jackpot_instances"
 
     id = Column(Integer, primary_key=True, index=True)
-    jackpot_id = Column(Integer, ForeignKey('jackpots.id'), nullable=False)
+    jackpot_id = Column(Integer, ForeignKey('jackpots.id'), nullable=True)
     status = Column(SqlEnum(JackpotStatus), default=JackpotStatus.PENDING)
     scheduled_datetime = Column(DateTime, default=datetime.datetime.now, doc="The date and time when the game instance will be held")
     created_at = Column(DateTime, default=datetime.datetime.now)
@@ -126,6 +130,9 @@ class Game(Base):
     prize = Column(DECIMAL(9, 2), nullable=True, default=1000)
     country = Column(String(32), nullable=True)
     min_ticket_count = Column(Integer, default=1, doc="Minimum number of tickets per user")
+
+    image = Column(String(255), nullable=True, default="default_image.png", doc="The image of the game instance")
+    status = Column(SqlEnum(GameStatus), default=GameStatus.PENDING)
 
     scheduled_datetime = Column(DateTime, default=datetime.datetime.now, doc="The date and time when the game instance will be held")
     zone = Column(Integer, default=1, doc="The timezone of the game instance in UTC format")
@@ -162,7 +169,7 @@ class Ticket(Base):
 
     id = Column(Integer, primary_key=True, index=True)
     user_id = Column(Integer, ForeignKey('users.id'), nullable=False)
-    game_instance_id = Column(Integer, ForeignKey('game_instances.id'), nullable=False)
+    game_id = Column(Integer, ForeignKey('games.id'), nullable=True)
     jackpot_id = Column(Integer, ForeignKey('jackpots.id'), nullable=True)
     currency_id = Column(Integer, ForeignKey('currencies.id'), nullable=True)
     numbers = Column(ARRAY(Integer), nullable=False)

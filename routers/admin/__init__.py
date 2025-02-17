@@ -44,7 +44,7 @@ def get_crud_router(
 
         return JSONResponse(
             status_code=status.HTTP_200_OK,
-            content=schema(items=[item for item in items], count=count).model_dump()
+            content=schema(items=[item for item in items], count=count).model_dump(mode='json')
         )
 
     @router.get(
@@ -62,9 +62,16 @@ def get_crud_router(
         stmt = select(model).where(model.id == id)
         item = await db.execute(stmt)
         item = item.scalar()
+
+        if not item:
+            return JSONResponse(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                content=BadResponse(message=f"{model.__name__} not found").model_dump(mode='json')
+            )
+
         return JSONResponse(
             status_code=status.HTTP_200_OK,
-            content=get_schema.model_validate(item).model_dump()
+            content=get_schema.model_validate(item).model_dump(mode='json')
         )
 
     @router.post(
@@ -84,7 +91,7 @@ def get_crud_router(
         await db.commit()
         return JSONResponse(
             status_code=status.HTTP_201_CREATED,
-            content=get_schema.model_validate(new_item).model_dump()
+            content=get_schema.model_validate(new_item).model_dump(mode='json')
         )
 
     @router.put(
@@ -108,7 +115,7 @@ def get_crud_router(
         await db.commit()
         return JSONResponse(
             status_code=status.HTTP_200_OK,
-            content=get_schema.model_validate(db_item).model_dump()
+            content=get_schema.model_validate(db_item).model_dump(mode='json')
         )
 
 

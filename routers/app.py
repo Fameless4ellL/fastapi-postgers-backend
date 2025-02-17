@@ -1,21 +1,20 @@
 import datetime
 import json
 import random
-from typing import Annotated
+from typing import Annotated, Optional
 from fastapi import Depends, Path, status
 from fastapi.responses import JSONResponse
 from sqlalchemy import func, select, exists
 from web3 import AsyncWeb3
 from models.db import get_db
-from models.user import Balance, BalanceChangeHistory, User
+from models.user import Balance, BalanceChangeHistory, User, Wallet
 from models.other import (
     Currency,
     Game,
-    GameInstance,
     GameStatus,
     GameType,
+    Jackpot,
     Ticket,
-    JackpotInstance,
     JackpotType,
     JackpotStatus,
 )
@@ -69,66 +68,63 @@ async def game_instances(
     """
     Получение списка доступных игр
     """
-    stmt = select(GameInstance).options(
-        joinedload(GameInstance.game).load_only(
-            Game.name,
-            Game.price,
-            Game.prize,
-            Game.max_limit_grid,
-        )
-    ).filter(
-        GameInstance.status == GameStatus.PENDING,
-        GameInstance.game.has(game_type=_type)
+    stmt = select(Game).filter(
+        Game.status == GameStatus.PENDING,
+        Game.game_type == _type
     ).add_columns(
-        GameInstance.created_at,
-        GameInstance.id,
-        GameInstance.status,
-        GameInstance.scheduled_datetime
+        Game.name,
+        Game.price,
+        Game.prize,
+        Game.max_limit_grid,
+        Game.created_at,
+        Game.id,
+        Game.status,
+        Game.scheduled_datetime
     ).offset(offset).limit(limit)
 
     if _type is GameType.LOCAL:
-        stmt = stmt.filter(GameInstance.game.has(country=user.country))
+        stmt = stmt.filter(Game.country == user.country)
 
     result = await db.execute(stmt)
     game = result.scalars().all()
 
     data = [{
         "id": g.id,
-        "name": g.game.name,
+        "name": g.name,
         "image": url_for("static", path=g.image),
         "status": g.status.value,
-        "price": float(g.game.price),
-        "prize": float(g.game.prize),
-        "max_limit_grid": g.game.max_limit_grid,
+        "price": float(g.price),
+        "prize": float(g.prize),
+        "max_limit_grid": g.max_limit_grid,
         "endtime": g.scheduled_datetime.timestamp(),
         "created": g.created_at.timestamp()
     } for g in game]
 
-    stmt = select(func.count(GameInstance.id)).filter(
-        GameInstance.status == GameStatus.PENDING,
-        GameInstance.game.has(game_type=_type)
+    stmt = select(func.count(Game.id)).filter(
+        Game.status == GameStatus.PENDING,
+        Game.game_type == _type
     )
 
     if _type is GameType.LOCAL:
-        stmt = stmt.filter(GameInstance.game.has(country=user.country))
+        stmt = stmt.filter(Game.country == user.country)
 
     count_result = await db.execute(stmt)
     count = count_result.scalar()
 
     if not data and count == 0:
         # create a new game
-        game_inst, _game = await generate_game(db, _type, user.country)
+        _game = await generate_game(db, _type, user.country)
 
         data = [{
-            "id": game_inst.id,
+            "id": _game.id,
             "name": _game.name,
-            "image": url_for("static", path=game_inst.image),
-            "status": game_inst.status.value,
+            "image": url_for("static", path=_game.image),
+            "status": _game.status.value,
             "price": float(_game.price),
             "prize": float(_game.prize),
             "max_limit_grid": _game.max_limit_grid,
-            "endtime": game_inst.scheduled_datetime.timestamp(),
-            "created": game_inst.created_at.timestamp()
+            "endtime": _game.scheduled_datetime.timestamp(),
+            "created": _game.created_at.timestamp()
         }]
 
     return JSONResponse(
@@ -159,9 +155,8 @@ async def calc_balance(
         await db.commit()
 
     result = await db.execute(
-        select(GameInstance)
-        .options(joinedload(GameInstance.game).load_only(Game.price))
-        .filter(GameInstance.id == game_id)
+        select(Game)
+        .filter(Game.id == game_id)
     )
     game = result.scalars().first()
 
@@ -171,7 +166,7 @@ async def calc_balance(
             content=BadResponse(message="Game not found").model_dump()
         )
 
-    total_balance = balance.balance - (game.game.price * quantity)
+    total_balance = balance.balance - (game.price * quantity)
 
     return JSONResponse(
         status_code=status.HTTP_200_OK if total_balance >= 0 else status.HTTP_400_BAD_REQUEST,
@@ -192,9 +187,8 @@ async def read_game(
     Получение доп. информации по игре
     """
     result = await db.execute(
-        select(GameInstance)
-        .options(joinedload(GameInstance.game))
-        .filter(GameInstance.id == game_id)
+        select(Game)
+        .filter(Game.id == game_id)
     )
     game = result.scalars().first()
 
@@ -204,8 +198,8 @@ async def read_game(
             content=BadResponse(message="Game not found").model_dump()
         )
     if (
-        game.game.game_type == GameType.LOCAL
-        and str(game.game.country) != user.country
+        game.game_type == GameType.LOCAL
+        and str(game.country) != user.country
     ):
         return JSONResponse(
             status_code=status.HTTP_404_NOT_FOUND,
@@ -214,16 +208,16 @@ async def read_game(
 
     data = {
         "id": game.id,
-        "name": game.game.name,
-        "description": game.game.description,
+        "name": game.name,
+        "description": game.description,
         "status": game.status.value,
         "image": url_for("static", path=game.image),
-        "game_type": game.game.game_type.value,
-        "limit_by_ticket": game.game.limit_by_ticket,
-        "min_ticket_count": game.game.min_ticket_count,
-        "max_limit_grid": game.game.max_limit_grid,
-        "price": float(game.game.price or 0),
-        "prize": float(game.game.prize or 0),
+        "game_type": game.game_type.value,
+        "limit_by_ticket": game.limit_by_ticket,
+        "min_ticket_count": game.min_ticket_count,
+        "max_limit_grid": game.max_limit_grid,
+        "price": float(game.price or 0),
+        "prize": float(game.prize or 0),
         "endtime": game.scheduled_datetime.timestamp(),
         "created": game.created_at.timestamp()
     }
@@ -249,19 +243,12 @@ async def buy_tickets(
     """
     Для покупки билетов frame:20
     """
-    game_inst = await db.execute(
-        select(GameInstance)
-        .filter(GameInstance.id == game_id)
-        .add_columns(GameInstance.status, GameInstance.game_id)
+    game = await db.execute(
+        select(Game)
+        .filter(Game.id == game_id)
     )
-    game_inst = game_inst.scalar()
-    if game_inst is None or game_inst.status != GameStatus.PENDING:
-        return JSONResponse(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            content=BadResponse(message="Game not found").model_dump()
-        )
+    game: Optional[Game] = game.scalar()
 
-    game = await db.get(Game, game_inst.game_id)
     if game is None:
         return JSONResponse(
             status_code=status.HTTP_400_BAD_REQUEST,
@@ -269,8 +256,8 @@ async def buy_tickets(
         )
 
     if (
-        game.game.game_type == GameType.LOCAL
-        and str(game.game.country) != user.country
+        game.game_type == GameType.LOCAL
+        and str(game.country) != user.country
     ):
         return JSONResponse(
             status_code=status.HTTP_404_NOT_FOUND,
@@ -302,7 +289,7 @@ async def buy_tickets(
 
     if not item.demo:
         wallet = await db.execute(
-            select(User.wallet).filter(User.id == user.id)
+            select(Wallet).filter(User.id == user.id)
         )
         wallet = wallet.scalar()
 
@@ -344,18 +331,18 @@ async def buy_tickets(
 
         # jackpots
         jackpots = await db.execute(
-            select(JackpotInstance)
+            select(Jackpot)
             .filter(
-                JackpotInstance.status == JackpotStatus.PENDING
+                Jackpot.status == JackpotStatus.PENDING
             )
         )
         jackpots = jackpots.scalars().all()
 
         for jackpot in jackpots:
-            if jackpot.jackpot._type == JackpotType.LOCAL and jackpot.jackpot.country != user.country:
+            if jackpot._type == JackpotType.LOCAL and jackpot.country != user.country:
                 continue
 
-            jackpot.amount += total_price * float(jackpot.jackpot.percentage) / 100
+            jackpot.amount += total_price * float(jackpot.percentage) / 100
             jackpot_id = jackpot.id
             db.add(jackpot)
 
@@ -384,7 +371,7 @@ async def buy_tickets(
             select(exists().where(
                 Ticket.user_id == user.id,
                 Ticket.demo.is_(True),
-                Ticket.game_instance_id == game_id
+                Ticket.game_id == game_id
             ))
         )
         if ticket.scalar():
@@ -399,7 +386,7 @@ async def buy_tickets(
     tickets = [
         Ticket(
             user_id=user.id,
-            game_instance_id=game_id,
+            game_id=game_id,
             numbers=numbers,
             demo=item.demo,
             jackpot_id=jackpot_id,
@@ -428,20 +415,12 @@ async def gen_tickets(
     """
     generate tickets
     """
-    game_inst = await db.execute(
-        select(GameInstance)
-        .filter(GameInstance.id == game_id)
-        .add_columns(GameInstance.status, GameInstance.game_id)
+    game = await db.execute(
+        select(Game)
+        .filter(Game.id == game_id)
     )
-    game_inst = game_inst.scalar()
-    if game_inst is None or game_inst.status != GameStatus.PENDING:
-        return JSONResponse(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            content=BadResponse(message="Game not found").model_dump()
-        )
-
-    game = await db.get(Game, game_inst.game_id)
-    if game is None:
+    game = game.scalar()
+    if game is None or game.status != GameStatus.PENDING:
         return JSONResponse(
             status_code=status.HTTP_400_BAD_REQUEST,
             content=BadResponse(message="Game not found").model_dump()
@@ -516,20 +495,12 @@ async def edit_ticket(
     user: Annotated[User, Depends(get_user)],
     db: Annotated[AsyncSession, Depends(get_db)],
 ):
-    game_inst = await db.execute(
-        select(GameInstance)
-        .filter(GameInstance.id == game_id)
-        .add_columns(GameInstance.status, GameInstance.game_id)
+    game = await db.execute(
+        select(Game)
+        .filter(Game.id == game_id)
     )
-    game_inst = game_inst.scalar()
-    if game_inst is None or game_inst.status != GameStatus.PENDING:
-        return JSONResponse(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            content=BadResponse(message="Game not found").model_dump()
-        )
-
-    game = await db.get(Game, game_inst.game_id)
-    if game is None:
+    game = game.scalar()
+    if game is None or game.status != GameStatus.PENDING:
         return JSONResponse(
             status_code=status.HTTP_400_BAD_REQUEST,
             content=BadResponse(message="Game not found").model_dump()
@@ -584,7 +555,7 @@ async def get_leaderboard(
     """
     tickets = await db.execute(
         select(Ticket)
-        .filter(Ticket.game_instance_id == game_id)
+        .filter(Ticket.game_id == game_id)
         .order_by(Ticket.won.desc())
         .offset(skip).limit(limit)
     )
@@ -592,7 +563,7 @@ async def get_leaderboard(
 
     data = [{
         "id": t.id,
-        "game_instance_id": t.game_instance_id,
+        "game_instance_id": t.game_id,
         "numbers": t.numbers,
         "demo": t.demo,
         "won": t.won,
@@ -602,7 +573,7 @@ async def get_leaderboard(
 
     count_result = await db.execute(
         select(func.count(Ticket.id))
-        .filter(Ticket.game_instance_id == game_id)
+        .filter(Ticket.game_id == game_id)
     )
     count = count_result.scalar()
 
@@ -623,17 +594,17 @@ async def get_jackpots(
     """
     Получение списка джекпотов
     """
-    stmt = select(JackpotInstance).filter(
-        JackpotInstance.status == JackpotStatus.PENDING,
-        JackpotInstance.jackpot.has(_type=JackpotType.LOCAL),
-        JackpotInstance.jackpot.has(country=user.country)
+    stmt = select(Jackpot).filter(
+        Jackpot.status == GameStatus.PENDING,
+        Jackpot._type == JackpotType.LOCAL,
+        Jackpot.country == user.country
     ).offset(0).limit(5)
     local = await db.execute(stmt)
     local = local.scalars().all() or []
 
-    stmt = select(JackpotInstance).filter(
-        JackpotInstance.status == JackpotStatus.PENDING,
-        JackpotInstance.jackpot.has(_type=JackpotType.GLOBAL)
+    stmt = select(Jackpot).filter(
+        Jackpot.status == GameStatus.PENDING,
+        Jackpot._type == JackpotType.GLOBAL
     ).offset(0).limit(5)
     global_ = await db.execute(stmt)
     global_ = global_.scalars().all() or []
@@ -641,7 +612,6 @@ async def get_jackpots(
     data = [
         {
             "id": j.id,
-            "jackpot_id": j.jackpot_id,
             "status": j.status.value,
             "endtime": j.scheduled_datetime.timestamp(),
             "created": j.created_at.timestamp()

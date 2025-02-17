@@ -1,3 +1,4 @@
+from decimal import Decimal
 import json
 import requests
 import marshal
@@ -6,7 +7,7 @@ from typing import Optional
 from datetime import datetime, timedelta
 
 from models.db import get_sync_db
-from models.other import Game, GameInstance, GameStatus, Ticket
+from models.other import Game, GameStatus, Ticket
 from utils import worker
 from models.user import Balance, BalanceChangeHistory
 from globals import redis
@@ -47,10 +48,23 @@ def generate_game(
         minute=game.scheduled_datetime.minute,
     )
 
-    game_inst = GameInstance(
-        game_id=game.id,
+    game_inst = Game(
+        name=f"game #{str(game.id)}",
+        game_type=game.game_type,
+        description=game.description,
+        country=game.country,
+        repeat=True,
+        repeat_days=game.repeat_days,
+        scheduled_datetime=scheduled_datetime,
+        price=game.price,
+        max_win_amount=game.max_win_amount,
+        prize=game.prize,
+        currency_id=game.currency_id,
+        limit_by_ticket=game.limit_by_ticket,
+        max_limit_grid=game.max_limit_grid,
+        min_ticket_count=game.min_ticket_count,
+        image=game.image,
         status=GameStatus.PENDING,
-        scheduled_datetime=scheduled_datetime
     )
     db.add(game_inst)
     db.commit()
@@ -73,23 +87,22 @@ def proceed_game(game_id: Optional[int] = None):
     db = next(get_sync_db())
 
     if game_id:
-        pending_games = db.query(GameInstance).filter(
-            GameInstance.status == GameStatus.PENDING,
-            GameInstance.id == game_id
+        pending_games = db.query(Game).filter(
+            Game.status == GameStatus.PENDING,
+            Game.id == game_id
         ).with_for_update().all()
     else:
-        pending_games = db.query(GameInstance).filter(
-            GameInstance.status == GameStatus.PENDING
+        pending_games = db.query(Game).filter(
+            Game.status == GameStatus.PENDING
         ).with_for_update().all()
 
-    for game_inst in pending_games:
-        game = db.query(Game).filter(Game.id == game_inst.game_id).first()
+    for game in pending_games:
 
         if not game:
             continue
 
         tickets = db.query(Ticket).filter(
-            Ticket.game_instance_id == game_inst.id
+            Ticket.game_id == game.id
         ).all()
 
         prize = float(game.prize or 1000)
@@ -135,7 +148,7 @@ def proceed_game(game_id: Optional[int] = None):
                     continue
 
                 previous_balance = user_balance.balance
-                user_balance.balance += prize_per_ticket
+                user_balance.balance += Decimal(prize_per_ticket)
                 db.add(user_balance)
 
                 balance_change = BalanceChangeHistory(
@@ -147,8 +160,8 @@ def proceed_game(game_id: Optional[int] = None):
                     new_balance=user_balance.balance
                 )
                 db.add(balance_change)
-        game_inst.status = GameStatus.COMPLETED
-        db.add(game_inst)
+        game.status = GameStatus.COMPLETED
+        db.add(game)
 
         if game.repeat:
             generate_game(game.id)

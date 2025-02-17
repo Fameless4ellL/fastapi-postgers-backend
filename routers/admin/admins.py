@@ -6,7 +6,7 @@ from pydantic_extra_types.country import CountryAlpha3
 
 from sqlalchemy import func, select, or_
 from models.user import User, Role
-from models.other import Network, Currency
+from models.other import Game, Jackpot, Network, Currency
 from routers import admin
 from routers.admin import get_crud_router
 from routers.utils import get_admin_token, send_mail
@@ -23,7 +23,15 @@ from schemes.admin import (
     Currencies,
     CurrencyCreate,
     CurrencyUpdate,
-    NetworkUpdate
+    NetworkUpdate,
+    GameSchema,
+    Games,
+    GameCreate,
+    GameUpdate,
+    Jackpots,
+    JackpotSchema,
+    JackpotCreate,
+    JackpotUpdate,
 )
 from schemes.base import BadResponse
 
@@ -64,6 +72,22 @@ get_crud_router(
     get_schema=CurrencySchema,
     create_schema=CurrencyCreate,
     update_schema=CurrencyUpdate
+)
+get_crud_router(
+    model=Game,
+    prefix="/games",
+    schema=Games,
+    get_schema=GameSchema,
+    create_schema=GameCreate,
+    update_schema=GameUpdate
+)
+get_crud_router(
+    model=Jackpot,
+    prefix="/jackpots",
+    schema=Jackpots,
+    get_schema=JackpotSchema,
+    create_schema=JackpotCreate,
+    update_schema=JackpotUpdate
 )
 
 
