@@ -333,7 +333,7 @@ async def buy_tickets(
         jackpots = await db.execute(
             select(Jackpot)
             .filter(
-                Jackpot.status == JackpotStatus.PENDING
+                Jackpot.status == GameStatus.PENDING
             )
         )
         jackpots = jackpots.scalars().all()

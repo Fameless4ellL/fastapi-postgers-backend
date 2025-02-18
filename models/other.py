@@ -98,11 +98,14 @@ class Jackpot(Base):
 
     created_at = Column(DateTime, default=datetime.datetime.now)
     updated_at = Column(DateTime, default=datetime.datetime.now, onupdate=datetime.datetime.now)
+    
+    deleted = Column(Boolean, default=False, doc="Indicates if the instance is deleted")
 
     jackpot_instances = relationship("JackpotInstance", back_populates="jackpot", uselist=False)
 
 
 class JackpotInstance(Base):
+    """deprecated"""
     __tablename__ = "jackpot_instances"
 
     id = Column(Integer, primary_key=True, index=True)
@@ -121,6 +124,7 @@ class Game(Base):
     id = Column(Integer, primary_key=True, index=True)
     name = Column(String(100), nullable=False)
     game_type = Column(SqlEnum(GameType), nullable=False)
+    kind = Column(SqlEnum(GameView), default=GameView.MONETARY, doc="The type of the game", nullable=True)
     currency_id = Column(Integer, ForeignKey('currencies.id'), nullable=True)
     limit_by_ticket = Column(Integer, default=9)
     max_limit_grid = Column(Integer, default=90)
@@ -144,6 +148,8 @@ class Game(Base):
         doc="The days of the week when the game instance is repeated, required if repeat is True"
     )
 
+    deleted = Column(Boolean, default=False, doc="Indicates if the instance is deleted")
+
     created_at = Column(DateTime, default=datetime.datetime.now)
     updated_at = Column(DateTime, default=datetime.datetime.now, onupdate=datetime.datetime.now)
 
@@ -151,6 +157,7 @@ class Game(Base):
 
 
 class GameInstance(Base):
+    """deprecated"""
     __tablename__ = "game_instances"
 
     id = Column(Integer, primary_key=True, index=True)

@@ -2,7 +2,13 @@ from pydantic import BaseModel, Field, SecretStr, ConfigDict
 from typing import Optional
 from datetime import datetime
 
-from models.other import GameType
+from models.other import GameStatus, GameType, GameView
+from utils.datastructure import MultiValueEnum
+
+
+class BaseAdmin(BaseModel):
+    class Config:
+        from_attributes = True
 
 
 class User(BaseModel):
@@ -148,7 +154,7 @@ class Currencies(BaseModel):
     count: int = 0
 
 
-class GameBase(BaseModel):
+class GameBase(BaseAdmin):
     name: str
     game_type: str
     currency_id: Optional[int]
@@ -167,11 +173,8 @@ class GameBase(BaseModel):
     updated_at: datetime
     created_at: datetime
 
-    class Config:
-        from_attributes = True
 
-
-class GameCreate(BaseModel):
+class GameCreate(BaseAdmin):
     name: str
     game_type: GameType
     currency_id: Optional[int]
@@ -193,13 +196,43 @@ class GameUpdate(GameCreate):
     pass
 
 
-class GameSchema(GameBase):
+class GameSchema(BaseAdmin):
     id: int
+    name: str
+    kind: str
+    limit_by_ticket: int = 9
+    max_limit_grid: int = 90
+    game_type: str
+    status: GameStatus
+    deleted: bool
+    updated_at: datetime
+    created_at: datetime
 
 
 class Games(BaseModel):
     items: list[GameSchema] = []
     count: int = 0
+
+
+class Category(MultiValueEnum):
+    _5x36 = 0, {"limit_by_ticket": 5, "max_limit_grid": 36}
+    _6x45 = 1, {"limit_by_ticket": 6, "max_limit_grid": 45}
+    _10x75 = 2, {"limit_by_ticket": 10, "max_limit_grid": 75}
+    _15x90 = 3, {"limit_by_ticket": 15, "max_limit_grid": 90}
+
+
+class GameFilter:
+    def __init__(
+        self,
+        game_type: Optional[GameType] = None,
+        category: Optional[list[Category]] = None,
+        date_from: Optional[datetime] = None,
+        date_to: Optional[datetime] = None,
+    ):
+        self.game_type = game_type
+        self.category = category
+        self.date_from = date_from
+        self.date_to = date_to
 
 
 class JackpotBase(BaseModel):
@@ -211,6 +244,7 @@ class JackpotBase(BaseModel):
     scheduled_datetime: datetime
     tzone: int = 1
     repeat: bool = False
+    status: GameStatus
     repeat_days: list[int] = [0, 1, 2, 3, 4, 5, 6]
 
     updated_at: datetime

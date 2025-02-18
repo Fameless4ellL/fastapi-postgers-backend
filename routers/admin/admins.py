@@ -16,6 +16,7 @@ from models.db import get_db
 from schemes.admin import (
     Admin,
     Admins,
+    GameFilter,
     NetworkCreate,
     NetworkSchema,
     Networks,
@@ -79,7 +80,8 @@ get_crud_router(
     schema=Games,
     get_schema=GameSchema,
     create_schema=GameCreate,
-    update_schema=GameUpdate
+    update_schema=GameUpdate,
+    filters=Annotated[GameFilter, Depends(GameFilter)]
 )
 get_crud_router(
     model=Jackpot,

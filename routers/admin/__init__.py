@@ -8,6 +8,8 @@ from pydantic import BaseModel
 from models.db import get_db
 from models.user import Role
 from routers import admin
+from globals import scheduler
+from utils.workers import add_to_queue
 from routers.utils import get_admin_token
 
 
@@ -18,7 +20,9 @@ def get_crud_router(
     create_schema: Type[BaseModel],
     update_schema: Type[BaseModel],
     prefix: str = "",
-    security_scopes: List[str] = [Role.GLOBAL_ADMIN.value]
+    security_scopes: List[str] = [Role.GLOBAL_ADMIN.value],
+    filters: Annotated = None,
+    order_by: str = "id"
 ) -> APIRouter:
     router = admin
 
@@ -32,11 +36,33 @@ def get_crud_router(
     )
     async def get_items(
         db: Annotated[AsyncSession, Depends(get_db)],
+        filters: filters,
         offset: int = 0,
         limit: int = 10,
     ):
+
         stmt = select(model)
-        items = await db.execute(stmt.offset(offset).limit(limit))
+
+        if model.__name__ == "Game":
+            filters: GameFilter = filters
+
+            if filters.game_type:
+                stmt = stmt.filter(model.game_type == filters.game_type)
+
+            if filters.category:
+                for category in filters.category:
+                    stmt = stmt.filter(
+                        model.limit_by_ticket == category.label['limit_by_ticket'],
+                        model.max_limit_grid == category.label['max_limit_grid']
+                    )
+
+            if filters.date_from:
+                stmt = stmt.filter(model.created_at >= filters.date_from)
+
+            if filters.date_to:
+                stmt = stmt.filter(model.scheduled_datetime <= filters.date_to)
+
+        items = await db.execute(stmt.order_by(model.id.desc()).offset(offset).limit(limit))
         items = items.scalars().all()
 
         count = await db.execute(stmt.with_only_columns(func.count(model.id)))
@@ -89,6 +115,15 @@ def get_crud_router(
         new_item = model(**item.model_dump())
         db.add(new_item)
         await db.commit()
+
+        if model.__name__ == "Game":
+            scheduler.add_job(
+                func=add_to_queue,
+                trigger="date",
+                args=[new_item.id],
+                run_date=new_item.scheduled_datetime,
+            )
+
         return JSONResponse(
             status_code=status.HTTP_201_CREATED,
             content=get_schema.model_validate(new_item).model_dump(mode='json')
