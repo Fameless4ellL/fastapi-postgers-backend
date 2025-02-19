@@ -2,7 +2,7 @@ from fastapi import APIRouter, Depends, Path, status, Security
 from fastapi.responses import JSONResponse
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select, func
-from typing import Type, List, Annotated
+from typing import Type, List, Annotated, Optional
 from schemes.base import BadResponse
 from pydantic import BaseModel
 from models.db import get_db
@@ -21,7 +21,7 @@ def get_crud_router(
     update_schema: Type[BaseModel],
     prefix: str = "",
     security_scopes: List[str] = [Role.GLOBAL_ADMIN.value],
-    filters: Annotated = None,
+    filters: Optional[object] = None,
     order_by: str = "id"
 ) -> APIRouter:
     router = admin

@@ -131,7 +131,7 @@ class CurrencyBase(BaseModel):
     name: str
     network_id: int
     address: str
-    decimals: int
+    decimals: Optional[int]
 
     class Config:
         from_attributes = True
@@ -233,6 +233,10 @@ class GameFilter:
         self.category = category
         self.date_from = date_from
         self.date_to = date_to
+        
+        
+class Empty:
+    pass
 
 
 class JackpotBase(BaseModel):

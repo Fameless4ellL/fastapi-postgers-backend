@@ -361,6 +361,7 @@ async def buy_tickets(
             change_amount=-total_price,
             change_type="ticket purchase",
             previous_balance=user_balance.balance + total_price,
+            status=BalanceChangeHistory.Status.PENDING,
             new_balance=user_balance.balance
         )
         db.add(balance_change)
@@ -614,6 +615,9 @@ async def get_jackpots(
             "id": j.id,
             "status": j.status.value,
             "endtime": j.scheduled_datetime.timestamp(),
+            "image": url_for("static", path=j.image),
+            "amount": float(j.prize),
+            "percentage": j.percentage,
             "created": j.created_at.timestamp()
         } for j in local + global_
     ]

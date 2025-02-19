@@ -1,7 +1,7 @@
 import datetime
 from enum import Enum
 from .db import Base
-from sqlalchemy import DECIMAL, Boolean, Column, DateTime, ForeignKey, Integer, String
+from sqlalchemy import DECIMAL, Boolean, Column, DateTime, ForeignKey, Integer, String, Enum as SQLEnum
 
 
 class Role(Enum):
@@ -61,6 +61,13 @@ class Balance(Base):
 
 
 class BalanceChangeHistory(Base):
+    class Status(Enum):
+        PENDING = "pending"
+        SUCCESS = "success"
+        CANCELED = "canceled"
+        INSUFFICIENT_FUNDS = "insufficient_funds"
+        WEB3_ERROR = "web3_error"
+
     __tablename__ = "balance_change_history"
 
     id = Column(Integer, primary_key=True, index=True)
@@ -69,7 +76,9 @@ class BalanceChangeHistory(Base):
     currency_id = Column(Integer, ForeignKey('currencies.id', ondelete='CASCADE'), nullable=True)
     change_amount = Column(DECIMAL(20, 8), default=0)
     change_type = Column(String(64), nullable=False)
-    previous_balance = Column(Integer, nullable=False)
+    previous_balance = Column(Integer, nullable=False)    
+    status = Column(SQLEnum(Status), default=Status.PENDING)
     proof = Column(String(256), nullable=True)
     new_balance = Column(DECIMAL(20, 8), default=0)
+    args = Column(String, nullable=True, default="{}")
     created_at = Column(DateTime, default=datetime.datetime.now)

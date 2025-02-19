@@ -21,6 +21,7 @@ from schemes.game import (
     Tickets, Deposit, Withdraw
 )
 from schemes.user import Profile
+from utils.workers import add_to_queue
 
 
 @public.get(
@@ -209,7 +210,6 @@ async def withdraw(
     user: Annotated[User, Depends(get_user)],
     db: Annotated[AsyncSession, Depends(get_db)],
     currency: Annotated[Currency, Depends(get_currency)],
-    w3: Annotated[AsyncWeb3, Depends(get_w3)],
     item: Withdraw
 ):
     """
@@ -227,36 +227,6 @@ async def withdraw(
             content="Wallet not found"
         )
 
-    try:
-        abi = await aredis.get("abi")
-
-        contract = w3.eth.contract(
-            address=currency.address,
-            abi=json.loads(abi)
-        )
-
-        amount = int(item.amount * 10 ** currency.decimals)
-        _hash = await contract.functions.transfer(wallet.address, amount).transact()
-
-        tx = await w3.eth.wait_for_transaction_receipt(_hash, timeout=60)
-    except Exception as e:
-        return JSONResponse(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            content=str(e)
-        )
-
-    if tx is None:
-        return JSONResponse(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            content="Transaction not found"
-        )
-
-    if tx.status != 1:
-        return JSONResponse(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            content="Transaction failed"
-        )
-
     balance_result = await db.execute(
         select(Balance)
         .with_for_update()
@@ -266,8 +236,12 @@ async def withdraw(
     if not balance:
         balance = Balance(user_id=user.id)
         db.add(balance)
-    else:
-        balance.balance -= Decimal(item.amount)
+
+    if balance.balance < item.amount:
+        return JSONResponse(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            content="Insufficient funds"
+        )
 
     history = BalanceChangeHistory(
         user_id=user.id,
@@ -275,15 +249,24 @@ async def withdraw(
         currency_id=currency.id,
         change_amount=item.amount,
         change_type="withdrawal",
+        status=BalanceChangeHistory.Status.PENDING,
         previous_balance=balance.balance - Decimal(item.amount),
-        proof=_hash,
         new_balance=balance.balance
     )
 
     db.add(history)
+
+    balance.balance -= Decimal(item.amount)
+    db.add(balance)
+
     await db.commit()
 
-    return JSONResponse(status_code=status.HTTP_200_OK, content=tx)
+    add_to_queue(
+        "withdraw",
+        {"history_id": history.id, }
+    )
+
+    return JSONResponse(status_code=status.HTTP_200_OK)
 
 
 @public.get(

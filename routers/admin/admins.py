@@ -33,6 +33,7 @@ from schemes.admin import (
     JackpotSchema,
     JackpotCreate,
     JackpotUpdate,
+    Empty
 )
 from schemes.base import BadResponse
 
@@ -64,7 +65,8 @@ get_crud_router(
     schema=Networks,
     get_schema=NetworkSchema,
     create_schema=NetworkCreate,
-    update_schema=NetworkUpdate
+    update_schema=NetworkUpdate,
+    filters=Annotated[Empty, Depends(Empty)]
 )
 get_crud_router(
     model=Currency,
@@ -72,7 +74,8 @@ get_crud_router(
     schema=Currencies,
     get_schema=CurrencySchema,
     create_schema=CurrencyCreate,
-    update_schema=CurrencyUpdate
+    update_schema=CurrencyUpdate,
+    filters=Annotated[Empty, Depends(Empty)]
 )
 get_crud_router(
     model=Game,
@@ -89,7 +92,8 @@ get_crud_router(
     schema=Jackpots,
     get_schema=JackpotSchema,
     create_schema=JackpotCreate,
-    update_schema=JackpotUpdate
+    update_schema=JackpotUpdate,
+    filters=Annotated[Empty, Depends(Empty)]
 )
 
 

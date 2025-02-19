@@ -482,3 +482,158 @@ def deposit(
     db.commit()
 
     return True
+
+
+@worker.register
+def withdrawal(
+    history_id: int,
+    counter: int = 0
+):
+    db = next(get_sync_db())
+
+    balance_change_history = db.query(BalanceChangeHistory).with_for_update().filter(
+        BalanceChangeHistory.id == history_id,
+        BalanceChangeHistory.change_type == "withdrawal",
+        BalanceChangeHistory.status == BalanceChangeHistory.Status.PENDING
+    )
+    balance_change_history = balance_change_history.scalar()
+
+    if balance_change_history:
+        return False
+
+    args = json.loads(balance_change_history.args)
+    args.setdefault('web3', [])
+
+    if counter > 3:
+        args['error'] = "Max retries exceeded"
+        balance_change_history.args = json.dumps(args)
+        balance_change_history.status = BalanceChangeHistory.Status.WEB3_ERROR
+        db.add(balance_change_history)
+        db.commit()
+        return
+
+    wallet_result = db.query(Wallet).filter(
+        Wallet.user_id == balance_change_history.id
+    )
+    wallet = wallet_result.scalar()
+
+    if not wallet:
+        args['error'] = "Missing wallet"
+        balance_change_history.args = json.dumps(args)
+        balance_change_history.status = BalanceChangeHistory.Status.CANCELED
+        db.add(balance_change_history)
+        db.commit()
+        return False
+
+    try:
+        w3 = get_w3(wallet.network_id)
+
+        currency = db.query(Currency).filter(
+            Currency.id == balance_change_history.currency_id
+        )
+        currency = currency.scalar()
+        if not currency:
+            return False
+
+        abi = redis.get("abi")
+
+        contract = w3.eth.contract(
+            address=currency.address,
+            abi=json.loads(abi)
+        )
+
+        amount = int(balance_change_history.amount * 10 ** currency.decimals)
+        _hash = contract.functions.transfer(wallet.address, amount).transact()
+
+        tx = w3.eth.get_transaction_receipt(_hash)
+    except Exception as e:
+        args['web3'].append(str(e))
+        balance_change_history.args = json.dumps(args)
+        db.add(balance_change_history)
+        db.commit()
+
+        add_job_to_scheduler(
+            "add_to_queue",
+            ["withdrawal", history_id, counter + 1],
+            datetime.now() + timedelta(minutes=1)
+        )
+        return False
+
+    if tx.status != 1:
+        args['web3'].append("Transaction failed")
+        balance_change_history.args = json.dumps(args)
+        db.add(balance_change_history)
+        db.commit()
+
+        add_job_to_scheduler(
+            "add_to_queue",
+            ["withdrawal", history_id, counter + 1],
+            datetime.now() + timedelta(minutes=1)
+        )
+        return False
+
+    balance_result = db.query(Balance).with_for_update().filter(
+        Balance.user_id == balance_change_history.id
+    )
+    balance = balance_result.scalar()
+    if not balance:
+        balance = Balance(user_id=balance_change_history.id)
+        db.add(balance)
+
+        status = BalanceChangeHistory.Status.CANCELED
+
+    else:
+        balance.balance -= Decimal(balance_change_history.amount)
+
+        status = BalanceChangeHistory.Status.SUCCESS
+
+    balance_change_history.status = status
+    balance_change_history.proof = tx.transactionHash
+
+    db.add(balance_change_history)
+    db.commit()
+
+
+# def buy_tickets():
+#     db = next(get_sync_db())
+    
+#     wallet = db.query(Wallet).filter(
+#         User.id == user.id
+#     )
+#     wallet = wallet.scalar()
+
+#     if wallet is None:
+#         return JSONResponse(
+#             status_code=status.HTTP_400_BAD_REQUEST,
+#             content=BadResponse(message="Wallet not found").model_dump()
+#         )
+
+#     balance_result = await db.execute(
+#         select(Balance)
+#         .with_for_update()
+#         .filter(Balance.user_id == user.id)
+#     )
+#     user_balance = balance_result.scalar() or Balance(balance=0)
+#     total_price = game.price * len(item.numbers)
+
+#     try:
+#         contract = w3.eth.contract(
+#             address=currency.address,
+#             abi=json.loads(await aredis.get("abi"))
+#         )
+#         amount = int(total_price * 10 ** currency.decimals)
+
+#         w3.eth.default_account = wallet.address
+#         _hash = await contract.functions.transfer(settings.address, amount).transact()
+#         tx = await w3.eth.wait_for_transaction_receipt(_hash, timeout=60)
+
+#         if tx is None or tx.status != 1:
+#             return JSONResponse(
+#                 status_code=status.HTTP_400_BAD_REQUEST,
+#                 content=BadResponse(message="Transaction failed").model_dump()
+#             )
+#     except Exception as e:
+#         return JSONResponse(
+#             status_code=status.HTTP_400_BAD_REQUEST,
+#             content=BadResponse(message=str(e)).model_dump()
+#         )

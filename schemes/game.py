@@ -83,11 +83,15 @@ class Deposit(BaseModel):
 
 class Withdraw(BaseModel):
     amount: float = 0
+    address: str
 
 
 class Jackpot(BaseModel):
     id: int
     jackpot_id: int
     status: str
+    image: Optional[str] = None
+    prize: float
+    percentage: float
     endtime: float
     created: float

@@ -161,6 +161,7 @@ async def get_currency(
     network: Annotated[Network, Depends(get_network)],
     currency: str = "USDT"
 ) -> Currency:
+    print(network.id, network.symbol, currency)
     cur = await db.execute(select(Currency).filter(
         Currency.code == currency,
         Currency.network_id == network.id
