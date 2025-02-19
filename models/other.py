@@ -98,7 +98,7 @@ class Jackpot(Base):
 
     created_at = Column(DateTime, default=datetime.datetime.now)
     updated_at = Column(DateTime, default=datetime.datetime.now, onupdate=datetime.datetime.now)
-    
+
     deleted = Column(Boolean, default=False, doc="Indicates if the instance is deleted")
 
     jackpot_instances = relationship("JackpotInstance", back_populates="jackpot", uselist=False)

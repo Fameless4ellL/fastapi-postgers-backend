@@ -595,20 +595,36 @@ async def get_jackpots(
     """
     Получение списка джекпотов
     """
-    stmt = select(Jackpot).filter(
+    stmt = select(
+        func.sum(Ticket.amount).label("total_tickets"),
+        Jackpot.id,
+        Jackpot.status,
+        Jackpot.image,
+        Jackpot.scheduled_datetime,
+        Jackpot.percentage,
+        Jackpot.created_at,
+    ).outerjoin(Ticket, Ticket.jackpot_id == Jackpot.id).filter(
         Jackpot.status == GameStatus.PENDING,
         Jackpot._type == JackpotType.LOCAL,
         Jackpot.country == user.country
-    ).offset(0).limit(5)
+    ).group_by(Jackpot.id).offset(0).limit(5)
     local = await db.execute(stmt)
-    local = local.scalars().all() or []
+    local = local.fetchall() or []
 
-    stmt = select(Jackpot).filter(
+    stmt = select(
+        func.sum(Ticket.amount).label("total_tickets"),
+        Jackpot.id,
+        Jackpot.status,
+        Jackpot.image,
+        Jackpot.scheduled_datetime,
+        Jackpot.percentage,
+        Jackpot.created_at,
+    ).outerjoin(Ticket, Ticket.jackpot_id == Jackpot.id).filter(
         Jackpot.status == GameStatus.PENDING,
-        Jackpot._type == JackpotType.GLOBAL
-    ).offset(0).limit(5)
+        Jackpot._type == JackpotType.GLOBAL,
+    ).group_by(Jackpot.id).offset(0).limit(5)
     global_ = await db.execute(stmt)
-    global_ = global_.scalars().all() or []
+    global_ = global_.fetchall() or []
 
     data = [
         {
@@ -616,8 +632,8 @@ async def get_jackpots(
             "status": j.status.value,
             "endtime": j.scheduled_datetime.timestamp(),
             "image": url_for("static", path=j.image),
-            "amount": float(j.prize),
-            "percentage": j.percentage,
+            "amount": float(j.total_tickets or 0),
+            "percentage": float(j.percentage),
             "created": j.created_at.timestamp()
         } for j in local + global_
     ]
