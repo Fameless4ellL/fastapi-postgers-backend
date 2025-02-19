@@ -81,7 +81,7 @@ class Jackpot(Base):
     _type = Column(SqlEnum(JackpotType), default=JackpotType.GLOBAL)
     currency_id = Column(Integer, ForeignKey('currencies.id'), nullable=True)
     percentage = Column(DECIMAL(5, 2), default=10, doc="Percentage of deductions from daily money games")
-    image = Column(String(255), nullable=True, default="default_image.png", doc="The image of the instance")
+    image = Column(String(255), nullable=True, default="default_jackpot.png", doc="The image of the instance")
     country = Column(String(32), nullable=True)
 
     scheduled_datetime = Column(DateTime, default=datetime.datetime.now, doc="The date and time when the game instance will be held")
