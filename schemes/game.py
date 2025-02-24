@@ -16,6 +16,7 @@ class Game(BaseModel):
     id: int
     name: str
     image: Optional[str] = None
+    currency: Optional[str] = None
     status: str
     price: float
     prize: float
@@ -65,6 +66,7 @@ class GenTicket:
 class Ticket(BaseModel):
     id: int
     game_instance_id: int
+    currency: Optional[str]
     numbers: list[int]
     won: Optional[bool]
     amount: float = 0

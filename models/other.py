@@ -102,6 +102,7 @@ class Jackpot(Base):
     deleted = Column(Boolean, default=False, doc="Indicates if the instance is deleted")
 
     jackpot_instances = relationship("JackpotInstance", back_populates="jackpot", uselist=False)
+    currency = relationship("Currency", uselist=False)
 
 
 class JackpotInstance(Base):
@@ -154,6 +155,7 @@ class Game(Base):
     updated_at = Column(DateTime, default=datetime.datetime.now, onupdate=datetime.datetime.now)
 
     game_instances = relationship("GameInstance", back_populates="game", uselist=False)
+    currency = relationship("Currency", uselist=False)
 
 
 class GameInstance(Base):
@@ -185,3 +187,5 @@ class Ticket(Base):
     demo = Column(Boolean, default=False)
     created_at = Column(DateTime, default=datetime.datetime.now)
     updated_at = Column(DateTime, default=datetime.datetime.now, onupdate=datetime.datetime.now)
+
+    currency = relationship("Currency", uselist=False)

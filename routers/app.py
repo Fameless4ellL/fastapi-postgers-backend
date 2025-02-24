@@ -16,7 +16,6 @@ from models.other import (
     Jackpot,
     Ticket,
     JackpotType,
-    JackpotStatus,
 )
 from routers import public
 from routers.utils import generate_game, get_currency, get_user, get_w3, nth, url_for
@@ -71,15 +70,8 @@ async def game_instances(
     stmt = select(Game).filter(
         Game.status == GameStatus.PENDING,
         Game.game_type == _type
-    ).add_columns(
-        Game.name,
-        Game.price,
-        Game.prize,
-        Game.max_limit_grid,
-        Game.created_at,
-        Game.id,
-        Game.status,
-        Game.scheduled_datetime
+    ).options(
+        joinedload(Game.currency)
     ).offset(offset).limit(limit)
 
     if _type is GameType.LOCAL:
@@ -92,6 +84,7 @@ async def game_instances(
         "id": g.id,
         "name": g.name,
         "image": url_for("static", path=g.image),
+        "currency": g.currency.code if g.currency else None,
         "status": g.status.value,
         "price": float(g.price),
         "prize": float(g.prize),
@@ -118,6 +111,7 @@ async def game_instances(
         data = [{
             "id": _game.id,
             "name": _game.name,
+            "currency": _game.currency.code if _game.currency else None,
             "image": url_for("static", path=_game.image),
             "status": _game.status.value,
             "price": float(_game.price),
@@ -144,16 +138,6 @@ async def calc_balance(
     db: Annotated[AsyncSession, Depends(get_db)],
     quantity: int = 1
 ):
-    balance_result = await db.execute(
-        select(Balance)
-        .filter(Balance.user_id == user.id)
-    )
-    balance = balance_result.scalar()
-    if not balance:
-        balance = Balance(user_id=user.id)
-        db.add(balance)
-        await db.commit()
-
     result = await db.execute(
         select(Game)
         .filter(Game.id == game_id)
@@ -165,6 +149,18 @@ async def calc_balance(
             status_code=status.HTTP_404_NOT_FOUND,
             content=BadResponse(message="Game not found").model_dump()
         )
+
+    stmt = select(Balance).filter(
+        Balance.user_id == user.id,
+        Balance.currency_id == game.currency_id
+    )
+    balance_result = await db.execute(stmt)
+    balance = balance_result.scalar()
+
+    if not balance:
+        balance = Balance(user_id=user.id)
+        db.add(balance)
+        await db.commit()
 
     total_balance = balance.balance - (game.price * quantity)
 
@@ -186,10 +182,13 @@ async def read_game(
     """
     Получение доп. информации по игре
     """
-    result = await db.execute(
-        select(Game)
-        .filter(Game.id == game_id)
+    stmt = select(Game).filter(
+        Game.id == game_id
+    ).options(
+        joinedload(Game.currency)
     )
+
+    result = await db.execute(stmt)
     game = result.scalars().first()
 
     if game is None:
@@ -210,6 +209,7 @@ async def read_game(
         "id": game.id,
         "name": game.name,
         "description": game.description,
+        "currency": game.currency.code if game.currency else None,
         "status": game.status.value,
         "image": url_for("static", path=game.image),
         "game_type": game.game_type.value,
@@ -302,7 +302,10 @@ async def buy_tickets(
         balance_result = await db.execute(
             select(Balance)
             .with_for_update()
-            .filter(Balance.user_id == user.id)
+            .filter(
+                Balance.user_id == user.id,
+                Balance.currency_id == currency.id
+            )
         )
         user_balance = balance_result.scalar() or Balance(balance=0)
         total_price = game.price * len(item.numbers)
@@ -557,6 +560,7 @@ async def get_leaderboard(
     tickets = await db.execute(
         select(Ticket)
         .filter(Ticket.game_id == game_id)
+        .options(joinedload(Ticket.currency))
         .order_by(Ticket.won.desc())
         .offset(skip).limit(limit)
     )
@@ -565,6 +569,7 @@ async def get_leaderboard(
     data = [{
         "id": t.id,
         "game_instance_id": t.game_id,
+        "currency": t.currency.code if t.currency else None,
         "numbers": t.numbers,
         "demo": t.demo,
         "won": t.won,
