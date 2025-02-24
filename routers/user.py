@@ -29,7 +29,7 @@ from utils.workers import add_to_queue
     tags=["user"],
     responses={400: {"model": BadResponse}, 200: {"model": Profile}}
 )
-async def balance(
+async def profile(
     user: Annotated[User, Depends(get_user)],
     db: Annotated[AsyncSession, Depends(get_db)],
     currency: Annotated[str, Depends(get_currency)],
@@ -72,6 +72,8 @@ async def balance(
         )
         db.add(wallet)
         await db.commit()
+
+        await aredis.sadd("BLOCKER:WALLETS", wallet.address)
 
     total_balance = float(balance.balance)
     return JSONResponse(

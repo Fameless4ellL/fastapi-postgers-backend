@@ -127,6 +127,7 @@ class JSONifiedState(EventScannerState):
         txhash = event.transactionHash.hex()
         block_number = event.blockNumber
         args = event["args"]
+
         if args.to in redis_m.get_wallets():
             transfer = {
                 "txhash": txhash,
@@ -141,6 +142,7 @@ class JSONifiedState(EventScannerState):
                 "http://api:8000/api/transfer/",
                 json=transfer
             )
+
         return f"{block_number}-{txhash}-{log_index}"
 
 
@@ -212,7 +214,6 @@ class EventScanner:
             )
 
             for evt in events:
-                print(evt)
                 idx = evt["logIndex"]
                 assert idx is not None, "Somehow tried to scan a pending block"
 
@@ -224,7 +225,7 @@ class EventScanner:
 
                 processed = self.state.process_event(evt)
                 all_processed.append(processed)
-        logger.info(f"Block {end_block} processed with {len(events)} events")
+
         return end_block, all_processed
 
     def estimate_next_chunk_size(

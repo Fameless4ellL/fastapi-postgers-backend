@@ -36,20 +36,12 @@ async def register(
             content={"message": "Phone number or username is required"}
         )
 
-    if not await aredis.exists(f"SMS:{request.client.host}"):
+    if not await aredis.exists(f"AUTH:{request.client.host}"):
         return JSONResponse(
             status_code=status.HTTP_400_BAD_REQUEST,
-            content={"message": "Invalid code"})
+            content={"message": "Please resend sms code"})
 
-    code: bytes = await aredis.get(f"SMS:{request.client.host}")
-
-    if code.decode("utf-8") != user.code:
-        return JSONResponse(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            content={"message": "Invalid code"}
-        )
-
-    await aredis.delete(f"SMS:{request.client.host}")
+    await aredis.delete(f"AUTH:{request.client.host}")
 
     # get country from phone_number
     country_code = parse(user.phone_number)
@@ -130,21 +122,13 @@ async def login(
         return JSONResponse(
             status_code=status.HTTP_404_NOT_FOUND, content={"message": "User not found"}
         )
-
-    if not await aredis.exists(f"SMS:{request.client.host}"):
+   
+    if not  await aredis.exists(f"AUTH:{request.client.host}"):
         return JSONResponse(
             status_code=status.HTTP_400_BAD_REQUEST,
-            content={"message": "Invalid code"})
+            content={"message": "Please resend sms code"})
 
-    code: bytes = await aredis.get(f"SMS:{request.client.host}")
-
-    if code.decode("utf-8") != user.code:
-        return JSONResponse(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            content={"message": "Invalid code"}
-        )
-
-    await aredis.delete(f"SMS:{request.client.host}")
+    await aredis.delete(f"AUTH:{request.client.host}")
 
     # if not user or not verify_password(
     #     user.password.get_secret_value(), userdb.password
@@ -272,6 +256,9 @@ async def check_code(
             status_code=status.HTTP_400_BAD_REQUEST,
             content={"message": "Invalid code"}
         )
+
+    await aredis.delete(f"SMS:{request.client.host}")
+    await aredis.set(f"AUTH:{request.client.host}", 1, ex=60 * 5)
 
     return JSONResponse(
         status_code=200,
