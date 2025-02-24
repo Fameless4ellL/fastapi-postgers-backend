@@ -1,8 +1,9 @@
+import os
 import pycountry
 import json
 from decimal import Decimal
 from typing import Annotated
-from fastapi import Depends, status
+from fastapi import Depends, status, UploadFile
 from fastapi.responses import JSONResponse
 from sqlalchemy import func, select
 from web3 import AsyncWeb3
@@ -269,6 +270,42 @@ async def withdraw(
     )
 
     return JSONResponse(status_code=status.HTTP_200_OK)
+
+
+@public.post("/upload", tags=["user"])
+async def upload_document(
+    user: Annotated[User, Depends(get_user)],
+    db: Annotated[AsyncSession, Depends(get_db)],
+    file: UploadFile
+):
+    """
+    Загрузка документа
+    """
+    if not file.content_type.startswith("image"):
+        return JSONResponse(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            content="Invalid file type"
+        )
+
+    directory = "static/kyc"
+    os.makedirs(directory, exist_ok=True)
+
+    # Delete old file if it exists
+    if user.document:
+        old_file_path = os.path.join(directory, user.document)
+        if os.path.exists(old_file_path):
+            os.remove(old_file_path)
+
+    # Save file to disk
+    file_path = os.path.join(directory, file.filename)
+    with open(file_path, "wb") as f:
+        f.write(await file.read())
+
+    user.document = file.filename
+    db.add(user)
+    await db.commit()
+
+    return JSONResponse(status_code=status.HTTP_200_OK, content="OK")
 
 
 @public.get(

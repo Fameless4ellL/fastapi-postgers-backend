@@ -34,6 +34,10 @@ class User(Base):
     password = Column(String(128), nullable=True)
     role = Column(String(64), default=Role.USER.value)
     active = Column(Boolean, default=True)
+
+    kyc = Column(Boolean, default=False)
+    document = Column(String(256), nullable=True)
+
     created_at = Column(DateTime, default=datetime.datetime.now)
     updated_at = Column(DateTime, default=datetime.datetime.now, onupdate=datetime.datetime.now)
 
