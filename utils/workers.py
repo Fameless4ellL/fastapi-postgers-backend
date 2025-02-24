@@ -17,6 +17,7 @@ from sqlalchemy import func
 from models.user import Balance, BalanceChangeHistory
 from globals import redis
 from settings import settings
+from utils.web3 import AWSHTTPProvider
 
 
 @worker.register
@@ -373,7 +374,7 @@ def get_w3(
         return False
 
     try:
-        w3 = Web3(Web3.AsyncHTTPProvider(network.rpc_url))
+        w3 = Web3(AWSHTTPProvider(network.rpc_url))
 
         if not w3.is_connected():
             return False

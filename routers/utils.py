@@ -13,12 +13,13 @@ from sqlalchemy import select
 from models.db import get_db
 from sqlalchemy.ext.asyncio import AsyncSession
 from models.user import User, Role
-from web3 import AsyncWeb3, middleware
+from web3 import Web3, middleware
 from models.other import Game, GameType, Network, Currency
 import settings
 from utils.signature import decode_access_token
 from settings import email, settings
 from globals import scheduler, aredis
+from utils.web3 import AWSHTTPProvider
 from utils.workers import add_to_queue
 
 
@@ -177,16 +178,17 @@ async def get_currency(
 
 async def get_w3(
     network: Annotated[Network, Depends(get_network)],
-) -> AsyncWeb3:
+) -> Web3:
     try:
-        w3 = AsyncWeb3(AsyncWeb3.AsyncHTTPProvider(network.rpc_url))
+        w3 = Web3(AWSHTTPProvider(network.rpc_url))
 
-        if not await w3.is_connected():
+        if w3.is_connected():
             raise HTTPException(
                 status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
-                detail="Network is not available"
+                detail="Network is not connected"
             )
     except client_exceptions.ClientError:
+        traceback.print_exc()
         raise HTTPException(
             status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
             detail="Network is not available"

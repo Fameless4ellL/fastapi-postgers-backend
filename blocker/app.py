@@ -4,7 +4,7 @@ import requests
 import logging
 import time
 
-from web3.providers import AsyncHTTPProvider
+from utils import AWSAsyncHTTPProvider
 from abc import ABC, abstractmethod
 
 from typing import Tuple, List, Dict, Any, Iterable
@@ -410,7 +410,7 @@ async def consumer(queue: asyncio.Queue):
 
 async def run(node: str, network: str) -> None:
     logging.basicConfig(level=logging.INFO)
-    provider = AsyncHTTPProvider(node, exception_retry_configuration=None)
+    provider = AWSAsyncHTTPProvider(node, exception_retry_configuration=None)
     w3 = AsyncWeb3(provider)
 
     state = JSONifiedState(network=network)
@@ -425,7 +425,7 @@ async def run(node: str, network: str) -> None:
     for address in ERC20_TOKENS:
         contract = w3.eth.contract(address=address, abi=ABI)
         contracts.append(
-            {"event": contract.events.Transfer, "filters": {"address": address}}
+            {"event": contract.events.Transfer, "filters": {"address": w3.to_checksum_address(address)}}
         )
 
     scanner = EventScanner(

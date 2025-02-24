@@ -52,6 +52,17 @@ services:
       - redis
     restart: on-failure
 
+  blocker:
+    build:
+      context: .
+      dockerfile: blocker/Dockerfile
+    command: python app.py
+    depends_on:
+      - redis
+    volumes:
+      - ./blocker/:/app/
+    restart: always
+
   redis:
     image: redis
     restart: on-failure

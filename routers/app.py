@@ -315,8 +315,8 @@ async def buy_tickets(
             amount = int(total_price * 10 ** currency.decimals)
 
             w3.eth.default_account = wallet.address
-            _hash = await contract.functions.transfer(settings.address, amount).transact()
-            tx = await w3.eth.wait_for_transaction_receipt(_hash, timeout=60)
+            _hash = contract.functions.transfer(settings.address, amount).transact()
+            tx = w3.eth.wait_for_transaction_receipt(_hash, timeout=60)
 
             if tx is None or tx.status != 1:
                 return JSONResponse(

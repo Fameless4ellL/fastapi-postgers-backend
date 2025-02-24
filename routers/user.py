@@ -121,7 +121,7 @@ async def deposit(
             content="Wallet not found"
         )
 
-    tx: TxReceipt = await w3.eth.wait_for_transaction_receipt(item.hash, timeout=60)
+    tx: TxReceipt = w3.eth.wait_for_transaction_receipt(item.hash, timeout=60)
 
     currency = await db.execute(
         select(Currency)

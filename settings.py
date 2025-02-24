@@ -34,5 +34,12 @@ class Settings(BaseSettings):
     private_key: str = "54c302fd650d7cbb6afb8b4644a79fbb3a1177e8502d6c1b2365c8cbb97c468a"
 
 
+class AWS(BaseSettings):
+    access_key: str = ""
+    secret_key: str = ""
+    region: str = "us-west-2"
+
+
+aws = AWS()
 email = Email()
 settings = Settings()
