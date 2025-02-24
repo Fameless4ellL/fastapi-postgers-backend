@@ -4,12 +4,12 @@ import requests
 import logging
 import time
 
-from utils import AWSAsyncHTTPProvider
+from utils import AWSHTTPProvider
 from abc import ABC, abstractmethod
 
 from typing import Tuple, List, Dict, Any, Iterable
 
-from web3 import AsyncWeb3, exceptions
+from web3 import Web3, exceptions
 from web3.datastructures import AttributeDict
 from web3.exceptions import BlockNotFound
 from eth_abi.codec import ABICodec
@@ -147,7 +147,7 @@ class JSONifiedState(EventScannerState):
 class EventScanner:
     def __init__(
         self,
-        w3: AsyncWeb3,
+        w3: Web3,
         state: EventScannerState,
         contracts: List[Dict[str, Any]],
         max_chunk_scan_size: int = 10000,
@@ -167,22 +167,14 @@ class EventScanner:
         self.chunk_size_decrease = 0.5
         self.chunk_size_increase = 2.0
 
-    async def get_block_timestamp(self, block_num) -> datetime.datetime:
-        try:
-            block_info = await self.w3.eth.get_block(block_num)
-        except BlockNotFound:
-            return None
-        last_time = block_info["timestamp"]
-        return datetime.datetime.fromtimestamp(last_time)
-
     def get_suggested_scan_start_block(self):
         end_block = self.get_last_scanned_block()
         if end_block:
             return max(1, end_block - self.NUM_BLOCKS_RESCAN_FOR_FORKS)
         return 1
 
-    async def get_suggested_scan_end_block(self):
-        return await self.w3.eth.block_number - 1
+    def get_suggested_scan_end_block(self):
+        return self.w3.eth.block_number - 1
 
     def get_last_scanned_block(self) -> int:
         return self.state.get_last_scanned_block()
@@ -190,20 +182,11 @@ class EventScanner:
     def delete_potentially_forked_block_data(self, after_block: int):
         self.state.delete_data(after_block)
 
-    async def scan_chunk(
+    def scan_chunk(
         self,
         start_block,
         end_block
-    ) -> Tuple[int, datetime.datetime, list]:
-        block_timestamps = {}
-        get_block_timestamp = self.get_block_timestamp
-
-        async def get_block_when(block_num):
-            if block_num not in block_timestamps:
-                block_timestamps[block_num] = await get_block_timestamp(
-                    block_num
-                )
-            return block_timestamps[block_num]
+    ) -> Tuple[int, list]:
 
         all_processed = []
 
@@ -211,8 +194,8 @@ class EventScanner:
             event_type = contract["event"]
             filters = contract["filters"]
 
-            async def _fetch_events(_start_block, _end_block):
-                return await _fetch_events_for_all_contracts(
+            def _fetch_events(_start_block, _end_block):
+                return _fetch_events_for_all_contracts(
                     self.w3,
                     event_type,
                     filters,
@@ -220,7 +203,7 @@ class EventScanner:
                     to_block=_end_block
                 )
 
-            end_block, events = await _retry_web3_call(
+            end_block, events = _retry_web3_call(
                 _fetch_events,
                 start_block=start_block,
                 end_block=end_block,
@@ -232,18 +215,17 @@ class EventScanner:
                 print(evt)
                 idx = evt["logIndex"]
                 assert idx is not None, "Somehow tried to scan a pending block"
-                # block_number = evt["blockNumber"]
-                # block_when = await get_block_when(block_number)
+
                 logger.debug(
                     f"Processing event {evt['event']},"
                     f"block: {evt['blockNumber']}"
                     f"count: {evt['blockNumber']}"
                 )
+
                 processed = self.state.process_event(evt)
                 all_processed.append(processed)
         logger.info(f"Block {end_block} processed with {len(events)} events")
-        end_block_timestamp = await get_block_when(end_block)
-        return end_block, end_block_timestamp, all_processed
+        return end_block, all_processed
 
     def estimate_next_chunk_size(
         self,
@@ -259,7 +241,7 @@ class EventScanner:
         current_chuck_size = min(self.max_scan_chunk_size, current_chuck_size)
         return int(current_chuck_size)
 
-    async def scan(
+    def scan(
         self,
         start_block,
         end_block,
@@ -289,7 +271,7 @@ class EventScanner:
             )
 
             start = time.time()
-            actual_end_block, _, new_entries = await self.scan_chunk(
+            actual_end_block, new_entries = self.scan_chunk(
                 current_block,
                 estimated_end_block
             )
@@ -307,7 +289,7 @@ class EventScanner:
         return all_processed, total_chunks_scanned
 
 
-async def _retry_web3_call(
+def _retry_web3_call(
     func,
     start_block,
     end_block,
@@ -323,7 +305,7 @@ async def _retry_web3_call(
     """
     for i in range(retries):
         try:
-            return end_block, await func(start_block, end_block)
+            return end_block, func(start_block, end_block)
         except Exception as e:
             if i < retries - 1:
                 logger.warning(
@@ -331,14 +313,14 @@ async def _retry_web3_call(
                     f"({end_block-start_block}) failed with {e} , retrying in {delay} seconds"
                 )
                 end_block = start_block + ((end_block - start_block) // 2)
-                await asyncio.sleep(delay)
+                time.sleep(delay)
                 continue
             else:
                 logger.warning("Out of retries")
                 raise
 
 
-async def _fetch_events_for_all_contracts(
+def _fetch_events_for_all_contracts(
     w3,
     event,
     argument_filters: Dict[str, Any],
@@ -366,7 +348,7 @@ async def _fetch_events_for_all_contracts(
         "Querying eth_getLogs with the following parameters: "
         f"{event_filter_params}"
     )
-    logs = await w3.eth.get_logs(event_filter_params)
+    logs = w3.eth.get_logs(event_filter_params)
     all_events = []
     for log in logs:
         evt = get_event_data(codec, abi, log)
@@ -410,14 +392,14 @@ async def consumer(queue: asyncio.Queue):
 
 async def run(node: str, network: str) -> None:
     logging.basicConfig(level=logging.INFO)
-    provider = AWSAsyncHTTPProvider(node, exception_retry_configuration=None)
-    w3 = AsyncWeb3(provider)
+    provider = AWSHTTPProvider(node, exception_retry_configuration=None)
+    w3 = Web3(provider)
 
     state = JSONifiedState(network=network)
     state.restore()
 
     if state.state == 0:
-        state.state = await w3.eth.block_number - 1
+        state.state = w3.eth.block_number - 1
 
     ERC20_TOKENS = redis_m.get_tokens(network)
     contracts = []
@@ -445,12 +427,12 @@ async def run(node: str, network: str) -> None:
             start_block = max(
                 state.get_last_scanned_block() - chain_reorg_safety_blocks, 0
             )
-            end_block = await scanner.get_suggested_scan_end_block()
+            end_block = scanner.get_suggested_scan_end_block()
 
             logger.info(f"{network.upper()}: Scanning events from blocks {start_block} - {end_block}")
 
             start = time.time()
-            result, total_chunks_scanned = await scanner.scan(
+            result, total_chunks_scanned = scanner.scan(
                 start_block, end_block
             )
 
@@ -470,6 +452,8 @@ async def run(node: str, network: str) -> None:
             await asyncio.sleep(5)
         except Exception as e:
             logger.error(f"Unexpected error: {e}. Retrying in 5 seconds...")
+            await asyncio.sleep(5)
+        else:
             await asyncio.sleep(5)
     return None
 
