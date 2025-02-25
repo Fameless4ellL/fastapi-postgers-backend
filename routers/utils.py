@@ -181,8 +181,7 @@ async def get_w3(
 ) -> Web3:
     try:
         w3 = Web3(AWSHTTPProvider(network.rpc_url))
-
-        if w3.is_connected():
+        if not w3.is_connected():
             raise HTTPException(
                 status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
                 detail="Network is not connected"

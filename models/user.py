@@ -80,7 +80,7 @@ class BalanceChangeHistory(Base):
     currency_id = Column(Integer, ForeignKey('currencies.id', ondelete='CASCADE'), nullable=True)
     change_amount = Column(DECIMAL(20, 8), default=0)
     change_type = Column(String(64), nullable=False)
-    previous_balance = Column(Integer, nullable=False)    
+    previous_balance = Column(Integer, nullable=True)    
     status = Column(SQLEnum(Status), default=Status.PENDING)
     proof = Column(String(256), nullable=True)
     new_balance = Column(DECIMAL(20, 8), default=0)

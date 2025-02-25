@@ -89,125 +89,6 @@ async def profile(
     )
 
 
-@public.post("/deposit", tags=["user"])
-async def deposit(
-    user: Annotated[User, Depends(get_user)],
-    db: Annotated[AsyncSession, Depends(get_db)],
-    w3: Annotated[AsyncWeb3, Depends(get_w3)],
-    item: Deposit
-):
-    """
-    Пополнение баланса
-    """
-    # check if balance history exists with this hash
-    balance_change_history = await db.execute(
-        select(BalanceChangeHistory)
-        .filter(BalanceChangeHistory.proof == item.hash)
-    )
-    balance_change_history = balance_change_history.scalar()
-
-    if balance_change_history:
-        return JSONResponse(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            content="Transaction already processed"
-        )
-
-    wallet_result = await db.execute(
-        select(Wallet)
-        .filter(Wallet.user_id == user.id)
-    )
-    wallet = wallet_result.scalar()
-
-    if not wallet:
-        return JSONResponse(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            content="Wallet not found"
-        )
-
-    tx: TxReceipt = w3.eth.wait_for_transaction_receipt(item.hash, timeout=60)
-
-    currency = await db.execute(
-        select(Currency)
-        .filter(Currency.code == "USDC")
-    )
-    currency = currency.scalar()
-    if not currency:
-        return JSONResponse(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            content="Currency not found"
-        )
-
-    contract = w3.eth.contract(
-        address=tx.contractAddress,
-        abi=json.loads(await aredis.get("abi"))
-    )
-
-    logs = contract.events.Transfer().process_receipt(tx)
-
-    transfer = {}
-    for log in logs:
-        if log.event != "Transfer":
-            continue
-
-        transfer = log.args
-        break
-
-    decimals = 18
-
-    if tx is None:
-        return JSONResponse(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            content="Transaction not found"
-        )
-
-    if (
-        tx.status != 1
-        or transfer.to.lower() != wallet.address.lower()
-    ):
-        return JSONResponse(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            content="Transaction failed"
-        )
-
-    balance_result = await db.execute(
-        select(Balance)
-        .with_for_update()
-        .filter(
-            Balance.user_id == user.id,
-            Balance.currency_id == currency.id
-        )
-    )
-    balance = balance_result.scalar()
-
-    amount = Decimal(transfer.value / 10 ** decimals)
-
-    if not balance:
-        balance = Balance(
-            user_id=user.id,
-            currency_id=currency.id,
-            balance=amount
-        )
-        db.add(balance)
-    else:
-        balance.balance += amount
-
-    history = BalanceChangeHistory(
-        user_id=user.id,
-        balance_id=balance.id,
-        currency_id=currency.id,
-        change_amount=amount,
-        change_type="deposit",
-        previous_balance=balance.balance - amount,
-        proof=item.hash,
-        new_balance=balance.balance
-    )
-
-    db.add(history)
-    await db.commit()
-
-    return JSONResponse(status_code=status.HTTP_200_OK, content="OK")
-
-
 @public.post("/withdraw", tags=["user"])
 async def withdraw(
     user: Annotated[User, Depends(get_user)],
@@ -361,11 +242,53 @@ async def get_countries():
     """
     data = [{
         "alpha_3": country.alpha_3,
-        "name": country.name
+        "name": country.name,
+        "flag": country.flag
     } for country in pycountry.countries]
 
     # по запросу фронта, ага
     return JSONResponse(
         status_code=status.HTTP_200_OK,
         content=data
+    )
+
+
+@public.get(
+    "/history", tags=["user"],
+    responses={400: {"model": BadResponse}, 200: {"model": Tickets}}
+)
+async def get_history(
+    db: Annotated[AsyncSession, Depends(get_db)],
+    user: Annotated[User, Depends(get_user)],
+    skip: int = 0,
+    limit: int = 10,
+):
+    """
+    Получение истории изменения баланса
+    """
+    history = await db.execute(
+        select(BalanceChangeHistory)
+        .filter(BalanceChangeHistory.user_id == user.id)
+        .order_by(BalanceChangeHistory.created_at.desc())
+        .offset(skip).limit(limit)
+    )
+    history = history.scalars().all()
+
+    data = [{
+        "id": h.id,
+        "amount": float(h.change_amount),
+        "type": h.change_type,
+        "status": str(h.status),
+        "created": h.created_at.timestamp()
+    } for h in history]
+
+    count_result = await db.execute(
+        select(func.count(BalanceChangeHistory.id))
+        .filter(BalanceChangeHistory.user_id == user.id)
+    )
+    count = count_result.scalar()
+
+    return JSONResponse(
+        status_code=status.HTTP_200_OK,
+        content=dict(tickets=data, count=count)
     )

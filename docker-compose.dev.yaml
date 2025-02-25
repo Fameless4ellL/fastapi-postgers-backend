@@ -21,6 +21,12 @@ services:
     depends_on:
       - db
       - redis
+    environment:
+      - AWS_ACCESS_KEY_ID=${AWS_ACCESS_KEY_ID}
+      - AWS_SECRET_ACCESS_KEY=${AWS_SECRET_ACCESS_KEY}
+      - AWS_REGION=${AWS_REGION}
+    ports:
+      - "0.0.0.0:8000:8000"
     volumes:
       - .:/app/
     restart: on-failure
@@ -34,7 +40,7 @@ services:
     volumes:
       - ./nginx.conf:/etc/nginx/nginx.conf
     ports:
-      - "127.0.0.1:8100:8000"
+      - "0.0.0.0:8100:8000"
 
   worker:
     build:
@@ -45,6 +51,9 @@ services:
     volumes:
       - .:/app/
     environment:
+      - AWS_ACCESS_KEY_ID=${AWS_ACCESS_KEY_ID}
+      - AWS_SECRET_ACCESS_KEY=${AWS_SECRET_ACCESS_KEY}
+      - AWS_REGION=${AWS_REGION}
       - PYTHONPATH=/app
     depends_on:
       - api

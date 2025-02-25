@@ -35,9 +35,9 @@ class Settings(BaseSettings):
 
 
 class AWS(BaseSettings):
-    access_key: str = ""
-    secret_key: str = ""
-    region: str = "us-west-2"
+    access_key: str = "AKIA3RYC6GBNMSHQQLBB"
+    secret_key: str = "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"
+    region: str = "us-east-1"
 
 
 aws = AWS()

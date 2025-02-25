@@ -1,5 +1,6 @@
 import asyncio
 import datetime
+import os
 import requests
 import logging
 import time
@@ -11,7 +12,6 @@ from typing import Tuple, List, Dict, Any, Iterable
 
 from web3 import Web3, exceptions
 from web3.datastructures import AttributeDict
-from web3.exceptions import BlockNotFound
 from eth_abi.codec import ABICodec
 from redis_ import redis_m
 from aiohttp.client_exceptions import ServerDisconnectedError
@@ -46,7 +46,7 @@ ABI = """[
     }
 ]
 """
-
+CRON_KEY = os.getenv("CRON_KEY", "thisisatest")
 
 class EventScannerState(ABC):
     @abstractmethod
@@ -78,7 +78,6 @@ class JSONifiedState(EventScannerState):
     def __init__(self, network="eth"):
         self.state = None
         self.network = network
-        self.fname = f"{network}-state.json"
         self.last_save = 0
 
     def reset(self):
@@ -120,8 +119,8 @@ class JSONifiedState(EventScannerState):
 
     def process_event(
         self,
-        # block_when: datetime.datetime,
-        event: AttributeDict
+        event: AttributeDict,
+        contract_address: str
     ) -> str:
         log_index = event.logIndex
         txhash = event.transactionHash.hex()
@@ -131,15 +130,16 @@ class JSONifiedState(EventScannerState):
         if args.to in redis_m.get_wallets():
             transfer = {
                 "txhash": txhash,
-                "from": args["from"],
+                "_from": args["from"],
                 "to": args.to,
+                "contract": contract_address,
                 "value": args.value,
-                # "timestamp": block_when.isoformat(),
             }
             logger.info(f"DEPOSIT: {transfer}")
 
             requests.post(
-                "http://api:8000/api/transfer/",
+                "http://api:8000/v1/cron/api/transfer/",
+                params={"key": "cron"},
                 json=transfer
             )
 
@@ -223,7 +223,7 @@ class EventScanner:
                     f"count: {evt['blockNumber']}"
                 )
 
-                processed = self.state.process_event(evt)
+                processed = self.state.process_event(evt, filters.get("address"))
                 all_processed.append(processed)
 
         return end_block, all_processed
