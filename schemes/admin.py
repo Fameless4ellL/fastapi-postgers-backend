@@ -1,9 +1,18 @@
-from pydantic import BaseModel, Field, SecretStr, ConfigDict
-from typing import Optional
+from pydantic import BaseModel, Field, SecretStr, WrapSerializer
+from typing import Optional, Annotated, Any
 from datetime import datetime
 
 from models.other import GameStatus, GameType, GameView
+from models.user import BalanceChangeHistory
+from routers.utils import url_for
 from utils.datastructure import MultiValueEnum
+
+
+def get_image(value: Any, handler, info) -> str:
+    return url_for("static", filename=value)
+
+
+Image = Annotated[str, WrapSerializer(get_image)]
 
 
 class BaseAdmin(BaseModel):
@@ -38,7 +47,6 @@ class UserInfo(User):
     role: str
     created_at: str
     updated_at: str
-    balance: int
     tickets: Ticket = Field(default=Ticket())
     winnings: Winnings = Field(default=Winnings())
 
@@ -75,6 +83,31 @@ class UserTickets(BaseModel):
     date_and_time: str
     won: bool
     amount: float
+
+
+class History(BaseModel):
+    id: int
+    change_type: str
+    amount: float
+    date_and_time: str
+    status: Optional[BalanceChangeHistory.Status] = BalanceChangeHistory.Status.PENDING
+
+
+class HistoryList(BaseModel):
+    items: list[History] = []
+    count: int = 0
+
+
+class WalletBase(BaseModel):
+    id: int
+    address: str
+    date_and_time: str
+
+
+class BalanceBase(BaseModel):
+    id: int
+    currency: str
+    balance: float
 
 
 class Admin(User):
@@ -158,12 +191,13 @@ class GameBase(BaseAdmin):
     name: str
     game_type: str
     currency_id: Optional[int]
-    limit_by_ticket: int = 9
+    limit_by_ticket: int = 15
     max_limit_grid: int = 90
     price: float = 1.0
     description: Optional[str]
     max_win_amount: Optional[float] = 8.0
     prize: Optional[float] = 1000.0
+    image: Optional[Image] = "default_image.png"
     country: Optional[str]
     min_ticket_count: int = 1
     scheduled_datetime: Optional[datetime]
@@ -200,8 +234,9 @@ class GameSchema(BaseAdmin):
     id: int
     name: str
     kind: str
-    limit_by_ticket: int = 9
+    limit_by_ticket: int = 15
     max_limit_grid: int = 90
+    image: Optional[Image] = "default_image.png"
     game_type: str
     status: GameStatus
     deleted: bool
@@ -233,17 +268,17 @@ class GameFilter:
         self.category = category
         self.date_from = date_from
         self.date_to = date_to
-        
-        
+
+
 class Empty:
     pass
 
 
-class JackpotBase(BaseModel):
+class JackpotBase(BaseAdmin):
     name: str
     _type: GameType
     percentage: float = 10.0
-    image: Optional[str] = "default_image.png"
+    image: Optional[Image] = "default_jackpot.png"
     country: Optional[str]
     scheduled_datetime: datetime
     tzone: int = 1
@@ -262,7 +297,6 @@ class JackpotCreate(BaseModel):
     name: str
     _type: str
     percentage: float = 10.0
-    image: Optional[str] = "default_image.png"
     country: Optional[str]
     scheduled_datetime: datetime
     tzone: int = 1

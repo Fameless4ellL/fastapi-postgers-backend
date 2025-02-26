@@ -28,6 +28,7 @@ admin_oauth2_scheme = security.OAuth2PasswordBearer(
     tokenUrl="/v1/token",
     scopes={
         Role.GLOBAL_ADMIN.value: "Global admin",
+        Role.ADMIN.value: "Admin",
         Role.LOCAL_ADMIN.value: "Local admin",
         Role.SUPER_ADMIN.value: "Super admin",
         Role.FINANCIER.value: "Financier",
@@ -109,8 +110,8 @@ async def get_admin_token(
     if not _token.scopes:
         raise invalid_token
 
-    for scope in security_scopes.scopes:
-        if scope not in _token.scopes:
+    for scope in _token.scopes:
+        if scope not in security_scopes.scopes:
             raise invalid_token
 
     if not await aredis.exists(f"TOKEN:ADMINS:{_token.id}"):

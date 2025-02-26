@@ -30,7 +30,8 @@ def generate_game(
     db = next(get_sync_db())
     game = db.query(Game).filter(
         Game.repeat.is_(True),
-        Game.id == game_id
+        Game.id == game_id,
+        Game.deleted.is_(False)
     ).first()
 
     if not game:
@@ -222,7 +223,8 @@ def generate_jackpot(
     db = next(get_sync_db())
     jackpot = db.query(Jackpot).filter(
         Jackpot.repeat.is_(True),
-        Jackpot.id == jackpot_id
+        Jackpot.id == jackpot_id,
+        Jackpot.deleted.is_(False)
     ).first()
 
     if not jackpot:
@@ -418,7 +420,7 @@ def deposit(
     tx: TxReceipt = w3.eth.wait_for_transaction_receipt(balance_change_history.proof, timeout=60)
 
     currency = db.query(Currency).filter(
-        Currency.code == "USDC"
+        Currency.id == balance_change_history.currency_id
     )
     currency = currency.scalar()
     if not currency:

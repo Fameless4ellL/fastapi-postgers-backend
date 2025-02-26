@@ -19,9 +19,9 @@ def get_crud_router(
     get_schema: Type[BaseModel],
     create_schema: Type[BaseModel],
     update_schema: Type[BaseModel],
+    filters: Type[BaseModel],
     prefix: str = "",
     security_scopes: List[str] = [Role.GLOBAL_ADMIN.value],
-    filters: Optional[object] = None,
     order_by: str = "id"
 ) -> APIRouter:
     router = admin
@@ -120,7 +120,15 @@ def get_crud_router(
             scheduler.add_job(
                 func=add_to_queue,
                 trigger="date",
-                args=[new_item.id],
+                args=["proceed_game", new_item.id],
+                run_date=new_item.scheduled_datetime,
+            )
+
+        if model.__name__ == "Jackpot":
+            scheduler.add_job(
+                func=add_to_queue,
+                trigger="date",
+                args=["proceed_jackpot", new_item.id],
                 run_date=new_item.scheduled_datetime,
             )
 

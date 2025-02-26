@@ -4,25 +4,28 @@ from typing import Annotated, Optional
 from pydantic_extra_types.country import CountryAlpha3
 
 from sqlalchemy import func, select, or_
-from models.user import Balance, User, Role
+from models.user import Balance, User, Role, Wallet, BalanceChangeHistory
 from models.other import Game, Ticket, Jackpot
 from routers import admin
-from routers.utils import get_admin_token
+from sqlalchemy.orm import joinedload
+from routers.utils import Token, get_admin_token
 from sqlalchemy.ext.asyncio import AsyncSession
 from models.db import get_db
 from schemes.admin import (
+    BalanceBase,
+    HistoryList,
     UserJackpots,
     UserTickets,
     Users,
     UserInfo as UserScheme,
     UserGames,
+    WalletBase,
 )
 from schemes.base import BadResponse
 
 
 @admin.get(
     "/users",
-    dependencies=[Security(get_admin_token, scopes=[Role.GLOBAL_ADMIN.value])],
     responses={
         400: {"model": BadResponse},
         200: {"model": Users},
@@ -30,6 +33,14 @@ from schemes.base import BadResponse
 )
 async def get_users(
     db: Annotated[AsyncSession, Depends(get_db)],
+    token: Annotated[Token, [Security(get_admin_token, scopes=[
+        Role.GLOBAL_ADMIN.value,
+        Role.ADMIN.value,
+        Role.SUPER_ADMIN.value,
+        Role.LOCAL_ADMIN.value,
+        Role.FINANCIER.value,
+        Role.SUPPORT.value
+    ])],],
     query: Annotated[Optional[str], Query(...)] = None,
     country: Annotated[Optional[CountryAlpha3], Query(...)] = None,
     offset: int = 0,
@@ -39,8 +50,12 @@ async def get_users(
     Get all users
     """
     stmt = select(User).filter(User.role == "user")
+
     if country:
         stmt = stmt.filter(User.country == country)
+
+    if Role.LOCAL_ADMIN in token.scopes:
+        stmt = stmt.filter(User.country == token.country)
 
     if query:
         stmt = stmt.filter(
@@ -73,7 +88,6 @@ async def get_users(
 
 @admin.get(
     "/users/{user_id}",
-    dependencies=[Security(get_admin_token, scopes=[Role.GLOBAL_ADMIN.value])],
     responses={
         400: {"model": BadResponse},
         200: {"model": UserScheme},
@@ -81,12 +95,24 @@ async def get_users(
 )
 async def get_user(
     db: Annotated[AsyncSession, Depends(get_db)],
+    token: Annotated[Token, [Security(get_admin_token, scopes=[
+        Role.GLOBAL_ADMIN.value,
+        Role.ADMIN.value,
+        Role.SUPER_ADMIN.value,
+        Role.LOCAL_ADMIN.value,
+        Role.FINANCIER.value,
+        Role.SUPPORT.value
+    ])],],
     user_id: Annotated[int, Path()],
 ):
     """
     Get all users
     """
     stmt = select(User).filter(User.id == user_id, User.role == "user")
+
+    if Role.LOCAL_ADMIN in token.scopes:
+        stmt = stmt.filter(User.country == token.country)
+
     user = await db.execute(stmt)
     user = user.scalars().first()
 
@@ -105,17 +131,6 @@ async def get_user(
         )
     )
     winnings = winnings.scalar()
-    balance_result = await db.execute(
-        select(Balance).filter(Balance.user_id == user.id)
-    )
-    balance = balance_result.scalar()
-
-    if not balance:
-        balance = Balance(user_id=user.id)
-        db.add(balance)
-        await db.commit()
-
-    total_balance = balance.balance
 
     data = {
         "id": user.id,
@@ -128,7 +143,6 @@ async def get_user(
         "role": user.role,
         "created_at": user.created_at.strftime("%Y-%m-%d %H:%M:%S"),
         "updated_at": user.updated_at.strftime("%Y-%m-%d %H:%M:%S"),
-        "balance": total_balance,
         "tickets": {"purchased": tickets or 0},
         "winnings": {"winnings": winnings or 0},
     }
@@ -139,7 +153,6 @@ async def get_user(
 
 @admin.get(
     "/users/{user_id}/games",
-    dependencies=[Security(get_admin_token, scopes=[Role.GLOBAL_ADMIN.value])],
     responses={
         400: {"model": BadResponse},
         200: {"model": UserGames},
@@ -147,6 +160,14 @@ async def get_user(
 )
 async def get_user_games(
     db: Annotated[AsyncSession, Depends(get_db)],
+    token: Annotated[Token, [Security(get_admin_token, scopes=[
+        Role.GLOBAL_ADMIN.value,
+        Role.ADMIN.value,
+        Role.SUPER_ADMIN.value,
+        Role.LOCAL_ADMIN.value,
+        Role.FINANCIER.value,
+        Role.SUPPORT.value
+    ])],],
     user_id: Annotated[int, Path()],
     offset: int = 0,
     limit: int = 10,
@@ -155,6 +176,10 @@ async def get_user_games(
     Get all user's games
     """
     stmt = select(User).filter(User.id == user_id, User.role == "user")
+
+    if Role.LOCAL_ADMIN in token.scopes:
+        stmt = stmt.filter(User.country == token.country)
+
     user = await db.execute(stmt)
     user = user.scalars().first()
 
@@ -210,7 +235,13 @@ async def get_user_games(
 
 @admin.get(
     "/users/{user_id}/games/{game_id}",
-    dependencies=[Security(get_admin_token, scopes=[Role.GLOBAL_ADMIN.value])],
+    dependencies=[Security(get_admin_token, scopes=[
+        Role.GLOBAL_ADMIN.value,
+        Role.ADMIN.value,
+        Role.SUPER_ADMIN.value,
+        Role.LOCAL_ADMIN.value,
+        Role.FINANCIER.value,
+        Role.SUPPORT.value])],
     responses={
         400: {"model": BadResponse},
         200: {"model": UserTickets},
@@ -272,7 +303,13 @@ async def get_user_tickets(
 
 @admin.get(
     "/users/{user_id}/jackpots",
-    dependencies=[Security(get_admin_token, scopes=[Role.GLOBAL_ADMIN.value])],
+    dependencies=[Security(get_admin_token, scopes=[
+        Role.GLOBAL_ADMIN.value,
+        Role.ADMIN.value,
+        Role.SUPER_ADMIN.value,
+        Role.LOCAL_ADMIN.value,
+        Role.FINANCIER.value,
+        Role.SUPPORT.value])],
     responses={
         400: {"model": BadResponse},
         200: {"model": UserJackpots},
@@ -329,7 +366,13 @@ async def get_user_jackpots(
 
 @admin.get(
     "/users/{user_id}/jackpots/{game_id}",
-    dependencies=[Security(get_admin_token, scopes=[Role.GLOBAL_ADMIN.value])],
+    dependencies=[Security(get_admin_token, scopes=[
+        Role.GLOBAL_ADMIN.value,
+        Role.ADMIN.value,
+        Role.SUPER_ADMIN.value,
+        Role.LOCAL_ADMIN.value,
+        Role.FINANCIER.value,
+        Role.SUPPORT.value])],
     responses={
         400: {"model": BadResponse},
         200: {"model": UserTickets},
@@ -386,4 +429,139 @@ async def get_user_tickets_by_jackpots(
     return JSONResponse(
         status_code=status.HTTP_200_OK,
         content={"tickets": data, "count": len(data)},
+    )
+
+
+@admin.get(
+    "/users/{user_id}/transactions",
+    dependencies=[Security(get_admin_token, scopes=[
+        Role.GLOBAL_ADMIN.value,
+        Role.ADMIN.value,
+        Role.SUPER_ADMIN.value,
+        Role.LOCAL_ADMIN.value,
+        Role.FINANCIER.value,
+        Role.SUPPORT.value
+    ])],
+    responses={
+        400: {"model": BadResponse},
+        200: {"model": HistoryList},
+    },
+)
+async def get_user_transactions(
+    db: Annotated[AsyncSession, Depends(get_db)],
+    user_id: Annotated[int, Path()],
+    offset: int = 0,
+    limit: int = 10,
+):
+    """
+    Get user's balance history
+    """
+    stmt = select(BalanceChangeHistory).filter(BalanceChangeHistory.user_id == user_id)
+
+    result = await db.execute(stmt.order_by(
+    ).offset(offset).limit(limit))
+    history = result.scalars().all()
+
+    count = await db.execute(stmt.with_only_columns(func.count(BalanceChangeHistory.id)))
+    count = count.scalar() or 0
+
+    data = [
+        {
+            "id": h.id,
+            "change_type": h.change_type,
+            "amount": h.change_amount,
+            "date_and_time": h.created_at.strftime("%Y-%m-%d %H:%M:%S"),
+            "status": h.status,
+        }
+        for h in history
+    ]
+
+    return JSONResponse(
+        status_code=status.HTTP_200_OK,
+        content=HistoryList(items=data, count=count).model_dump(mode='json'),
+    )
+
+
+@admin.get(
+    "/users/{user_id}/wallet",
+    dependencies=[Security(get_admin_token, scopes=[
+        Role.ADMIN.value,
+        Role.SUPER_ADMIN.value,
+        Role.FINANCIER.value,
+    ])],
+    responses={
+        400: {"model": BadResponse},
+        200: {"model": WalletBase},
+    },
+)
+async def get_user_wallet(
+    db: Annotated[AsyncSession, Depends(get_db)],
+    user_id: Annotated[int, Path()],
+):
+    """
+    Get user's balance history
+    """
+    stmt = select(Wallet).filter(Wallet.user_id == user_id)
+
+    result = await db.execute(stmt)
+    wallet = result.scalar()
+
+    if not wallet:
+        return JSONResponse(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            content={"message": "Wallet not found"},
+        )
+
+    data = {
+        "id": wallet.id,
+        "address": wallet.address,
+        "date_and_time": wallet.created_at.strftime("%Y-%m-%d %H:%M:%S"),
+    }
+
+    return JSONResponse(
+        status_code=status.HTTP_200_OK,
+        content=data,
+    )
+
+
+@admin.get(
+    "/users/{user_id}/balance",
+    dependencies=[Security(get_admin_token, scopes=[
+        Role.GLOBAL_ADMIN.value,
+        Role.ADMIN.value,
+        Role.SUPER_ADMIN.value,
+        Role.LOCAL_ADMIN.value,
+        Role.FINANCIER.value,
+        Role.SUPPORT.value
+    ])],
+    responses={
+        400: {"model": BadResponse},
+        200: {"model": BalanceBase},
+    },
+)
+async def get_user_balance(
+    db: Annotated[AsyncSession, Depends(get_db)],
+    user_id: Annotated[int, Path()],
+):
+    """
+    Get user's balance
+    """
+    stmt = select(Balance).options(
+        joinedload(Balance.currency)
+    ).filter(Balance.user_id == user_id)
+
+    result = await db.execute(stmt)
+    balance = result.scalars().all()
+
+    data = [
+        {
+            "id": b.id,
+            "balance": float(b.balance),
+            "currency": b.currency.code if b.currency else None,
+        } for b in balance
+    ]
+
+    return JSONResponse(
+        status_code=status.HTTP_200_OK,
+        content=data,
     )

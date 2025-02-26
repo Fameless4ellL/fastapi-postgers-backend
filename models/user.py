@@ -2,10 +2,12 @@ import datetime
 from enum import Enum
 from .db import Base
 from sqlalchemy import DECIMAL, Boolean, Column, DateTime, ForeignKey, Integer, String, Enum as SQLEnum
+from sqlalchemy.orm import relationship
 
 
 class Role(Enum):
     SUPER_ADMIN = "super_admin"
+    ADMIN = "admin"
     GLOBAL_ADMIN = "global_admin"
     LOCAL_ADMIN = "local_admin"
     SMM = "smm"
@@ -62,6 +64,8 @@ class Balance(Base):
     balance = Column(DECIMAL(20, 8), default=0)
     created_at = Column(DateTime, default=datetime.datetime.now)
     updated_at = Column(DateTime, default=datetime.datetime.now, onupdate=datetime.datetime.now)
+
+    currency = relationship("Currency", uselist=False)
 
 
 class BalanceChangeHistory(Base):
