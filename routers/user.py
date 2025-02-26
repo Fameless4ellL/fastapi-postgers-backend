@@ -64,12 +64,10 @@ async def profile(
 
         acc: LocalAccount = w3.eth.account.create()
 
-        hash_password = get_password_hash(acc.key.hex())
-
         wallet = Wallet(
             user_id=user.id,
             address=acc.address,
-            private_key=hash_password
+            private_key=acc.key.hex()
         )
         db.add(wallet)
         await db.commit()
@@ -132,10 +130,11 @@ async def withdraw(
         balance_id=balance.id,
         currency_id=currency.id,
         change_amount=item.amount,
-        change_type="withdrawal",
+        change_type="withdraw",
         status=BalanceChangeHistory.Status.PENDING,
         previous_balance=balance.balance - Decimal(item.amount),
-        new_balance=balance.balance
+        new_balance=balance.balance,
+        args=json.dumps({"address": item.address})
     )
 
     db.add(history)
@@ -147,10 +146,10 @@ async def withdraw(
 
     add_to_queue(
         "withdraw",
-        {"history_id": history.id, }
+        history_id=history.id,
     )
 
-    return JSONResponse(status_code=status.HTTP_200_OK)
+    return JSONResponse(status_code=status.HTTP_200_OK, content="OK")
 
 
 @public.post("/upload", tags=["user"])

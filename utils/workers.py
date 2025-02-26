@@ -366,6 +366,7 @@ def proceed_jackpot(jackpot_id: Optional[int] = None):
 
 def get_w3(
     network_id: int,
+    private_key: str = settings.private_key
 ) -> Web3:
     db = next(get_sync_db())
     network = db.query(Network).filter(
@@ -383,7 +384,7 @@ def get_w3(
     except client_exceptions.ClientError:
         return False
 
-    acct = w3.eth.account.from_key(settings.private_key)
+    acct = w3.eth.account.from_key(private_key)
 
     w3.middleware_onion.inject(middleware.SignAndSendRawMiddlewareBuilder.build(acct), layer=0)
     w3.eth.default_account = acct.address
@@ -392,120 +393,32 @@ def get_w3(
 
 
 @worker.register
-def deposit(
-    history_id: int,
-):
-    db = next(get_sync_db())
-    # check if balance history exists with this hash
-    balance_change_history = db.query(BalanceChangeHistory).filter(
-        BalanceChangeHistory.id == history_id
-    )
-    balance_change_history = balance_change_history.scalar()
-
-    if balance_change_history:
-        return False
-
-    wallet_result = db.query(Wallet).filter(
-        Wallet.user_id == balance_change_history.user_id
-    )
-    wallet = wallet_result.scalar()
-
-    if not wallet:
-        return False
-
-    w3 = get_w3(wallet.network_id)
-    if not w3:
-        return False
-
-    tx: TxReceipt = w3.eth.wait_for_transaction_receipt(balance_change_history.proof, timeout=60)
-
-    currency = db.query(Currency).filter(
-        Currency.id == balance_change_history.currency_id
-    )
-    currency = currency.scalar()
-    if not currency:
-        return False
-
-    contract = w3.eth.contract(
-        address=tx.contractAddress,
-        abi=json.loads(redis.get("abi"))
-    )
-
-    logs = contract.events.Transfer().process_receipt(tx)
-
-    transfer = {}
-    for log in logs:
-        if log.event != "Transfer":
-            continue
-
-        transfer = log.args
-        break
-
-    decimals = 18
-
-    if tx is None:
-        return False
-
-    if (
-        tx.status != 1
-        or transfer.to.lower() != wallet.address.lower()
-    ):
-        return False
-
-    balance_result = db.query(Balance).with_for_update().filter(
-            Balance.user_id == balance_change_history.id,
-            Balance.currency_id == currency.id
-    )
-    balance = balance_result.scalar()
-
-    amount = Decimal(transfer.value / 10 ** decimals)
-
-    if not balance:
-        balance = Balance(
-            user_id=balance_change_history.id,
-            currency_id=currency.id,
-            balance=amount
-        )
-        db.add(balance)
-    else:
-        balance.balance += amount
-
-    history = BalanceChangeHistory(
-        user_id=balance_change_history.id,
-        balance_id=balance.id,
-        currency_id=currency.id,
-        change_amount=amount,
-        change_type="deposit",
-        previous_balance=balance.balance - amount,
-        proof=tx.transactionHash,
-        new_balance=balance.balance
-    )
-
-    db.add(history)
-    db.commit()
-
-    return True
-
-
-@worker.register
-def withdrawal(
+def withdraw(
     history_id: int,
     counter: int = 0
 ):
     db = next(get_sync_db())
 
-    balance_change_history = db.query(BalanceChangeHistory).with_for_update().filter(
+    balance_change_history = db.query(BalanceChangeHistory).filter(
         BalanceChangeHistory.id == history_id,
-        BalanceChangeHistory.change_type == "withdrawal",
+        BalanceChangeHistory.change_type == "withdraw",
         BalanceChangeHistory.status == BalanceChangeHistory.Status.PENDING
-    )
-    balance_change_history = balance_change_history.scalar()
+    ).first()
 
-    if balance_change_history:
+    if not balance_change_history:
         return False
 
-    args = json.loads(balance_change_history.args)
+    args = json.loads(balance_change_history.args or "{}")
     args.setdefault('web3', [])
+    address = args.get("address")
+    
+    if not address:
+        args['error'] = "Missing address"
+        balance_change_history.args = json.dumps(args)
+        balance_change_history.status = BalanceChangeHistory.Status.CANCELED
+        db.add(balance_change_history)
+        db.commit()
+        return False
 
     if counter > 3:
         args['error'] = "Max retries exceeded"
@@ -515,10 +428,9 @@ def withdrawal(
         db.commit()
         return
 
-    wallet_result = db.query(Wallet).filter(
-        Wallet.user_id == balance_change_history.id
-    )
-    wallet = wallet_result.scalar()
+    wallet = db.query(Wallet).filter(
+        Wallet.user_id == balance_change_history.user_id
+    ).first()
 
     if not wallet:
         args['error'] = "Missing wallet"
@@ -529,24 +441,33 @@ def withdrawal(
         return False
 
     try:
-        w3 = get_w3(wallet.network_id)
 
         currency = db.query(Currency).filter(
             Currency.id == balance_change_history.currency_id
-        )
-        currency = currency.scalar()
+        ).first()
+
         if not currency:
             return False
+
+        w3 = get_w3(
+            currency.network_id,
+            wallet.private_key
+        )
 
         abi = redis.get("abi")
 
         contract = w3.eth.contract(
-            address=currency.address,
+            address=w3.to_checksum_address(currency.address),
             abi=json.loads(abi)
         )
 
-        amount = int(balance_change_history.amount * 10 ** currency.decimals)
-        _hash = contract.functions.transfer(wallet.address, amount).transact()
+        amount = int(balance_change_history.change_amount * 10 ** currency.decimals)
+        _hash = contract.functions.transfer(
+            w3.to_checksum_address(address),
+            amount
+        ).transact({
+            "from": w3.eth.default_account
+        })
 
         tx = w3.eth.get_transaction_receipt(_hash)
     except Exception as e:
@@ -557,7 +478,7 @@ def withdrawal(
 
         add_job_to_scheduler(
             "add_to_queue",
-            ["withdrawal", history_id, counter + 1],
+            ["withdraw", history_id, counter + 1],
             datetime.now() + timedelta(minutes=1)
         )
         return False
@@ -570,29 +491,29 @@ def withdrawal(
 
         add_job_to_scheduler(
             "add_to_queue",
-            ["withdrawal", history_id, counter + 1],
+            ["withdraw", history_id, counter + 1],
             datetime.now() + timedelta(minutes=1)
         )
         return False
 
-    balance_result = db.query(Balance).with_for_update().filter(
+    balance = db.query(Balance).filter(
         Balance.user_id == balance_change_history.id
-    )
-    balance = balance_result.scalar()
+    ).with_for_update().first()
+
     if not balance:
         balance = Balance(user_id=balance_change_history.id)
-        db.add(balance)
 
         status = BalanceChangeHistory.Status.CANCELED
 
     else:
-        balance.balance -= Decimal(balance_change_history.amount)
+        balance.balance -= Decimal(balance_change_history.change_amount)
 
         status = BalanceChangeHistory.Status.SUCCESS
 
     balance_change_history.status = status
     balance_change_history.proof = tx.transactionHash
 
+    db.add(balance)
     db.add(balance_change_history)
     db.commit()
 
