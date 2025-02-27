@@ -78,15 +78,6 @@ get_crud_router(
     filters=Annotated[Empty, Depends(Empty)]
 )
 get_crud_router(
-    model=Game,
-    prefix="/games",
-    schema=Games,
-    get_schema=GameSchema,
-    create_schema=GameCreate,
-    update_schema=GameUpdate,
-    filters=Annotated[GameFilter, Depends(GameFilter)]
-)
-get_crud_router(
     model=Jackpot,
     prefix="/jackpots",
     schema=Jackpots,

@@ -7,12 +7,12 @@ from typing import Optional
 class UserLogin(BaseModel):
     username: str = ""
     phone_number: str
-    code: str = Field(..., min_length=6, max_length=6, description="SMS code")
     password: Optional[SecretStr] = Field(default="", exclude=True, deprecated=True)
 
 
 class UserCreate(UserLogin):
     country: CountryAlpha3
+    refferal_code: Optional[str] = None
 
 
 class SendCode(BaseModel):

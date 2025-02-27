@@ -289,9 +289,6 @@ class JackpotBase(BaseAdmin):
     updated_at: datetime
     created_at: datetime
 
-    class Config:
-        from_attributes = True
-
 
 class JackpotCreate(BaseModel):
     name: str
@@ -315,3 +312,40 @@ class JackpotSchema(JackpotBase):
 class Jackpots(BaseModel):
     items: list[JackpotSchema] = []
     count: int = 0
+
+
+class ReferralBase(BaseAdmin):
+    name: str
+    deleted: bool
+    link: str
+    comment: Optional[str]
+    created_at: datetime
+
+
+class ReferralCreate(BaseAdmin):
+    name: str
+    link: str
+    comment: Optional[str]
+
+
+class ReferralUpdate(ReferralCreate):
+    pass
+
+
+class ReferralSchema(ReferralBase):
+    id: int
+
+
+class Referrals(BaseModel):
+    items: list[ReferralSchema] = []
+    count: int = 0
+
+
+class ReferralFilter:
+    def __init__(
+        self,
+        query: Optional[str] = "",
+        status: Optional[bool] = None,
+    ):
+        self.query = query
+        self.status = status

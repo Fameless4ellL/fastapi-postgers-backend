@@ -4,7 +4,7 @@ from fastapi.security import OAuth2PasswordRequestForm
 from phonenumbers import parse
 from fastapi import Depends, Request, status
 from models.db import get_db
-from models.user import User
+from models.user import User, ReferralLink
 from typing import Annotated
 from routers import public
 from fastapi.responses import JSONResponse
@@ -72,6 +72,20 @@ async def register(
             country=user.country,
         )
         db.add(user_in_db)
+
+        if user.refferal_code:
+            refferal = await db.execute(
+                select(ReferralLink).filter(
+                    ReferralLink.link == user.refferal_code
+                )
+            )
+            refferal = refferal.scalar()
+
+            if refferal:
+                user_in_db.referral_id = refferal.id
+                refferal.user_count += 1
+                db.add(refferal)
+
         await db.commit()
         await db.refresh(user_in_db)
 

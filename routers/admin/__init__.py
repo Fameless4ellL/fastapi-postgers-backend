@@ -1,8 +1,9 @@
 from fastapi import APIRouter, Depends, Path, status, Security
 from fastapi.responses import JSONResponse
 from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy import select, func
-from typing import Type, List, Annotated, Optional
+from sqlalchemy import select, func, or_
+from typing import Type, List, Annotated
+from schemes.admin import ReferralFilter
 from schemes.base import BadResponse
 from pydantic import BaseModel
 from models.db import get_db
@@ -10,7 +11,7 @@ from models.user import Role
 from routers import admin
 from globals import scheduler
 from utils.workers import add_to_queue
-from routers.utils import get_admin_token
+from routers.utils import get_admin_token, Token
 
 
 def get_crud_router(
@@ -62,6 +63,20 @@ def get_crud_router(
             if filters.date_to:
                 stmt = stmt.filter(model.scheduled_datetime <= filters.date_to)
 
+        if model.__name__ == "ReferralLink":
+            filters: ReferralFilter = filters
+
+            if filters.status:
+                stmt = stmt.filter(model.deleted == filters.status)
+
+            if filters.query:
+                stmt = stmt.filter(
+                    or_(
+                        model.name.ilike(f"%{filters.query}%"),
+                        model.comment.ilike(f"%{filters.query}%"),
+                    )
+                )
+
         items = await db.execute(stmt.order_by(model.id.desc()).offset(offset).limit(limit))
         items = items.scalars().all()
 
@@ -106,13 +121,17 @@ def get_crud_router(
             400: {"model": BadResponse},
             201: {"model": schema}
         },
-        dependencies=[Security(get_admin_token, scopes=security_scopes)]
     )
     async def create_item(
         db: Annotated[AsyncSession, Depends(get_db)],
+        token: Annotated[Token, Security(get_admin_token, scopes=security_scopes)],
         item: create_schema
     ):
         new_item = model(**item.model_dump())
+    
+        if model.__name__ == "ReferralLink":
+            new_item.generated_by = token.id
+        
         db.add(new_item)
         await db.commit()
 
@@ -165,3 +184,5 @@ def get_crud_router(
 from .admins import *
 from .auth import *
 from .users import *
+from .games import *
+from .referral import *

@@ -40,6 +40,8 @@ class User(Base):
     kyc = Column(Boolean, default=False)
     document = Column(String(256), nullable=True)
 
+    referral_id = Column(Integer, ForeignKey('referral_links.id'), nullable=True)
+
     created_at = Column(DateTime, default=datetime.datetime.now)
     updated_at = Column(DateTime, default=datetime.datetime.now, onupdate=datetime.datetime.now)
 
@@ -89,4 +91,19 @@ class BalanceChangeHistory(Base):
     proof = Column(String(256), nullable=True)
     new_balance = Column(DECIMAL(20, 8), default=0)
     args = Column(String, nullable=True, default="{}")
+    created_at = Column(DateTime, default=datetime.datetime.now)
+
+
+class ReferralLink(Base):
+    __tablename__ = "referral_links"
+
+    id = Column(Integer, primary_key=True, index=True)
+    name = Column(String(256), nullable=False, unique=True)
+    comment = Column(String(256), nullable=True)
+    link = Column(String(256), nullable=False)
+    generated_by = Column(Integer, ForeignKey('users.id'), nullable=False)
+    placement = Column(String(256), nullable=True, doc="placement of the link")
+    user_count = Column(Integer, default=0)
+
+    deleted = Column(Boolean, default=False)
     created_at = Column(DateTime, default=datetime.datetime.now)

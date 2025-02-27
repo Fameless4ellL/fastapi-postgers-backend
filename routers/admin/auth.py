@@ -1,11 +1,11 @@
-from fastapi import Depends, background, status
+from fastapi import Depends, Security, background, status
 from fastapi.responses import JSONResponse
 from typing import Annotated
 
 from sqlalchemy import select, or_
 from models.user import User
 from routers import admin
-from routers.utils import send_mail
+from routers.utils import Token, get_admin_token, send_mail
 from globals import aredis
 from sqlalchemy.ext.asyncio import AsyncSession
 from models.db import get_db
@@ -129,5 +129,22 @@ async def reset_password(
         "Your password has been reset",
         user.email,
     )
+
+    return JSONResponse(status_code=status.HTTP_200_OK, content="OK")
+
+
+@admin.post(
+    "/logout",
+    responses={
+        400: {"model": BadResponse},
+    },
+)
+async def logout(
+    token: Annotated[Token, [Security(get_admin_token)],],
+):
+    """
+    Admin logout
+    """
+    await aredis.delete(f"TOKEN:ADMINS:{token.id}")
 
     return JSONResponse(status_code=status.HTTP_200_OK, content="OK")
