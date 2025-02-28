@@ -1,27 +1,28 @@
 import os
+from eth_account import Account
 import pycountry
 import json
 from decimal import Decimal
-from typing import Annotated
+from typing import Annotated, List
 from fastapi import Depends, status, UploadFile
 from fastapi.responses import JSONResponse
 from sqlalchemy import func, select
-from web3 import AsyncWeb3
+from eth_account.signers.local import LocalAccount
+from sqlalchemy.orm import joinedload
+from tronpy.keys import to_base58check_address
 from models.db import get_db
 from models.user import Balance, User, Wallet, BalanceChangeHistory
 from models.other import Currency, Ticket
 from routers import public
-from routers.utils import get_user, get_currency, get_w3
-from utils.signature import get_password_hash
-from eth_account.signers.local import LocalAccount
+from globals import aredis
+from routers.utils import get_user, get_currency
+
 from sqlalchemy.ext.asyncio import AsyncSession
 from schemes.base import BadResponse, Country
-from globals import aredis
-from web3.types import TxReceipt
 from schemes.game import (
-    Tickets, Deposit, Withdraw
+    Tickets, Withdraw
 )
-from schemes.user import Profile
+from schemes.user import Profile, UserBalance
 from utils.workers import add_to_queue
 
 
@@ -33,27 +34,17 @@ from utils.workers import add_to_queue
 async def profile(
     user: Annotated[User, Depends(get_user)],
     db: Annotated[AsyncSession, Depends(get_db)],
-    currency: Annotated[str, Depends(get_currency)],
-    w3: Annotated[AsyncWeb3, Depends(get_w3)]
 ):
     """
     Получение информации о пользователе
     """
-    balance_result = await db.execute(
-        select(Balance)
-        .filter(
-            Balance.user_id == user.id,
-            Balance.currency_id == currency.id
-        )
+    
+    # sum balances
+    balances = await db.execute(
+        select(func.sum(Balance.balance))
+        .filter(Balance.user_id == user.id)
     )
-    balance = balance_result.scalar()
-    if not balance:
-        balance = Balance(
-            user_id=user.id,
-            currency_id=currency.id,
-        )
-        db.add(balance)
-        await db.commit()
+    balance = float(balances.scalar() or 0)
 
     wallet_result = await db.execute(
         select(Wallet)
@@ -61,8 +52,7 @@ async def profile(
     )
     wallet = wallet_result.scalar()
     if not wallet:
-
-        acc: LocalAccount = w3.eth.account.create()
+        acc: LocalAccount = Account.create()
 
         wallet = Wallet(
             user_id=user.id,
@@ -74,16 +64,67 @@ async def profile(
 
         await aredis.sadd("BLOCKER:WALLETS", wallet.address)
 
-    total_balance = float(balance.balance)
     return JSONResponse(
         status_code=status.HTTP_200_OK,
         content=Profile(
-            balance=total_balance,
+            balance=balance,
             locale=user.language_code or "EN",
-            address=wallet.address,
+            address={
+                "base58": to_base58check_address(wallet.address),
+                "evm": wallet.address,
+            },
             country=user.country,
             username=user.username
         ).model_dump()
+    )
+
+
+@public.get(
+    "/balance",
+    tags=["user"],
+    responses={400: {"model": BadResponse}, 200: {"model": List[UserBalance]}}
+)
+async def balance(
+    user: Annotated[User, Depends(get_user)],
+    db: Annotated[AsyncSession, Depends(get_db)],
+):
+    """
+    Получение balance пользователя
+    """
+
+    balancies = await db.execute(
+        select(Balance).options(
+            joinedload(Balance.currency).joinedload(Currency.network)
+        )
+        .filter(Balance.user_id == user.id)
+    )
+    balance = balancies.scalars().all()
+
+    if not balance:
+        currencies = await db.execute(select(Currency))
+        for currency in currencies.scalars().all():
+            bal = Balance(
+                user_id=user.id,
+                currency_id=currency.id,
+            )
+            db.add(bal)
+        await db.commit()
+
+        balancies = await db.execute(
+            select(Balance).options(
+                joinedload(Balance.currency).joinedload(Currency.network)
+            )
+            .filter(Balance.user_id == user.id)
+        )
+        balance = balancies.scalars().all()
+
+    return JSONResponse(
+        status_code=status.HTTP_200_OK,
+        content=[UserBalance(
+            network=b.currency.network.symbol,
+            currency=b.currency.code,
+            balance=float(b.balance)
+        ).model_dump() for b in balance]
     )
 
 

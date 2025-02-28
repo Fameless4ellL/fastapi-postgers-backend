@@ -4,8 +4,10 @@ from fastapi.security import OAuth2PasswordRequestForm
 from phonenumbers import parse
 from fastapi import Depends, Request, status
 from models.db import get_db
-from models.user import User, ReferralLink
+from models.user import User, ReferralLink, Wallet
 from typing import Annotated
+from eth_account.signers.local import LocalAccount
+from eth_account import Account
 from routers import public
 from fastapi.responses import JSONResponse
 from sqlalchemy import select, or_
@@ -14,7 +16,7 @@ from schemes.auth import CheckCode, SendCode, UserCreate, UserLogin, AccessToken
 from schemes.base import BadResponse
 from globals import aredis
 
-from utils.signature import ACCESS_TOKEN_EXPIRE_MINUTES, create_access_token, verify_password
+from utils.signature import create_access_token, verify_password
 
 
 @public.post(
@@ -72,6 +74,25 @@ async def register(
             country=user.country,
         )
         db.add(user_in_db)
+
+        wallet_result = await db.execute(
+            select(Wallet)
+            .filter(Wallet.user_id == user.id)
+        )
+        wallet = wallet_result.scalar()
+        if not wallet:
+
+            acc: LocalAccount = Account.create()
+
+            wallet = Wallet(
+                user_id=user.id,
+                address=acc.address,
+                private_key=acc.key.hex()
+            )
+            db.add(wallet)
+            await db.commit()
+
+            await aredis.sadd("BLOCKER:WALLETS", wallet.address)
 
         if user.refferal_code:
             refferal = await db.execute(

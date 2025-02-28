@@ -1,15 +1,23 @@
-from aiohttp import BasicAuth, ClientResponse, ClientSession, ClientTimeout
+import json
+from tronpy import Tron
+from tronpy.keys import PrivateKey, to_base58check_address
+from aiohttp import ClientResponse, ClientTimeout
 import requests
 from typing import Any, Optional, Union, Dict
 from eth_typing import URI
+from web3 import Web3, middleware
 from web3._utils.http_session_manager import HTTPSessionManager
 from web3._utils.empty import empty
 from web3.providers.rpc import HTTPProvider, AsyncHTTPProvider
 from web3._utils.http import (
     DEFAULT_HTTP_TIMEOUT,
 )
+from aiohttp import client_exceptions
 from requests_auth_aws_sigv4 import AWSSigV4
+from models.other import Currency
+from globals import redis
 from settings import aws
+from settings import settings
 
 
 aws_auth = AWSSigV4(
@@ -114,3 +122,98 @@ class AWSAsyncHTTPProvider(AsyncHTTPProvider):
         self._exception_retry_configuration = exception_retry_configuration
 
         super().__init__(**kwargs)
+
+
+def get_w3(
+    url: int,
+    private_key: str = settings.private_key
+) -> Union[Web3, bool]:
+    try:
+        w3 = Web3(AWSHTTPProvider(url))
+
+        if not w3.is_connected():
+            return False
+    except client_exceptions.ClientError:
+        return False
+
+    acct = w3.eth.account.from_key(private_key)
+
+    w3.middleware_onion.inject(
+        middleware.SignAndSendRawMiddlewareBuilder.build(acct),
+        layer=0
+    )
+    w3.eth.default_account = acct.address
+
+    return w3
+
+
+def transfer(
+    currency: Currency,
+    private_key: str,
+    amount: float,
+    address: str,
+) -> Union[str, bool]:
+    try:
+        if currency.network.symbol.lower() == "tron":
+            return transfer_trc20(currency, private_key, amount, address)
+
+        w3 = get_w3(
+            currency.network.rpc_url,
+            private_key
+        )
+
+        if not w3:
+            return False
+
+        abi = redis.get("abi")
+
+        contract = w3.eth.contract(
+            address=w3.to_checksum_address(address),
+            abi=json.loads(abi)
+        )
+
+        amount = int(amount * 10 ** currency.decimals)
+        _hash = contract.functions.transfer(
+            w3.to_checksum_address(address),
+            amount
+        ).transact()
+
+        tx = w3.eth.get_transaction_receipt(_hash)
+
+        if tx.status != 1:
+            return "", "Transaction failed"
+    except Exception as e:
+        return "", str(e)
+    return tx, "success"
+
+
+def transfer_trc20(
+    currency: Currency,
+    private_key: str,
+    amount: float,
+    address: str,
+) -> Union[str, bool]:
+    try:
+        client = Tron(network='nile')
+        contract = client.get_contract(
+            to_base58check_address(currency.address)
+        )
+
+        priv_key = PrivateKey(bytes.fromhex(private_key))
+
+        amount = int(amount * 10 ** currency.decimals)
+        txn = (
+            contract.functions.transfer(address, amount)
+            .with_owner(to_base58check_address(settings.address))
+            .fee_limit(5_000_000)
+            .build()
+            .sign(priv_key)
+        )
+
+        txn = client.broadcast(txn).wait()
+        if txn["result"]:
+            return txn["txid"], "success"
+        else:
+            return "", "failed"
+    except Exception as e:
+        return "", str(e)

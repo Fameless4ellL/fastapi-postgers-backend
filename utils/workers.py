@@ -7,17 +7,15 @@ from typing import Optional
 from datetime import datetime, timedelta
 
 from models.db import get_sync_db
-from web3 import Web3, middleware
-from web3.types import TxReceipt
-from aiohttp import client_exceptions
 from models.user import Wallet
-from models.other import Currency, Game, GameStatus, Network, Ticket, Jackpot
+from models.other import Currency, Game, GameStatus, Ticket, Jackpot
+from utils.web3 import transfer
+from sqlalchemy.orm import joinedload
 from utils import worker
 from sqlalchemy import func
 from models.user import Balance, BalanceChangeHistory
 from globals import redis
 from settings import settings
-from utils.web3 import AWSHTTPProvider
 
 
 @worker.register
@@ -364,34 +362,6 @@ def proceed_jackpot(jackpot_id: Optional[int] = None):
     return True
 
 
-def get_w3(
-    network_id: int,
-    private_key: str = settings.private_key
-) -> Web3:
-    db = next(get_sync_db())
-    network = db.query(Network).filter(
-        Network.id == network_id
-    ).first()
-
-    if not network:
-        return False
-
-    try:
-        w3 = Web3(AWSHTTPProvider(network.rpc_url))
-
-        if not w3.is_connected():
-            return False
-    except client_exceptions.ClientError:
-        return False
-
-    acct = w3.eth.account.from_key(private_key)
-
-    w3.middleware_onion.inject(middleware.SignAndSendRawMiddlewareBuilder.build(acct), layer=0)
-    w3.eth.default_account = acct.address
-
-    return w3
-
-
 @worker.register
 def withdraw(
     history_id: int,
@@ -411,7 +381,7 @@ def withdraw(
     args = json.loads(balance_change_history.args or "{}")
     args.setdefault('web3', [])
     address = args.get("address")
-    
+
     if not address:
         args['error'] = "Missing address"
         balance_change_history.args = json.dumps(args)
@@ -440,51 +410,29 @@ def withdraw(
         db.commit()
         return False
 
-    try:
+    currency = db.query(Currency).options(
+        joinedload(Currency.network)
+    ).filter(
+        Currency.id == balance_change_history.currency_id
+    ).first()
 
-        currency = db.query(Currency).filter(
-            Currency.id == balance_change_history.currency_id
-        ).first()
-
-        if not currency:
-            return False
-
-        w3 = get_w3(
-            currency.network_id,
-            wallet.private_key
-        )
-
-        abi = redis.get("abi")
-
-        contract = w3.eth.contract(
-            address=w3.to_checksum_address(currency.address),
-            abi=json.loads(abi)
-        )
-
-        amount = int(balance_change_history.change_amount * 10 ** currency.decimals)
-        _hash = contract.functions.transfer(
-            w3.to_checksum_address(address),
-            amount
-        ).transact({
-            "from": w3.eth.default_account
-        })
-
-        tx = w3.eth.get_transaction_receipt(_hash)
-    except Exception as e:
-        args['web3'].append(str(e))
+    if not currency:
+        args['error'] = "Missing currency or network"
         balance_change_history.args = json.dumps(args)
+        balance_change_history.status = BalanceChangeHistory.Status.CANCELED
         db.add(balance_change_history)
         db.commit()
-
-        add_job_to_scheduler(
-            "add_to_queue",
-            ["withdraw", history_id, counter + 1],
-            datetime.now() + timedelta(minutes=1)
-        )
         return False
 
-    if tx.status != 1:
-        args['web3'].append("Transaction failed")
+    tx, err = transfer(
+        currency,
+        wallet.private_key,
+        float(balance_change_history.change_amount),
+        address
+    )
+
+    if not tx:
+        args['web3'].append(str(err))
         balance_change_history.args = json.dumps(args)
         db.add(balance_change_history)
         db.commit()
