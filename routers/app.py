@@ -36,6 +36,7 @@ from schemes.tg import WidgetLogin
 from utils.signature import TgAuth
 from globals import aredis
 from settings import settings
+from utils.web3 import transfer
 
 
 @public.post("/tg/login", deprecated=True)
@@ -237,14 +238,13 @@ async def buy_tickets(
     item: BuyTicket,
     user: Annotated[User, Depends(get_user)],
     db: Annotated[AsyncSession, Depends(get_db)],
-    currency: Annotated[Currency, Depends(get_currency)],
-    w3: Annotated[AsyncWeb3, Depends(get_w3)],
 ):
     """
     Для покупки билетов frame:20
     """
     game = await db.execute(
         select(Game)
+        .options(joinedload(Game.currency))
         .filter(Game.id == game_id)
     )
     game: Optional[Game] = game.scalar()
@@ -268,7 +268,10 @@ async def buy_tickets(
         return JSONResponse(
             status_code=status.HTTP_400_BAD_REQUEST,
             content=BadResponse(
-                message=f"Invalid ticket numbers, need {game.limit_by_ticket} per ticket"
+                message=(
+                    f"Invalid ticket numbers, "
+                    f"need {game.limit_by_ticket} per ticket"
+                )
             ).model_dump()
         )
 
@@ -276,13 +279,18 @@ async def buy_tickets(
         return JSONResponse(
             status_code=status.HTTP_400_BAD_REQUEST,
             content=BadResponse(
-                message=f"Not enough tickets to participate, need {game.min_ticket_count}"
+                message=(
+                    f"Not enough tickets to participate, "
+                    f"need {game.min_ticket_count}"
+                )
             ).model_dump()
         )
     if item.demo and len(item.numbers) > 1:
         return JSONResponse(
             status_code=status.HTTP_400_BAD_REQUEST,
-            content=BadResponse(message="Demo mode is available only for one ticket").model_dump()
+            content=BadResponse(message=(
+                "Demo mode is available only for one ticket"
+            )).model_dump()
         )
 
     jackpot_id = None
@@ -304,32 +312,23 @@ async def buy_tickets(
             .with_for_update()
             .filter(
                 Balance.user_id == user.id,
-                Balance.currency_id == currency.id
+                Balance.currency_id == game.currency_id
             )
         )
         user_balance = balance_result.scalar() or Balance(balance=0)
         total_price = game.price * len(item.numbers)
 
-        try:
-            contract = w3.eth.contract(
-                address=currency.address,
-                abi=json.loads(await aredis.get("abi"))
-            )
-            amount = int(total_price * 10 ** currency.decimals)
+        tx, err = transfer(
+            game.currency,
+            wallet.private_key,
+            total_price,
+            settings.address,
+        )
 
-            w3.eth.default_account = wallet.address
-            _hash = contract.functions.transfer(settings.address, amount).transact()
-            tx = w3.eth.wait_for_transaction_receipt(_hash, timeout=60)
-
-            if tx is None or tx.status != 1:
-                return JSONResponse(
-                    status_code=status.HTTP_400_BAD_REQUEST,
-                    content=BadResponse(message="Transaction failed").model_dump()
-                )
-        except Exception as e:
+        if not tx:
             return JSONResponse(
                 status_code=status.HTTP_400_BAD_REQUEST,
-                content=BadResponse(message=str(e)).model_dump()
+                content=BadResponse(message=err).model_dump()
             )
 
         # jackpots
@@ -361,11 +360,14 @@ async def buy_tickets(
         user_balance.balance -= total_price
         balance_change = BalanceChangeHistory(
             user_id=user.id,
+            currency_id=game.currency_id,
+            balance_id=user_balance.id,
             change_amount=-total_price,
             change_type="ticket purchase",
             previous_balance=user_balance.balance + total_price,
             status=BalanceChangeHistory.Status.PENDING,
-            new_balance=user_balance.balance
+            new_balance=user_balance.balance,
+            proof=tx
         )
         db.add(balance_change)
         await db.commit()

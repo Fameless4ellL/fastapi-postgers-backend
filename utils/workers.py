@@ -424,11 +424,14 @@ def withdraw(
         db.commit()
         return False
 
+    tx = balance_change_history.proof or ""
+
     tx, err = transfer(
         currency,
         wallet.private_key,
         float(balance_change_history.change_amount),
-        address
+        address,
+        tx
     )
 
     if not tx:

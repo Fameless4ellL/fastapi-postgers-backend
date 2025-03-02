@@ -71,6 +71,8 @@ class Currency(Base):
 
     created_at = Column(DateTime, default=datetime.datetime.now)
     updated_at = Column(DateTime, default=datetime.datetime.now, onupdate=datetime.datetime.now)
+    
+    network = relationship("Network", uselist=False)
 
 
 class Jackpot(Base):

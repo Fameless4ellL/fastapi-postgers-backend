@@ -157,7 +157,7 @@ async def login(
         return JSONResponse(
             status_code=status.HTTP_404_NOT_FOUND, content={"message": "User not found"}
         )
-   
+
     if not  await aredis.exists(f"AUTH:{request.client.host}"):
         return JSONResponse(
             status_code=status.HTTP_400_BAD_REQUEST,

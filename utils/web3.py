@@ -152,10 +152,11 @@ def transfer(
     private_key: str,
     amount: float,
     address: str,
+    tx: str = ""
 ) -> Union[str, bool]:
     try:
         if currency.network.symbol.lower() == "tron":
-            return transfer_trc20(currency, private_key, amount, address)
+            return transfer_trc20(currency, private_key, amount, address, tx)
 
         w3 = get_w3(
             currency.network.rpc_url,
@@ -164,6 +165,13 @@ def transfer(
 
         if not w3:
             return False
+
+        if tx:
+            tx = w3.eth.get_transaction_receipt(tx)
+            if tx.status != 1:
+                return "", "Transaction failed"
+
+            return tx, "success"
 
         abi = redis.get("abi")
 
@@ -192,9 +200,18 @@ def transfer_trc20(
     private_key: str,
     amount: float,
     address: str,
+    tx: str = ""
 ) -> Union[str, bool]:
     try:
         client = Tron(network='nile')
+
+        if tx:
+            txn = client.get_transaction(tx)
+            if txn["ret"][0]["contractRet"] != "SUCCESS":
+                return "", "Transaction failed"
+
+            return tx, "success"
+
         contract = client.get_contract(
             to_base58check_address(currency.address)
         )
