@@ -1,6 +1,7 @@
 import json
 from tronpy import Tron
 from tronpy.keys import PrivateKey, to_base58check_address
+from eth_account import Account
 from aiohttp import ClientResponse, ClientTimeout
 import requests
 from typing import Any, Optional, Union, Dict
@@ -192,7 +193,7 @@ def transfer(
             return "", "Transaction failed"
     except Exception as e:
         return "", str(e)
-    return tx, "success"
+    return _hash, "success"
 
 
 def transfer_trc20(
@@ -217,18 +218,19 @@ def transfer_trc20(
         )
 
         priv_key = PrivateKey(bytes.fromhex(private_key))
+        acct = Account.from_key(private_key)
 
         amount = int(amount * 10 ** currency.decimals)
         address = to_base58check_address(address)
         txn = (
             contract.functions.transfer(address, amount)
-            .with_owner(to_base58check_address(settings.address))
+            .with_owner(to_base58check_address(acct.address))
             .fee_limit(5_000_000)
             .build()
             .sign(priv_key)
         )
 
-        txn = txn.broadcast().wait()
+        txn = txn.broadcast()
         if txn["result"]:
             return txn["txid"], "success"
         else:

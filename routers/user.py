@@ -153,7 +153,10 @@ async def withdraw(
     balance_result = await db.execute(
         select(Balance)
         .with_for_update()
-        .filter(Balance.user_id == user.id)
+        .filter(
+            Balance.user_id == user.id,
+            Balance.currency_id == currency.id
+        )
     )
     balance = balance_result.scalar()
     if not balance:

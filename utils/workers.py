@@ -395,6 +395,15 @@ def withdraw(
         balance_change_history.args = json.dumps(args)
         balance_change_history.status = BalanceChangeHistory.Status.WEB3_ERROR
         db.add(balance_change_history)
+
+        balance = db.query(Balance).filter(
+            Balance.user_id == balance_change_history.user_id
+        ).with_for_update().first()
+
+        if balance:
+            balance.balance += Decimal(balance_change_history.change_amount)
+            db.add(balance)
+
         db.commit()
         return
 
@@ -448,11 +457,14 @@ def withdraw(
         return False
 
     balance = db.query(Balance).filter(
-        Balance.user_id == balance_change_history.id
+        Balance.user_id == balance_change_history.user_id
     ).with_for_update().first()
 
     if not balance:
-        balance = Balance(user_id=balance_change_history.id)
+        balance = Balance(
+            user_id=balance_change_history.user_id,
+            currency_id=balance_change_history.currency_id
+        )
 
         status = BalanceChangeHistory.Status.CANCELED
 
@@ -462,7 +474,7 @@ def withdraw(
         status = BalanceChangeHistory.Status.SUCCESS
 
     balance_change_history.status = status
-    balance_change_history.proof = tx.transactionHash
+    balance_change_history.proof = tx
 
     db.add(balance)
     db.add(balance_change_history)
