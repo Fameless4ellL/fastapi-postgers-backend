@@ -139,7 +139,7 @@ class JSONifiedState(EventScannerState):
 
             requests.post(
                 "http://api:8000/v1/cron/api/transfer/",
-                params={"key": "cron"},
+                params={"key": "thisisatest"},
                 json=transfer
             )
 

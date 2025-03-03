@@ -219,6 +219,7 @@ def transfer_trc20(
         priv_key = PrivateKey(bytes.fromhex(private_key))
 
         amount = int(amount * 10 ** currency.decimals)
+        address = to_base58check_address(address)
         txn = (
             contract.functions.transfer(address, amount)
             .with_owner(to_base58check_address(settings.address))
@@ -227,7 +228,7 @@ def transfer_trc20(
             .sign(priv_key)
         )
 
-        txn = client.broadcast(txn).wait()
+        txn = txn.broadcast().wait()
         if txn["result"]:
             return txn["txid"], "success"
         else:
