@@ -12,7 +12,7 @@ from routers import public
 from fastapi.responses import JSONResponse
 from sqlalchemy import select, or_
 from sqlalchemy.ext.asyncio import AsyncSession
-from schemes.auth import CheckCode, SendCode, UserCreate, UserLogin, AccessToken
+from schemes.auth import CheckCode, LoginType, SendCode, UserCreate, UserLogin, AccessToken
 from schemes.base import BadResponse
 from globals import aredis
 
@@ -299,3 +299,46 @@ async def check_code(
         status_code=200,
         content={"message": "Code is correct"}
     )
+
+
+
+@public.post("/login_type", tags=["auth"])
+async def register(
+    user: LoginType,
+    db: Annotated[AsyncSession, Depends(get_db)]
+):
+    if not user.phone_number and not user.username:
+        return JSONResponse(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            content={"message": "Phone number or username is required"}
+        )
+
+    # get country from phone_number
+    country_code = parse(user.phone_number)
+    # country = geocoder.region_code_for_number(country_code)
+    phone_number = f"{country_code.country_code}{country_code.national_number}"
+
+    user_in_db = await db.execute(
+        select(User).filter(
+            or_(
+                User.phone_number == phone_number,
+                User.username == user.username
+            )
+        )
+    )
+    user_in_db = user_in_db.scalar()
+
+    if user_in_db:
+        return JSONResponse(
+            status_code=status.HTTP_200_OK,
+            content={
+                "type": "Login",
+            },
+        )
+    else:
+        return JSONResponse(
+            status_code=status.HTTP_200_OK,
+            content={
+                "type": "Register",
+            },
+        )
