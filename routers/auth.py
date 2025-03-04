@@ -85,7 +85,7 @@ async def register(
             acc: LocalAccount = Account.create()
 
             wallet = Wallet(
-                user_id=user.id,
+                user_id=user_in_db.id,
                 address=acc.address,
                 private_key=acc.key.hex()
             )
