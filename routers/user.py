@@ -1,4 +1,6 @@
+from enum import Enum
 import os
+import importlib
 from eth_account import Account
 import pycountry
 import json
@@ -12,7 +14,7 @@ from sqlalchemy.orm import joinedload
 from tronpy.keys import to_base58check_address
 from models.db import get_db
 from models.user import Balance, User, Wallet, BalanceChangeHistory
-from models.other import Currency, Ticket
+from models.other import Currency, Game, Jackpot, Ticket
 from routers import public
 from globals import aredis
 from routers.utils import get_user, get_currency
@@ -20,9 +22,9 @@ from routers.utils import get_user, get_currency
 from sqlalchemy.ext.asyncio import AsyncSession
 from schemes.base import BadResponse, Country
 from schemes.game import (
-    Tickets, Withdraw
+    MyGamesType, Tickets, Withdraw
 )
-from schemes.user import Profile, UserBalance
+from schemes.user import KYC, Profile, UserBalance
 from utils.workers import add_to_queue
 
 
@@ -38,7 +40,7 @@ async def profile(
     """
     Получение информации о пользователе
     """
-    
+
     # sum balances
     balances = await db.execute(
         select(func.sum(Balance.balance))
@@ -197,9 +199,10 @@ async def withdraw(
 
 
 @public.post("/upload", tags=["user"])
-async def upload_document(
+async def upload_kyc(
     user: Annotated[User, Depends(get_user)],
     db: Annotated[AsyncSession, Depends(get_db)],
+    item: KYC,
     file: UploadFile
 ):
     """
@@ -225,6 +228,8 @@ async def upload_document(
     with open(file_path, "wb") as f:
         f.write(await file.read())
 
+    user.firstname = item.first_name
+    user.lastname = item.last_name
     user.document = file.filename
     db.add(user)
     await db.commit()
@@ -239,17 +244,23 @@ async def upload_document(
 async def get_tickets(
     db: Annotated[AsyncSession, Depends(get_db)],
     user: Annotated[User, Depends(get_user)],
+    game_id: int = None,
+    jackpot_id: int = None,
     skip: int = 0,
     limit: int = 10,
 ):
     """
     Получение билетов пользователя
     """
-    tickets = await db.execute(
-        select(Ticket)
-        .filter(Ticket.user_id == user.id)
-        .offset(skip).limit(limit)
-    )
+    stmt = select(Ticket).filter(Ticket.user_id == user.id)
+
+    if game_id:
+        stmt = stmt.filter(Ticket.game_id == game_id)
+
+    if jackpot_id:
+        stmt = stmt.filter(Ticket.jackpot_id == jackpot_id)
+
+    tickets = await db.execute(stmt.offset(skip).limit(limit))
     tickets = tickets.scalars().all()
 
     data = [{
@@ -298,7 +309,7 @@ async def get_countries():
 
 @public.get(
     "/history", tags=["user"],
-    responses={400: {"model": BadResponse}, 200: {"model": Tickets}}
+    responses={400: {"model": BadResponse}}
 )
 async def get_history(
     db: Annotated[AsyncSession, Depends(get_db)],
@@ -334,4 +345,52 @@ async def get_history(
     return JSONResponse(
         status_code=status.HTTP_200_OK,
         content=dict(tickets=data, count=count)
+    )
+
+
+@public.get(
+    "/mygames", tags=["user"],
+    responses={400: {"model": BadResponse}, 200: {"model": Tickets}}
+)
+async def get_my_games(
+    db: Annotated[AsyncSession, Depends(get_db)],
+    user: Annotated[User, Depends(get_user)],
+    item: MyGamesType,
+    skip: int = 0,
+    limit: int = 10,
+):
+    """
+    Получение игр пользователя в котором он участвовал
+    """
+    model = importlib.import_module("models.other")
+    model = getattr(model, item.model)
+
+    # list of games or jackpots by user distinct
+    stmt = select(model).join(Ticket).filter(Ticket.user_id == user.id)
+
+    items = await db.execute(stmt.offset(skip).limit(limit))
+    items = items.scalars().fetchall()
+    
+    return "Under construction"
+
+    data = [{
+        "id": t.id,
+        "game_instance_id": t.game_id,
+        "currency": t.currency.code if t.currency else None,
+        "numbers": t.numbers,
+        "demo": t.demo,
+        "won": t.won,
+        "amount": float(t.amount),
+        "created": t.created_at.timestamp()
+    } for t in items]
+
+    count_result = await db.execute(
+        select(func.count(Ticket.id))
+        .filter(Ticket.user_id == user.id)
+    )
+    count = count_result.scalar()
+
+    return JSONResponse(
+        status_code=status.HTTP_200_OK,
+        content=Tickets(tickets=data, count=count).model_dump()
     )

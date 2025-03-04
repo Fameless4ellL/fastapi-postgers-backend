@@ -71,7 +71,7 @@ class Currency(Base):
 
     created_at = Column(DateTime, default=datetime.datetime.now)
     updated_at = Column(DateTime, default=datetime.datetime.now, onupdate=datetime.datetime.now)
-    
+
     network = relationship("Network", uselist=False)
 
 
@@ -105,6 +105,7 @@ class Jackpot(Base):
 
     jackpot_instances = relationship("JackpotInstance", back_populates="jackpot", uselist=False)
     currency = relationship("Currency", uselist=False)
+    tickets = relationship("Ticket", back_populates="jackpot", uselist=True)
 
 
 class JackpotInstance(Base):
@@ -158,6 +159,7 @@ class Game(Base):
 
     game_instances = relationship("GameInstance", back_populates="game", uselist=False)
     currency = relationship("Currency", uselist=False)
+    tickets = relationship("Ticket", back_populates="game", uselist=True)
 
 
 class GameInstance(Base):
@@ -191,3 +193,5 @@ class Ticket(Base):
     updated_at = Column(DateTime, default=datetime.datetime.now, onupdate=datetime.datetime.now)
 
     currency = relationship("Currency", uselist=False)
+    jackpot = relationship("Jackpot", back_populates="tickets", uselist=False)
+    game = relationship("Game", back_populates="tickets", uselist=False)

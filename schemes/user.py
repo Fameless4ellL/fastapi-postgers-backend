@@ -9,6 +9,11 @@ class UserBalance(BaseModel):
     balance: float
 
 
+class KYC(BaseModel):
+    first_name: str
+    last_name: str
+
+
 class Address(BaseModel):
     base58: str
     evm: str

@@ -301,9 +301,8 @@ async def check_code(
     )
 
 
-
 @public.post("/login_type", tags=["auth"])
-async def register(
+async def login_type(
     user: LoginType,
     db: Annotated[AsyncSession, Depends(get_db)]
 ):

@@ -12,6 +12,19 @@ class TicketMode(str, Enum):
     MANUAL = "manual"
 
 
+class MyGamesType(str, Enum):
+    def __new__(cls, value, model):
+        obj = str.__new__(cls, [value])
+        obj._value_ = value
+        obj.model = model
+        return obj
+
+    model: str
+
+    JACKPOT = "Jackpot", "Jackpot"
+    GAME = "game", "Game"
+
+
 class Game(BaseModel):
     id: int
     name: str
