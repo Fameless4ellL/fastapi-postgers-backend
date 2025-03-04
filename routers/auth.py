@@ -77,7 +77,7 @@ async def register(
 
         wallet_result = await db.execute(
             select(Wallet)
-            .filter(Wallet.user_id == user.id)
+            .filter(Wallet.user_id == user_in_db.id)
         )
         wallet = wallet_result.scalar()
         if not wallet:
