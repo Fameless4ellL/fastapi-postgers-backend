@@ -66,7 +66,7 @@ class GenTicket:
 class Ticket(BaseModel):
     id: int
     game_instance_id: int
-    currency: Optional[str]
+    currency: Optional[str] = None
     numbers: list[int]
     won: Optional[bool]
     amount: float = 0
