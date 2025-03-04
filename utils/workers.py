@@ -150,21 +150,34 @@ def proceed_game(game_id: Optional[int] = None):
                 ).first()
 
                 if not user_balance:
-                    continue
+                    user_balance = Balance(
+                        user_id=ticket.user_id,
+                        currency_id=game.currency_id
+                    )
+                    db.add(user_balance)
+                    db.commit()
 
                 previous_balance = user_balance.balance
-                user_balance.balance += Decimal(prize_per_ticket)
-                db.add(user_balance)
+                balance = user_balance.balance + Decimal(prize)
 
                 balance_change = BalanceChangeHistory(
                     user_id=ticket.user_id,
                     balance_id=user_balance.id,
+                    currency_id=game.currency_id,
                     change_amount=prize_per_ticket,
                     change_type="win",
                     previous_balance=previous_balance,
-                    new_balance=user_balance.balance
+                    new_balance=balance
                 )
                 db.add(balance_change)
+                db.commit()
+                db.refresh(balance_change)
+
+                deposit(
+                    history_id=balance_change.id,
+                    change_type=balance_change.change_type
+                )
+
         game.status = GameStatus.COMPLETED
         db.add(game)
 
@@ -336,21 +349,34 @@ def proceed_jackpot(jackpot_id: Optional[int] = None):
                 ).first()
 
                 if not user_balance:
-                    continue
+                    user_balance = Balance(
+                        user_id=ticket.user_id,
+                        currency_id=jackpot.currency_id
+                    )
+                    db.add(user_balance)
+                    db.commit()
 
                 previous_balance = user_balance.balance
-                user_balance.balance += Decimal(prize)
-                db.add(user_balance)
+                balance = user_balance.balance + Decimal(prize)
 
                 balance_change = BalanceChangeHistory(
                     user_id=ticket.user_id,
                     balance_id=user_balance.id,
+                    currency_id=jackpot.currency_id,
                     change_amount=prize,
                     change_type="jackpot",
                     previous_balance=previous_balance,
-                    new_balance=user_balance.balance
+                    new_balance=balance
                 )
                 db.add(balance_change)
+                db.commit()
+                db.refresh(balance_change)
+
+                deposit(
+                    history_id=balance_change.id,
+                    change_type=balance_change.change_type
+                )
+
         jackpot.status = GameStatus.COMPLETED
         db.add(jackpot)
 
@@ -360,6 +386,109 @@ def proceed_jackpot(jackpot_id: Optional[int] = None):
     db.commit()
 
     return True
+
+
+@worker.register
+def deposit(
+    history_id: int,
+    change_type: str = 'jackpot',
+    counter: int = 0
+):
+    db = next(get_sync_db())
+
+    balance_change_history = db.query(BalanceChangeHistory).filter(
+        BalanceChangeHistory.id == history_id,
+        BalanceChangeHistory.change_type == change_type,
+        BalanceChangeHistory.status == BalanceChangeHistory.Status.PENDING
+    ).first()
+
+    if not balance_change_history:
+        return False
+
+    args = json.loads(balance_change_history.args or "{}")
+    args.setdefault('web3', [])
+
+    if counter > 3:
+        args['error'] = "Max retries exceeded"
+        balance_change_history.args = json.dumps(args)
+        balance_change_history.status = BalanceChangeHistory.Status.WEB3_ERROR
+        db.add(balance_change_history)
+
+        db.commit()
+        return
+
+    wallet = db.query(Wallet).filter(
+        Wallet.user_id == balance_change_history.user_id
+    ).first()
+
+    if not wallet:
+        args['error'] = "Missing wallet"
+        balance_change_history.args = json.dumps(args)
+        balance_change_history.status = BalanceChangeHistory.Status.CANCELED
+        db.add(balance_change_history)
+        db.commit()
+        return False
+
+    currency = db.query(Currency).options(
+        joinedload(Currency.network)
+    ).filter(
+        Currency.id == balance_change_history.currency_id
+    ).first()
+
+    if not currency:
+        args['error'] = "Missing currency or network"
+        balance_change_history.args = json.dumps(args)
+        balance_change_history.status = BalanceChangeHistory.Status.CANCELED
+        db.add(balance_change_history)
+        db.commit()
+        return False
+
+    tx = balance_change_history.proof or ""
+
+    tx, err = transfer(
+        currency,
+        settings.private_key,
+        float(balance_change_history.change_amount),
+        wallet.address,
+        tx
+    )
+
+    if not tx:
+        args['web3'].append(str(err))
+        balance_change_history.args = json.dumps(args)
+        db.add(balance_change_history)
+        db.commit()
+
+        add_job_to_scheduler(
+            "add_to_queue",
+            ["deposit", history_id, counter + 1],
+            datetime.now() + timedelta(minutes=1)
+        )
+        return False
+
+    balance = db.query(Balance).filter(
+        Balance.user_id == balance_change_history.user_id
+    ).with_for_update().first()
+
+    if not balance:
+        balance = Balance(
+            user_id=balance_change_history.user_id,
+            currency_id=balance_change_history.currency_id
+        )
+
+        status = BalanceChangeHistory.Status.CANCELED
+
+    else:
+        balance.balance += Decimal(balance_change_history.change_amount)
+
+        status = BalanceChangeHistory.Status.SUCCESS
+
+    balance_change_history.status = status
+    balance_change_history.proof = tx
+
+    db.add(balance)
+    db.add(balance_change_history)
+    db.commit()
 
 
 @worker.register
