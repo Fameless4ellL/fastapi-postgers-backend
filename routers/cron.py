@@ -91,7 +91,7 @@ async def transfer(
         balance = Balance(
             user_id=wallet.user_id,
             currency_id=currency.id,
-            amount=amount
+            balance=amount
         )
     else:
         balance.balance += amount
