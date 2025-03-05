@@ -17,8 +17,8 @@ class UserCreate(UserLogin):
 
 class SendCode(BaseModel):
     phone_number: PhoneNumber
-    
-    
+
+
 class LoginType(UserLogin):
     phone_number: PhoneNumber
 

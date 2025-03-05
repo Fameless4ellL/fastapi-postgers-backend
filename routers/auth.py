@@ -12,7 +12,7 @@ from routers import public
 from fastapi.responses import JSONResponse
 from sqlalchemy import select, or_
 from sqlalchemy.ext.asyncio import AsyncSession
-from schemes.auth import CheckCode, LoginType, SendCode, UserCreate, UserLogin, AccessToken
+from schemes.auth import CheckCode, SendCode, UserCreate, UserLogin, AccessToken
 from schemes.base import BadResponse
 from globals import aredis
 
@@ -254,8 +254,13 @@ async def send_code(
 
     await aredis.set(f"SMS:{ip}", code, ex=60)
 
+    # get country from phone_number
+    country_code = parse(user.phone_number)
+    # country = geocoder.region_code_for_number(country_code)
+    phone_number = f"{country_code.country_code}{country_code.national_number}"
+
     user_in_db = await db.execute(
-        select(User).filter(User.phone_number == item.phone_number)
+        select(User).filter(User.phone_number == phone_number)
     )
     user_in_db = user_in_db.scalar()
 
