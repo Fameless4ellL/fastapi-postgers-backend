@@ -244,8 +244,10 @@ async def buy_tickets(
     """
     game = await db.execute(
         select(Game)
-        .options(joinedload(Game.currency))
         .filter(Game.id == game_id)
+        .options(
+            joinedload(Game.currency).joinedload(Currency.network)
+        )
     )
     game: Optional[Game] = game.scalar()
 
@@ -315,8 +317,24 @@ async def buy_tickets(
                 Balance.currency_id == game.currency_id
             )
         )
-        user_balance = balance_result.scalar() or Balance(balance=0)
+        user_balance = balance_result.scalar()
+
+        if not user_balance:
+            user_balance = Balance(
+                user_id=user.id,
+                currency_id=game.currency_id
+            )
+            db.add(user_balance)
+            await db.commit()
+
         total_price = game.price * len(item.numbers)
+
+        # check if the user has enough balance
+        if user_balance.balance < total_price:
+            return JSONResponse(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                content=BadResponse(message="Insufficient balance").model_dump()
+            )
 
         tx, err = transfer(
             game.currency,
@@ -344,18 +362,15 @@ async def buy_tickets(
             if jackpot._type == JackpotType.LOCAL and jackpot.country != user.country:
                 continue
 
-            jackpot.amount += total_price * float(jackpot.percentage) / 100
+            percentage = jackpot.percentage or 10
+            amount = jackpot.amount or 0
+
+            jackpot.amount = amount + (total_price * percentage / 100)
             jackpot_id = jackpot.id
             db.add(jackpot)
 
             break
 
-        # check if the user has enough balance
-        if user_balance.balance < total_price:
-            return JSONResponse(
-                status_code=status.HTTP_400_BAD_REQUEST,
-                content=BadResponse(message="Insufficient balance").model_dump()
-            )
         # deduct the balance and log in balance change history
         user_balance.balance -= total_price
         balance_change = BalanceChangeHistory(
@@ -365,7 +380,7 @@ async def buy_tickets(
             change_amount=-total_price,
             change_type="ticket purchase",
             previous_balance=user_balance.balance + total_price,
-            status=BalanceChangeHistory.Status.PENDING,
+            status=BalanceChangeHistory.Status.SUCCESS,
             new_balance=user_balance.balance,
             proof=tx
         )

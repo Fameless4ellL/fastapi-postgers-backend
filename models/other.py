@@ -95,6 +95,8 @@ class Jackpot(Base):
         doc="The days of the week when the instance is repeated, required if repeat is True"
     )
 
+    amount = Column(DECIMAL(9, 2), nullable=True, default=0)
+
     image = Column(String(255), nullable=True, default="default_image.png", doc="The image of the game instance")
     status = Column(SqlEnum(GameStatus), default=GameStatus.PENDING)
 

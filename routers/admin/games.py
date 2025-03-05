@@ -8,7 +8,6 @@ from models.other import Game, GameStatus
 from routers import admin
 from routers.admin import get_crud_router
 from routers.utils import get_admin_token
-from globals import scheduler, aredis
 from sqlalchemy.ext.asyncio import AsyncSession
 from models.db import get_db
 from schemes.admin import (

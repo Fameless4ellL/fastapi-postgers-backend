@@ -15,10 +15,10 @@ from web3._utils.http import (
 )
 from aiohttp import client_exceptions
 from requests_auth_aws_sigv4 import AWSSigV4
+from tronpy.providers import HTTPProvider as TronHTTPProvider
 from models.other import Currency
 from globals import redis
-from settings import aws
-from settings import settings
+from settings import settings, aws
 
 
 aws_auth = AWSSigV4(
@@ -148,6 +148,12 @@ def get_w3(
     return w3
 
 
+def get_tron(url: str) -> Tron:
+    provider = TronHTTPProvider(url)
+    
+    return Tron(provider=provider, network='nile')
+
+
 def transfer(
     currency: Currency,
     private_key: str,
@@ -204,7 +210,8 @@ def transfer_trc20(
     tx: str = ""
 ) -> Union[str, bool]:
     try:
-        client = Tron(network='nile')
+        provider = TronHTTPProvider(currency.network.rpc_url)
+        client = Tron(provider=provider)
 
         if tx:
             txn = client.get_transaction(tx)
