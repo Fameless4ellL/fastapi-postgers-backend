@@ -17,12 +17,12 @@ from models.user import Balance, User, Wallet, BalanceChangeHistory
 from models.other import Currency, Game, Jackpot, Ticket
 from routers import public
 from globals import aredis
-from routers.utils import get_user, get_currency
+from routers.utils import get_user, get_currency, url_for
 
 from sqlalchemy.ext.asyncio import AsyncSession
 from schemes.base import BadResponse, Country
 from schemes.game import (
-    MyGamesType, Tickets, Withdraw
+    MyGames, MyGamesType, Tickets, Withdraw
 )
 from schemes.user import KYC, Profile, UserBalance
 from utils.workers import add_to_queue
@@ -350,7 +350,7 @@ async def get_history(
 
 @public.get(
     "/mygames", tags=["user"],
-    responses={400: {"model": BadResponse}, 200: {"model": Tickets}}
+    responses={400: {"model": BadResponse}, 200: {"model": MyGames}}
 )
 async def get_my_games(
     db: Annotated[AsyncSession, Depends(get_db)],
@@ -366,31 +366,48 @@ async def get_my_games(
     model = getattr(model, item.model)
 
     # list of games or jackpots by user distinct
-    stmt = select(model).join(Ticket).filter(Ticket.user_id == user.id)
+    stmt = select(model).join(Ticket).options(
+        joinedload(model.currency)
+    ).filter(
+        Ticket.user_id == user.id
+    )
 
     items = await db.execute(stmt.offset(skip).limit(limit))
     items = items.scalars().fetchall()
-    
-    return "Under construction"
 
-    data = [{
-        "id": t.id,
-        "game_instance_id": t.game_id,
-        "currency": t.currency.code if t.currency else None,
-        "numbers": t.numbers,
-        "demo": t.demo,
-        "won": t.won,
-        "amount": float(t.amount),
-        "created": t.created_at.timestamp()
-    } for t in items]
+    print(items)
+    data = []
+    for i in items:
+        # Calculate the sum of Ticket.amount for the chosen game
+        sum_stmt = select(func.sum(Ticket.amount)).filter(
+            Ticket.user_id == user.id,
+            Ticket.game_id == i.id,
+            Ticket.won.is_(True)
+        )
+        sum_result = await db.execute(sum_stmt)
+        total_amount = sum_result.scalar() or 0
 
-    count_result = await db.execute(
-        select(func.count(Ticket.id))
-        .filter(Ticket.user_id == user.id)
+        data.append({
+            "id": i.id,
+            "currency": i.currency.code if i.currency else None,
+            "name": i.name,
+            "image": url_for("static", path=i.image),
+            "status": str(i.status),
+            "price": float(i.price),
+            "prize": float(i.prize),
+            "won": float(total_amount),
+            "endtime": i.scheduled_datetime.timestamp(),
+            "created": i.created_at.timestamp(),
+            "total_amount": float(total_amount)  # Add the total amount to the response
+        })
+
+    stmt = select(func.count(model.id)).join(Ticket).filter(
+        Ticket.user_id == user.id
     )
+    count_result = await db.execute(stmt)
     count = count_result.scalar()
 
     return JSONResponse(
         status_code=status.HTTP_200_OK,
-        content=Tickets(tickets=data, count=count).model_dump()
+        content=MyGames(games=data, count=count).model_dump()
     )

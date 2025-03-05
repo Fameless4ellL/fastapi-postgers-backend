@@ -92,6 +92,16 @@ class Tickets(BaseModel):
     count: int = 0
 
 
+class MyGame(Game):
+    max_limit_grid: Optional[int] = None
+    won: float = 0
+
+
+class MyGames(BaseModel):
+    games: list[MyGame] = Field(default=[])
+    count: int = 0
+
+
 class Deposit(BaseModel):
     hash: str
 
