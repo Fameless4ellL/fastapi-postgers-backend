@@ -148,12 +148,6 @@ def get_w3(
     return w3
 
 
-def get_tron(url: str) -> Tron:
-    provider = TronHTTPProvider(url)
-    
-    return Tron(provider=provider, network='nile')
-
-
 def transfer(
     currency: Currency,
     private_key: str,
