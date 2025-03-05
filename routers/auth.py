@@ -255,7 +255,7 @@ async def send_code(
     await aredis.set(f"SMS:{ip}", code, ex=60)
 
     # get country from phone_number
-    country_code = parse(user.phone_number)
+    country_code = parse(item.phone_number)
     # country = geocoder.region_code_for_number(country_code)
     phone_number = f"{country_code.country_code}{country_code.national_number}"
 
