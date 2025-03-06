@@ -1,11 +1,12 @@
 from pydantic import BaseModel, Field, SecretStr, WrapSerializer
 from typing import Optional, Annotated, Any
 from datetime import datetime
+from fastapi import Query
 
 from models.other import GameStatus, GameType, GameView
 from models.user import BalanceChangeHistory
 from routers.utils import url_for
-from utils.datastructure import MultiValueEnum
+from utils.datastructure import MultiValueStrEnum
 
 
 def get_image(value: Any, handler, info) -> str:
@@ -249,18 +250,18 @@ class Games(BaseModel):
     count: int = 0
 
 
-class Category(MultiValueEnum):
-    _5x36 = 0, {"limit_by_ticket": 5, "max_limit_grid": 36}
-    _6x45 = 1, {"limit_by_ticket": 6, "max_limit_grid": 45}
-    _10x75 = 2, {"limit_by_ticket": 10, "max_limit_grid": 75}
-    _15x90 = 3, {"limit_by_ticket": 15, "max_limit_grid": 90}
+class Category(MultiValueStrEnum):
+    _5x36 = "5x36", {"limit_by_ticket": 5, "max_limit_grid": 36}
+    _6x45 = "6x45", {"limit_by_ticket": 6, "max_limit_grid": 45}
+    _10x75 = "10x75", {"limit_by_ticket": 10, "max_limit_grid": 75}
+    _15x90 = "15x90", {"limit_by_ticket": 15, "max_limit_grid": 90}
 
 
 class GameFilter:
     def __init__(
         self,
         game_type: Optional[GameType] = None,
-        category: Optional[list[Category]] = None,
+        category: Optional[Annotated[list[Category], Query()]] = None,
         date_from: Optional[datetime] = None,
         date_to: Optional[datetime] = None,
     ):
