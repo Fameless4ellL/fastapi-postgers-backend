@@ -147,9 +147,14 @@ async def login(
             status_code=400, content={"message": "Phone number or username is required"}
         )
 
+    # get country from phone_number
+    country_code = parse(user.phone_number)
+    # country = geocoder.region_code_for_number(country_code)
+    phone_number = f"{country_code.country_code}{country_code.national_number}"
+
     userdb = await db.execute(
         select(User).filter(
-            or_(User.phone_number == user.phone_number, User.username == user.username)
+            or_(User.phone_number == phone_number, User.username == user.username)
         )
     )
     userdb = userdb.scalar()
@@ -158,12 +163,20 @@ async def login(
             status_code=status.HTTP_404_NOT_FOUND, content={"message": "User not found"}
         )
 
-    if not  await aredis.exists(f"AUTH:{request.client.host}"):
+    if not await aredis.exists(f"SMS:{request.client.host}"):
         return JSONResponse(
             status_code=status.HTTP_400_BAD_REQUEST,
-            content={"message": "Please resend sms code"})
+            content={"message": "Invalid code"})
 
-    await aredis.delete(f"AUTH:{request.client.host}")
+    code: bytes = await aredis.get(f"SMS:{request.client.host}")
+
+    if code.decode("utf-8") != user.code:
+        return JSONResponse(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            content={"message": "Invalid code"}
+        )
+
+    await aredis.delete(f"SMS:{request.client.host}")
 
     # if not user or not verify_password(
     #     user.password.get_secret_value(), userdb.password
