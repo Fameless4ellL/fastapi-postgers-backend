@@ -29,7 +29,7 @@ get_crud_router(
     update_schema=GameUpdate,
     filters=Annotated[GameFilter, Depends(GameFilter)],
     security_scopes=[
-        Role.GLOBAL_ADMIN.value,
+        Role.SUPER_ADMIN.value,
         Role.ADMIN.value,
         Role.GLOBAL_ADMIN.value,
         Role.LOCAL_ADMIN.value,

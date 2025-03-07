@@ -1,4 +1,4 @@
-from pydantic import BaseModel, Field, SecretStr, WrapSerializer
+from pydantic import BaseModel, Field, SecretStr, WrapSerializer, AfterValidator
 from typing import Optional, Annotated, Any
 from datetime import datetime
 from fastapi import Query
@@ -260,12 +260,16 @@ class Category(MultiValueStrEnum):
 class GameFilter:
     def __init__(
         self,
-        game_type: Optional[GameType] = None,
-        category: Optional[Annotated[list[Category], Query()]] = None,
+        game_type: Annotated[list[Annotated[GameType, Query()]], Query()] = None,
+        filter: Annotated[str, Query()] = None,
+        category: Annotated[list[Annotated[Category, Query()]], Query()] = None,
+        kind: Annotated[list[Annotated[GameView, Query()]], Query()] = None,
         date_from: Optional[datetime] = None,
         date_to: Optional[datetime] = None,
     ):
         self.game_type = game_type
+        self.filter = filter
+        self.kind = kind
         self.category = category
         self.date_from = date_from
         self.date_to = date_to

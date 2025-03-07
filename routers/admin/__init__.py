@@ -1,9 +1,9 @@
-from fastapi import APIRouter, Depends, Path, status, Security
+from fastapi import APIRouter, Depends, Path, status, Security, Query
 from fastapi.responses import JSONResponse
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select, func, or_
 from typing import Type, List, Annotated
-from schemes.admin import ReferralFilter
+from schemes.admin import ReferralFilter, GameFilter
 from schemes.base import BadResponse
 from pydantic import BaseModel
 from models.db import get_db
@@ -33,29 +33,41 @@ def get_crud_router(
             400: {"model": BadResponse},
             200: {"model": schema}
         },
-        dependencies=[Security(get_admin_token, scopes=security_scopes)]
+        # dependencies=[Security(get_admin_token, scopes=security_scopes)]
     )
     async def get_items(
         db: Annotated[AsyncSession, Depends(get_db)],
         filters: filters,
         offset: int = 0,
         limit: int = 10,
+        model: object = Query(model, include_in_schema=False)
     ):
+        model = model
 
         stmt = select(model)
 
         if model.__name__ == "Game":
             filters: GameFilter = filters
+            model: Game = model
 
             if filters.game_type:
-                stmt = stmt.filter(model.game_type == filters.game_type)
+                stmt = stmt.filter(model.game_type.in_(filters.game_type))
 
             if filters.category:
-                for category in filters.category:
-                    stmt = stmt.filter(
-                        model.limit_by_ticket == category.label['limit_by_ticket'],
-                        model.max_limit_grid == category.label['max_limit_grid']
-                    )
+
+                limit_by_ticket = [category.label['limit_by_ticket'] for category in filters.category]
+                max_limit_grid = [category.label['max_limit_grid'] for category in filters.category]
+
+                stmt = stmt.filter(
+                    model.limit_by_ticket.in_(limit_by_ticket),
+                    model.max_limit_grid.in_(max_limit_grid)
+                )
+
+            if filters.kind:
+                stmt = stmt.filter(model.kind.in_(filters.kind))
+
+            if filters.filter:
+                stmt = stmt.filter(model.name.ilike(f"%{filters.filter}%"))
 
             if filters.date_from:
                 stmt = stmt.filter(model.created_at >= filters.date_from)
