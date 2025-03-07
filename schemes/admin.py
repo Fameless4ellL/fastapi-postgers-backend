@@ -1,4 +1,4 @@
-from pydantic import BaseModel, Field, SecretStr, WrapSerializer, AfterValidator
+from pydantic import BaseModel, Field, SecretStr, WrapSerializer, computed_field
 from typing import Optional, Annotated, Any
 from datetime import datetime
 from fastapi import Query
@@ -234,15 +234,20 @@ class GameUpdate(GameCreate):
 class GameSchema(BaseAdmin):
     id: int
     name: str
-    kind: str
+    kind: Optional[GameView] = GameView.MONETARY
+    currency_id: Optional[int] = None
     limit_by_ticket: int = 15
     max_limit_grid: int = 90
     image: Optional[Image] = "default_image.png"
     game_type: str
     status: GameStatus
-    deleted: bool
+    deleted: Optional[bool] = False
     updated_at: datetime
     created_at: datetime
+
+    @computed_field
+    def category(self) -> str:
+        return f"{self.limit_by_ticket}/{self.max_limit_grid}"
 
 
 class Games(BaseModel):
@@ -251,10 +256,10 @@ class Games(BaseModel):
 
 
 class Category(MultiValueStrEnum):
-    _5x36 = "5x36", {"limit_by_ticket": 5, "max_limit_grid": 36}
-    _6x45 = "6x45", {"limit_by_ticket": 6, "max_limit_grid": 45}
-    _10x75 = "10x75", {"limit_by_ticket": 10, "max_limit_grid": 75}
-    _15x90 = "15x90", {"limit_by_ticket": 15, "max_limit_grid": 90}
+    _5x36 = "5/36", {"limit_by_ticket": 5, "max_limit_grid": 36}
+    _6x45 = "6/45", {"limit_by_ticket": 6, "max_limit_grid": 45}
+    _10x75 = "10/75", {"limit_by_ticket": 10, "max_limit_grid": 75}
+    _15x90 = "15/90", {"limit_by_ticket": 15, "max_limit_grid": 90}
 
 
 class GameFilter:

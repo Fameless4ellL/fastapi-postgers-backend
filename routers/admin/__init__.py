@@ -73,7 +73,7 @@ def get_crud_router(
                 stmt = stmt.filter(model.created_at >= filters.date_from)
 
             if filters.date_to:
-                stmt = stmt.filter(model.scheduled_datetime <= filters.date_to)
+                stmt = stmt.filter(model.created_at <= filters.date_to)
 
         if model.__name__ == "ReferralLink":
             filters: ReferralFilter = filters
