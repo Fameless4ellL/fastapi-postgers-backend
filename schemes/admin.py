@@ -1,6 +1,6 @@
 from pydantic import BaseModel, Field, SecretStr, WrapSerializer, computed_field
 from typing import Optional, Annotated, Any
-from datetime import datetime
+from datetime import datetime, date
 from fastapi import Query
 
 from models.other import GameStatus, GameType, GameView
@@ -269,8 +269,8 @@ class GameFilter:
         filter: Annotated[str, Query()] = None,
         category: Annotated[list[Annotated[Category, Query()]], Query()] = None,
         kind: Annotated[list[Annotated[GameView, Query()]], Query()] = None,
-        date_from: Optional[datetime] = None,
-        date_to: Optional[datetime] = None,
+        date_from: Annotated[date, Query()] = None,
+        date_to: Annotated[date, Query()] = None,
     ):
         self.game_type = game_type
         self.filter = filter
