@@ -17,6 +17,7 @@ class UserLogin(CheckCode):
 class UserCreate(UserLogin):
     country: CountryAlpha3
     refferal_code: Optional[str] = None
+    code: Optional[str] = Field(default="", exclude=True)
 
 
 class SendCode(BaseModel):

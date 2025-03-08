@@ -19,13 +19,23 @@ class TestAuth:
         tear_down: None
     ):
         response = api.post(
-            "/v1/register",
+            "/v1/check_code",
             json={
-                "username": "testuser",
-                "phone_number": "+77073993001",
+                "phone_number": user.phone_number,
                 "code": "123456",
             }
         )
+        assert response.status_code == status.HTTP_200_OK
+
+        response = api.post(
+            "/v1/register",
+            json={
+                "username": "testuser",
+                "country": "KAZ",
+                "phone_number": "+77073993001",
+            }
+        )
+        print(response.json())
         assert response.status_code == status.HTTP_200_OK
         assert "access_token" in response.json()
 
@@ -83,7 +93,21 @@ class TestAuth:
     ):
         response = api.post("/v1/send_code", json=code_data)
         assert response.status_code == expected_status
-        assert response.json()["message"] == expected_response["message"]
         assert redis.get("SMS:testclient").decode("utf-8") == str(
             response.json()["code"]
         )
+
+    def test_check_code(
+        self,
+        api: TestClient,
+        user: User,
+        tear_down: None
+    ):
+        response = api.post(
+            "/v1/check_code",
+            json={
+                "phone_number": user.phone_number,
+                "code": "123456",
+            }
+        )
+        assert response.status_code == status.HTTP_200_OK

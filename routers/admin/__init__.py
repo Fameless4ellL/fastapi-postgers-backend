@@ -33,7 +33,7 @@ def get_crud_router(
             400: {"model": BadResponse},
             200: {"model": schema}
         },
-        # dependencies=[Security(get_admin_token, scopes=security_scopes)]
+        dependencies=[Security(get_admin_token, scopes=security_scopes)]
     )
     async def get_items(
         db: Annotated[AsyncSession, Depends(get_db)],
@@ -139,11 +139,12 @@ def get_crud_router(
         token: Annotated[Token, Security(get_admin_token, scopes=security_scopes)],
         item: create_schema
     ):
+        print(item.model_dump())
         new_item = model(**item.model_dump())
-    
+
         if model.__name__ == "ReferralLink":
             new_item.generated_by = token.id
-        
+
         db.add(new_item)
         await db.commit()
 
@@ -151,6 +152,7 @@ def get_crud_router(
             scheduler.add_job(
                 func=add_to_queue,
                 trigger="date",
+                id=f"game_{new_item.id}",
                 args=["proceed_game", new_item.id],
                 run_date=new_item.scheduled_datetime,
             )
@@ -158,6 +160,7 @@ def get_crud_router(
         if model.__name__ == "Jackpot":
             scheduler.add_job(
                 func=add_to_queue,
+                id=f"jackpot_{new_item.id}",
                 trigger="date",
                 args=["proceed_jackpot", new_item.id],
                 run_date=new_item.scheduled_datetime,
@@ -174,7 +177,7 @@ def get_crud_router(
             400: {"model": BadResponse},
             200: {"model": schema}
         },
-        dependencies=[Security(get_admin_token, scopes=security_scopes)]
+        # dependencies=[Security(get_admin_token, scopes=security_scopes)]
     )
     async def update_item(
         db: Annotated[AsyncSession, Depends(get_db)],

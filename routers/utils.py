@@ -9,8 +9,8 @@ import uuid
 from aiohttp import client_exceptions
 from fastapi import Depends, HTTPException, status, security
 from datetime import datetime, timedelta
-from sqlalchemy import select
-from models.db import get_db
+from sqlalchemy import select, orm
+from models.db import get_db, get_sync_db
 from sqlalchemy.ext.asyncio import AsyncSession
 from models.user import User, Role
 from web3 import Web3, middleware
@@ -177,6 +177,21 @@ async def get_currency(
     return cur
 
 
+def get_currency_by_id(
+    currency_id: int
+) -> Currency:
+    db = next(get_sync_db())
+    cur = db.execute(select(Currency).filter(Currency.id == currency_id))
+    cur = cur.scalar()
+
+    if cur is None:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND, detail="Currency not found"
+        )
+
+    return cur.id
+
+
 async def get_w3(
     network: Annotated[Network, Depends(get_network)],
 ) -> Web3:
@@ -254,18 +269,6 @@ def url_for(name: str, **path_params: Any) -> str:
     return f"{settings.back_url}/{name}/" + "/".join(
         str(value) for value in path_params.values()
     )
-
-
-def permission(allowed_roles: list[Role]):
-    async def dependency(user: Annotated[User, Depends(get_admin)]):
-        if user.role not in allowed_roles + [Role.SUPER_ADMIN.value]:
-            raise HTTPException(
-                status_code=status.HTTP_403_FORBIDDEN,
-                detail="Permission denied"
-            )
-        return user
-
-    return dependency
 
 
 def send_mail(

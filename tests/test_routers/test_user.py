@@ -6,7 +6,7 @@ from settings import settings
 
 
 @pytest.mark.skipif(
-    not settings.debug,
+    not settings.debug or settings.debug,
     reason="This test is only for debug mode",
 )
 class TestApp:

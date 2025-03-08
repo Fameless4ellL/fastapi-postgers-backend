@@ -1,11 +1,22 @@
-from pydantic import BaseModel, Field, SecretStr, WrapSerializer, computed_field
+from pydantic import (
+    BaseModel,
+    Field,
+    SecretStr,
+    WrapSerializer,
+    computed_field,
+    FutureDatetime,
+    model_serializer,
+    AfterValidator,
+)
+import pytz
 from typing import Optional, Annotated, Any
 from datetime import datetime, date
+from pydantic_extra_types.country import CountryAlpha3
 from fastapi import Query
 
 from models.other import GameStatus, GameType, GameView
 from models.user import BalanceChangeHistory
-from routers.utils import url_for
+from routers.utils import get_currency_by_id, url_for
 from utils.datastructure import MultiValueStrEnum
 
 
@@ -14,6 +25,13 @@ def get_image(value: Any, handler, info) -> str:
 
 
 Image = Annotated[str, WrapSerializer(get_image)]
+
+
+class Category(MultiValueStrEnum):
+    _5x36 = "5/36", {"limit_by_ticket": 5, "max_limit_grid": 36}
+    _6x45 = "6/45", {"limit_by_ticket": 6, "max_limit_grid": 45}
+    _10x75 = "10/75", {"limit_by_ticket": 10, "max_limit_grid": 75}
+    _15x90 = "15/90", {"limit_by_ticket": 15, "max_limit_grid": 90}
 
 
 class BaseAdmin(BaseModel):
@@ -191,7 +209,7 @@ class Currencies(BaseModel):
 class GameBase(BaseAdmin):
     name: str
     game_type: str
-    currency_id: Optional[int]
+    currency_id: Annotated[int, AfterValidator(get_currency_by_id)]
     limit_by_ticket: int = 15
     max_limit_grid: int = 90
     price: float = 1.0
@@ -212,23 +230,54 @@ class GameBase(BaseAdmin):
 class GameCreate(BaseAdmin):
     name: str
     game_type: GameType
-    currency_id: Optional[int]
-    limit_by_ticket: int = 9
-    max_limit_grid: int = 90
+    kind: GameView
+    currency_id: Annotated[int, AfterValidator(get_currency_by_id)]
+    category: Category
     price: float = 1.0
-    description: Optional[str]
+    description: Optional[str] = Field("", max_length=500)
     max_win_amount: Optional[float] = 8.0
     prize: Optional[float] = 1000.0
-    country: Optional[str]
+    country: Optional[CountryAlpha3] = None
     min_ticket_count: int = 1
-    scheduled_datetime: Optional[datetime]
-    zone: Optional[int] = 1
+    scheduled_datetime: Optional[FutureDatetime]
     repeat: Optional[bool] = False
     repeat_days: Optional[list[int]]
 
+    @model_serializer
+    def ser_model(self):
+        # get the timezone from the zone
+        zone = self.scheduled_datetime.tzinfo
+        tz = pytz.timezone(zone.tzname(self.scheduled_datetime))
+        zone = tz.utcoffset(self.scheduled_datetime).total_seconds() // 3600
+        scheduled_datetime = self.scheduled_datetime.astimezone(tz).isoformat()
+
+        if self.scheduled_datetime and self.scheduled_datetime.tzinfo is not None:
+            scheduled_datetime = self.scheduled_datetime.replace(tzinfo=None)
+        else:
+            scheduled_datetime = self.scheduled_datetime
+
+        return {
+            "name": self.name,
+            "game_type": self.game_type,
+            "kind": self.kind,
+            "currency_id": self.currency_id,
+            "limit_by_ticket": self.category.label['limit_by_ticket'],
+            "max_limit_grid": self.category.label['max_limit_grid'],
+            "price": self.price,
+            "description": self.description,
+            "max_win_amount": self.max_win_amount,
+            "prize": self.prize,
+            "country": self.country,
+            "min_ticket_count": self.min_ticket_count,
+            "scheduled_datetime": scheduled_datetime,
+            "zone": zone,
+            "repeat": self.repeat,
+            "repeat_days": self.repeat_days,
+        }
+
 
 class GameUpdate(GameCreate):
-    pass
+    scheduled_datetime: Optional[datetime]
 
 
 class GameSchema(BaseAdmin):
@@ -253,13 +302,6 @@ class GameSchema(BaseAdmin):
 class Games(BaseModel):
     items: list[GameSchema] = []
     count: int = 0
-
-
-class Category(MultiValueStrEnum):
-    _5x36 = "5/36", {"limit_by_ticket": 5, "max_limit_grid": 36}
-    _6x45 = "6/45", {"limit_by_ticket": 6, "max_limit_grid": 45}
-    _10x75 = "10/75", {"limit_by_ticket": 10, "max_limit_grid": 75}
-    _15x90 = "15/90", {"limit_by_ticket": 15, "max_limit_grid": 90}
 
 
 class GameFilter:
