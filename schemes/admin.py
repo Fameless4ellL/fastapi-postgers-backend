@@ -34,6 +34,11 @@ class Category(MultiValueStrEnum):
     _15x90 = "15/90", {"limit_by_ticket": 15, "max_limit_grid": 90}
 
 
+class GameViewType(MultiValueStrEnum):
+    MONETARY = "Monetary", "monetary"
+    MATERIAL = "Clothing", "material"
+
+
 class BaseAdmin(BaseModel):
     class Config:
         from_attributes = True
@@ -310,7 +315,7 @@ class GameFilter:
         game_type: Annotated[list[Annotated[GameType, Query()]], Query()] = None,
         filter: Annotated[str, Query()] = None,
         category: Annotated[list[Annotated[Category, Query()]], Query()] = None,
-        kind: Annotated[list[Annotated[GameView, Query()]], Query()] = None,
+        kind: Annotated[list[Annotated[GameViewType, Query()]], Query()] = None,
         date_from: Annotated[date, Query()] = None,
         date_to: Annotated[date, Query()] = None,
     ):

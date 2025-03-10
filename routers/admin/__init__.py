@@ -64,7 +64,7 @@ def get_crud_router(
                 )
 
             if filters.kind:
-                stmt = stmt.filter(model.kind.in_(filters.kind))
+                stmt = stmt.filter(model.kind.in_(filters.kind.label))
 
             if filters.filter:
                 stmt = stmt.filter(model.name.ilike(f"%{filters.filter}%"))
@@ -177,7 +177,7 @@ def get_crud_router(
             400: {"model": BadResponse},
             200: {"model": schema}
         },
-        # dependencies=[Security(get_admin_token, scopes=security_scopes)]
+        dependencies=[Security(get_admin_token, scopes=security_scopes)]
     )
     async def update_item(
         db: Annotated[AsyncSession, Depends(get_db)],

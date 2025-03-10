@@ -1,4 +1,3 @@
-from enum import Enum
 import os
 import importlib
 from eth_account import Account
@@ -375,7 +374,6 @@ async def get_my_games(
     items = await db.execute(stmt.offset(skip).limit(limit))
     items = items.scalars().fetchall()
 
-    print(items)
     data = []
     for i in items:
         # Calculate the sum of Ticket.amount for the chosen game
