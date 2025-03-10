@@ -64,7 +64,8 @@ def get_crud_router(
                 )
 
             if filters.kind:
-                stmt = stmt.filter(model.kind.in_(filters.kind.label))
+                kind = [kind.label for kind in filters.kind]
+                stmt = stmt.filter(model.kind.in_(kind))
 
             if filters.filter:
                 stmt = stmt.filter(model.name.ilike(f"%{filters.filter}%"))

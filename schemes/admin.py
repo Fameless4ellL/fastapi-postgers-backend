@@ -35,8 +35,8 @@ class Category(MultiValueStrEnum):
 
 
 class GameViewType(MultiValueStrEnum):
-    MONETARY = "Monetary", "monetary"
-    MATERIAL = "Clothing", "material"
+    MONETARY = "Monetary", GameView.MONETARY
+    MATERIAL = "Clothing", GameView.MATERIAL
 
 
 class BaseAdmin(BaseModel):
