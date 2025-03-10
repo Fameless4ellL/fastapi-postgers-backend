@@ -2,9 +2,12 @@ from fastapi.testclient import TestClient
 import pytest
 from sqlalchemy.orm.session import Session
 from models.other import Game, GameType
-from models.user import User, Balance
+from models.user import Role, User, Balance
 from globals import redis
 from utils.signature import get_password_hash
+
+
+PASSWORD = "test_password"
 
 
 @pytest.fixture
@@ -20,78 +23,27 @@ def tear_down(db: Session):
 
 
 @pytest.fixture
-def user(db: Session):
-    hashed_password = get_password_hash("test_password")
-    user = User(
-        phone_number="+77079898911",
-        username="test_user1",
-        password=hashed_password,
-        country="KZ",
-    )
-    db.add(user)
+def admin(
+    db: Session,
+    user: User,
+):
+    user.role = Role.SUPER_ADMIN.value
     db.commit()
-
     yield user
-
-    db.query(User).filter(
-        User.username == "test_user1"
-    ).delete()
-    db.commit()
 
 
 @pytest.fixture
-def token(
-    db: Session,
+def admin_token(
     api: TestClient,
-    user: User,
-    tear_down: None
+    admin: User,
 ):
     response = api.post(
-        "/v1/login",
+        "/v1/admin/login",
         json={
-            "username": user.username,
-            "phone_number": user.phone_number,
-            "code": "123456",
+            "login": admin.username,
+            "password": PASSWORD,
         }
     )
     assert response.status_code == 200
     assert "access_token" in response.json()
     yield response.json()["access_token"]
-
-
-@pytest.fixture
-def game(db: Session):
-    game = Game(
-        name="Test Game",
-        currency_id=1,
-        game_type=GameType.GLOBAL,
-        scheduled_datetime="2025-01-30T12:57:40",
-    )
-    db.add(game)
-    db.commit()
-
-    yield game
-
-    db.query(Game).filter(
-        Game.name == "Test Game"
-    ).delete()
-    db.commit()
-
-
-@pytest.fixture
-def balance(db: Session, user: User):
-
-    balance = Balance(
-        user_id=user.id,
-        currency_id=1,
-        balance=0
-    )
-    db.add(balance)
-    db.commit()
-
-    yield balance
-
-    db.query(Balance).filter(
-        Balance.user_id == user.id
-    ).delete()
-    db.commit()

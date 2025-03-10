@@ -1,7 +1,7 @@
 from fastapi.testclient import TestClient
 import pytest
 from sqlalchemy.orm.session import Session
-from models.other import Game, GameType
+from models.other import Currency, Game, GameType, Network
 from models.user import User, Balance
 from globals import redis
 from utils.signature import get_password_hash
@@ -21,6 +21,11 @@ def tear_down(db: Session):
 
 @pytest.fixture
 def user(db: Session):
+    db.query(User).filter(
+        User.username == "test_user1"
+    ).delete()
+    db.commit()
+
     hashed_password = get_password_hash("test_password")
     user = User(
         phone_number="+77079898911",
@@ -33,10 +38,14 @@ def user(db: Session):
 
     yield user
 
-    db.query(User).filter(
-        User.username == "test_user1"
-    ).delete()
-    db.commit()
+    try:
+        db.query(User).filter(
+            User.username == "test_user1"
+        ).delete()
+        db.commit()
+    except Exception as e:
+        db.rollback()
+        print(e)
 
 
 @pytest.fixture
@@ -60,11 +69,72 @@ def token(
 
 
 @pytest.fixture
-def game(db: Session):
+def network(db: Session):
+    db.query(Currency).filter(
+        Currency.network_id == db.query(Network.id).filter(Network.name == "Test Network").scalar()
+    ).delete()
+    db.commit()
+
+    db.query(Network).filter(
+        Network.name == "Test Network"
+    ).delete()
+    db.commit()
+
+    network = Network(
+        name="Test Network",
+        symbol="TST",
+        chain_id=1,
+        rpc_url="http://localhost:8545",
+        explorer_url="http://localhost:8080",
+    )
+    db.add(network)
+    db.commit()
+
+    yield network
+
+    db.query(Currency).filter(
+        Currency.network_id == db.query(Network.id).filter(Network.name == "Test Network").scalar()
+    ).delete()
+    db.commit()
+
+    db.query(Network).filter(
+        Network.name == "Test Network"
+    ).delete()
+    db.commit()
+
+
+@pytest.fixture
+def currency(db: Session, network: Network):
+    currency = Currency(
+        code="TST",
+        name="Test Currency",
+        network_id=network.id,
+        address="0x",
+        decimals=18,
+        conversion_rate=1
+    )
+    db.add(currency)
+    db.commit()
+
+    yield currency
+
+
+@pytest.fixture
+@pytest.mark.parametrize("game_type", GameType)
+def game(
+    db: Session,
+    currency: Currency,
+    game_type: GameType
+):
+    db.query(Game).filter(
+        Game.name == "Test Game"
+    ).delete()
+    db.commit()
+
     game = Game(
         name="Test Game",
-        currency_id=1,
-        game_type=GameType.GLOBAL,
+        currency_id=currency.id,
+        game_type=game_type,
         scheduled_datetime="2025-01-30T12:57:40",
     )
     db.add(game)
@@ -72,10 +142,14 @@ def game(db: Session):
 
     yield game
 
-    db.query(Game).filter(
-        Game.name == "Test Game"
-    ).delete()
-    db.commit()
+    try:
+        db.query(Game).filter(
+            Game.name == "Test Game"
+        ).delete()
+        db.commit()
+    except Exception as e:
+        db.rollback()
+        print(e)
 
 
 @pytest.fixture

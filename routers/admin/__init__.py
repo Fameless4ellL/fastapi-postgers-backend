@@ -22,7 +22,7 @@ def get_crud_router(
     update_schema: Type[BaseModel],
     filters: Type[BaseModel],
     prefix: str = "",
-    security_scopes: List[str] = [Role.GLOBAL_ADMIN.value],
+    security_scopes: List[str] = [Role.SUPER_ADMIN.value],
     order_by: str = "id"
 ) -> APIRouter:
     router = admin
