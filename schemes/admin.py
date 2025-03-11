@@ -7,6 +7,7 @@ from pydantic import (
     FutureDatetime,
     model_serializer,
     AfterValidator,
+    ConfigDict
 )
 import pytz
 from typing import Optional, Annotated, Any
@@ -40,8 +41,7 @@ class GameViewType(MultiValueStrEnum):
 
 
 class BaseAdmin(BaseModel):
-    class Config:
-        from_attributes = True
+    model_config = ConfigDict(from_attributes=True)
 
 
 class User(BaseModel):
@@ -156,14 +156,13 @@ class ResetPassword(BaseModel):
 
 
 class NetworkBase(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+    
     chain_id: int
     name: str
     symbol: str
     rpc_url: str
     explorer_url: str
-
-    class Config:
-        from_attributes = True
 
 
 class NetworkCreate(NetworkBase):
@@ -184,14 +183,13 @@ class Networks(BaseModel):
 
 
 class CurrencyBase(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
     code: str
     name: str
     network_id: int
     address: str
     decimals: Optional[int]
-
-    class Config:
-        from_attributes = True
 
 
 class CurrencyCreate(CurrencyBase):
