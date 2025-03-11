@@ -74,11 +74,11 @@ async def get_admin_(
 
     if _type == "delete":
         game.deleted = True
-    if _type == "cancel":
-        try:
-            scheduler.remove_job(f"game_{game.id}")
-        except JobLookupError:
-            pass
+
+    try:
+        scheduler.remove_job(f"game_{game.id}")
+    except JobLookupError:
+        pass
 
     game.status = GameStatus.CANCELLED
 
