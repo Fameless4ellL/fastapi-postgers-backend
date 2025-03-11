@@ -1,6 +1,7 @@
 import os
 from fastapi import Depends, Path, UploadFile, status, Security
 from fastapi.responses import JSONResponse
+from apscheduler.jobstores.base import JobLookupError
 from typing import Annotated, Literal
 
 from sqlalchemy import select, func
@@ -18,6 +19,7 @@ from schemes.admin import (
     GameCreate,
     GameUpdate,
 )
+from globals import scheduler
 from schemes.base import BadResponse
 
 
@@ -57,22 +59,29 @@ get_crud_router(
 async def get_admin_(
     db: Annotated[AsyncSession, Depends(get_db)],
     game_id: Annotated[int, Path()],
-    _type: Literal["deleted", "cancel"],
+    _type: Literal["delete", "cancel"],
 ):
     """
     Get all admins
     """
     stmt = select(Game).filter(Game.id == game_id)
     game = await db.execute(stmt)
+    game = game.scalar()
     if not game:
         return JSONResponse(
             status_code=status.HTTP_400_BAD_REQUEST, content="Game not found"
         )
 
-    if _type == "deleted":
+    if _type == "delete":
         game.deleted = True
+    if _type == "cancel":
+        try:
+            scheduler.remove_job(f"game_{game.id}")
+        except JobLookupError:
+            pass
 
     game.status = GameStatus.CANCELLED
+
     db.add(game)
     await db.commit()
 

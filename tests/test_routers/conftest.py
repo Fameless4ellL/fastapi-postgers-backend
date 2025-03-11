@@ -119,12 +119,11 @@ def currency(db: Session, network: Network):
     yield currency
 
 
-@pytest.fixture
-@pytest.mark.parametrize("game_type", GameType)
+@pytest.fixture(params=GameType)
 def game(
     db: Session,
     currency: Currency,
-    game_type: GameType
+    request: pytest.FixtureRequest
 ):
     db.query(Game).filter(
         Game.name == "Test Game"
@@ -134,7 +133,7 @@ def game(
     game = Game(
         name="Test Game",
         currency_id=currency.id,
-        game_type=game_type,
+        game_type=request.param,
         scheduled_datetime="2025-01-30T12:57:40",
     )
     db.add(game)

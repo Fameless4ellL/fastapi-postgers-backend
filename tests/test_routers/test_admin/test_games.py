@@ -78,7 +78,6 @@ class TestGames:
                 "filter": filter,
             },
         )
-        print("/v1/admin/games", response.json(), game.id)
         assert response.status_code == 200
         assert "items" in response.json()
         assert "count" in response.json()
@@ -89,3 +88,23 @@ class TestGames:
             assert response.json()["items"][0]["kind"] == game.kind
             assert response.json()["items"][0]["country"] == game.country
             assert response.json()["items"][0]["description"] == game.description
+
+    @pytest.mark.parametrize('_type', ['delete', 'cancel'])
+    def test_delete_game(
+        self,
+        api: TestClient,
+        admin_token: str,
+        _type: str,
+        game: Game,
+    ):
+        response = api.delete(
+            f"/v1/admin/games/{game.id}",
+            headers={
+                "Authorization": f"Bearer {admin_token}",
+            },
+            params={
+                "_type": _type,
+            },
+        )
+        assert response.status_code == 200
+        assert response.json() == "Success"
