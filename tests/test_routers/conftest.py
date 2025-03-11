@@ -1,7 +1,7 @@
 from fastapi.testclient import TestClient
 import pytest
 from sqlalchemy.orm.session import Session
-from models.other import Currency, Game, GameType, Network
+from models.other import Currency, Game, GameType, Network, Ticket
 from models.user import User, Balance
 from globals import redis
 from utils.signature import get_password_hash
@@ -144,6 +144,38 @@ def game(
     try:
         db.query(Game).filter(
             Game.name == "Test Game"
+        ).delete()
+        db.commit()
+    except Exception as e:
+        db.rollback()
+        print(e)
+
+
+@pytest.fixture
+def ticket(
+    db: Session,
+    user: User,
+    game: Game
+):
+    db.query(Ticket).filter(
+        Ticket.user_id == user.id
+    ).delete()
+    db.commit()
+
+    _ticket = Ticket(
+        user_id=user.id,
+        game_id=game.id,
+        numbers=[1, 2, 3, 4, 5],
+        amount=1
+    )
+    db.add(_ticket)
+    db.commit()
+
+    yield _ticket
+
+    try:
+        db.query(Ticket).filter(
+            Ticket.user_id == user.id
         ).delete()
         db.commit()
     except Exception as e:

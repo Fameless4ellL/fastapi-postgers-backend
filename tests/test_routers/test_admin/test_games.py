@@ -1,6 +1,7 @@
 from fastapi.testclient import TestClient
 import pytest
-from models.other import Game, GameType
+from models.other import Game, GameType, Ticket
+from models.user import User
 from schemes.admin import Category, GameViewType
 from settings import settings
 
@@ -109,22 +110,78 @@ class TestGames:
         assert response.status_code == 200
         assert response.json() == "Success"
 
-    @pytest.mark.parametrize('_type', ['delete', 'cancel'])
     def test_get_purchased_tickets(
         self,
         api: TestClient,
         admin_token: str,
-        _type: str,
         game: Game,
+        ticket: Ticket
     ):
-        response = api.delete(
-            f"/v1/admin/games/{game.id}",
+        response = api.get(
+            f"/v1/admin/games/{game.id}/purchased",
             headers={
                 "Authorization": f"Bearer {admin_token}",
-            },
-            params={
-                "_type": _type,
-            },
+            }
         )
         assert response.status_code == 200
-        assert response.json() == "Success"
+
+    def test_get_participants(
+        self,
+        api: TestClient,
+        admin_token: str,
+        game: Game,
+        ticket: Ticket
+    ):
+        response = api.get(
+            f"/v1/admin/games/{game.id}/participants",
+            headers={
+                "Authorization": f"Bearer {admin_token}",
+            }
+        )
+        assert response.status_code == 200
+
+    def test_get_participant_tickets(
+        self,
+        api: TestClient,
+        admin_token: str,
+        user: User,
+        game: Game,
+        ticket: Ticket
+    ):
+        response = api.get(
+            f"/v1/admin/games/{game.id}/participants/{user.id}",
+            headers={
+                "Authorization": f"Bearer {admin_token}",
+            }
+        )
+        assert response.status_code == 200
+
+    def test_get_winners(
+        self,
+        api: TestClient,
+        admin_token: str,
+        game: Game,
+        ticket: Ticket
+    ):
+        response = api.get(
+            f"/v1/admin/games/{game.id}/winners",
+            headers={
+                "Authorization": f"Bearer {admin_token}",
+            }
+        )
+        assert response.status_code == 200
+
+    def test_set_ticket_status(
+        self,
+        api: TestClient,
+        admin_token: str,
+        game: Game,
+        ticket: Ticket
+    ):
+        response = api.put(
+            f"/v1/admin/games/{game.id}/winners/{ticket.id}",
+            headers={
+                "Authorization": f"Bearer {admin_token}",
+            }
+        )
+        assert response.status_code == 200

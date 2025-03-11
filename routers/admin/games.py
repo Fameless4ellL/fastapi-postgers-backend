@@ -4,14 +4,14 @@ from fastapi.responses import JSONResponse
 from apscheduler.jobstores.base import JobLookupError
 from typing import Annotated, Literal
 
-from sqlalchemy import select, func
-from models.user import Role
-from models.other import Currency, Game, GameStatus, Ticket
+from sqlalchemy import select, func, orm
+from models.user import Role, User
+from models.other import Currency, Game, GameStatus, GameView, Ticket
 from routers import admin
 from routers.admin import get_crud_router
 from routers.utils import get_admin_token
 from sqlalchemy.ext.asyncio import AsyncSession
-from models.db import get_db
+from models.db import get_db, get_sync_db
 from schemes.admin import (
     GameFilter,
     GameSchema,
@@ -186,12 +186,6 @@ async def get_purchased_tickets(
     tickets = await db.execute(stmt)
     tickets = tickets.scalars().all()
 
-    if not tickets:
-        return JSONResponse(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            content="Tickets not found"
-        )
-
     data = []
     total = 0
     for ticket in tickets:
@@ -208,4 +202,208 @@ async def get_purchased_tickets(
 
     return JSONResponse(
         status_code=status.HTTP_200_OK, content=data
+    )
+
+
+@admin.get(
+    "/games/{game_id}/participants",
+    dependencies=[Security(
+        get_admin_token,
+        scopes=[
+            Role.GLOBAL_ADMIN.value,
+            Role.LOCAL_ADMIN.value,
+            Role.ADMIN.value,
+            Role.SUPER_ADMIN.value
+        ])],
+    responses={
+        400: {"model": BadResponse},
+    },
+)
+async def get_participants(
+    db: Annotated[AsyncSession, Depends(get_db)],
+    game_id: Annotated[int, Path()],
+):
+    """
+    participants total by one Game
+    """
+    stmt = select(
+        Ticket.id,
+        Ticket.user_id,
+        func.count(Ticket.id).label("tickets"),
+        func.sum(Ticket.amount).label("amount"),
+        Ticket.created_at,
+        User.username
+    ).distinct(
+        Ticket.user_id
+    ).join(
+        User, Ticket.user_id == User.id
+    ).filter(
+        Ticket.game_id == game_id
+    ).group_by(
+        Ticket.id,
+        Ticket.user_id,
+        Ticket.created_at,
+        User.username
+    )
+    tickets = await db.execute(stmt)
+    tickets = tickets.fetchall()
+
+    data = [{
+        "id": ticket.id,
+        "user_id": ticket.user_id,
+        "user": ticket.username,
+        "tickets": ticket.tickets,
+        "amount": float(ticket.amount),
+        "date": ticket.created_at.strftime("%Y-%m-%d %H:%M:%S")
+    } for ticket in tickets]
+
+    return JSONResponse(
+        status_code=status.HTTP_200_OK, content=data
+    )
+
+
+@admin.get(
+    "/games/{game_id}/participants/{user_id}",
+    dependencies=[Security(
+        get_admin_token,
+        scopes=[
+            Role.GLOBAL_ADMIN.value,
+            Role.LOCAL_ADMIN.value,
+            Role.ADMIN.value,
+            Role.SUPER_ADMIN.value
+        ])],
+    responses={
+        400: {"model": BadResponse},
+    },
+)
+async def get_participant_tickets(
+    db: Annotated[AsyncSession, Depends(get_db)],
+    game_id: Annotated[int, Path()],
+    user_id: Annotated[int, Path()],
+):
+    """
+    get tickets by user_id from game_id
+    """
+    stmt = select(
+        Ticket.id,
+        Ticket.user_id,
+        Ticket.numbers,
+        Ticket.created_at,
+        User.username
+    ).join(
+        User, Ticket.user_id == User.id
+    ).filter(
+        Ticket.game_id == game_id,
+        Ticket.user_id == user_id
+    )
+    tickets = await db.execute(stmt)
+    tickets = tickets.fetchall()
+
+    data = [{
+        "id": ticket.id,
+        "user_id": ticket.user_id,
+        "user": ticket.username,
+        "tickets": ticket.numbers,
+        "date": ticket.created_at.strftime("%Y-%m-%d %H:%M:%S")
+    } for ticket in tickets]
+
+    return JSONResponse(
+        status_code=status.HTTP_200_OK, content=data
+    )
+
+
+@admin.get(
+    "/games/{game_id}/winners",
+    dependencies=[Security(
+        get_admin_token,
+        scopes=[
+            Role.GLOBAL_ADMIN.value,
+            Role.LOCAL_ADMIN.value,
+            Role.ADMIN.value,
+            Role.SUPER_ADMIN.value
+        ])],
+    responses={
+        400: {"model": BadResponse},
+    },
+)
+async def get_winners(
+    db: Annotated[orm.Session, Depends(get_sync_db)],
+    game_id: Annotated[int, Path()],
+):
+    """
+    get winners by  game_id
+    """
+    tickets = db.query(
+        Ticket.id,
+        Ticket.user_id,
+        func.sum(Ticket.amount).label("amount"),
+        Ticket.created_at,
+        User.username
+    ).join(
+        User, Ticket.user_id == User.id
+    ).filter(
+        Ticket.game_id == game_id,
+        Ticket.won.is_(True)
+    ).group_by(
+        Ticket.id,
+        Ticket.user_id,
+        Ticket.created_at,
+        User.username
+    ).all()
+
+    data = [{
+        "id": ticket.id,
+        "user_id": ticket.user_id,
+        "user": ticket.user.username,
+        "status": "paid" if ticket.amount > 0 else "not paid",
+        "amount": float(ticket.amount),
+        "date": ticket.created_at.strftime("%Y-%m-%d %H:%M:%S")
+    } for ticket in tickets]
+
+    return JSONResponse(
+        status_code=status.HTTP_200_OK, content=data
+    )
+
+
+@admin.put(
+    "/games/{game_id}/winners/{ticket_id}",
+    dependencies=[Security(
+        get_admin_token,
+        scopes=[
+            Role.GLOBAL_ADMIN.value,
+            Role.LOCAL_ADMIN.value,
+            Role.ADMIN.value,
+            Role.SUPER_ADMIN.value
+        ])],
+    responses={
+        400: {"model": BadResponse},
+    },
+)
+async def set_ticket_status(
+    db: Annotated[orm.Session, Depends(get_sync_db)],
+    game_id: Annotated[int, Path()],
+    ticket_id: Annotated[int, Path()],
+):
+    """
+    set ticket prize has been paid for material game
+    """
+    ticket = db.query(Ticket).filter(
+        Ticket.id == ticket_id,
+        Ticket.game_id == game_id,
+    ).join(
+        Game, Ticket.game_id == Game.id
+    ).filter(
+        Game.kind == GameView.MATERIAL
+    ).first()
+
+    if not ticket:
+        return JSONResponse(
+            status_code=status.HTTP_400_BAD_REQUEST, content="Ticket not found"
+        )
+
+    # TODO set ticket prize has been paid
+
+
+    return JSONResponse(
+        status_code=status.HTTP_200_OK, content="Unimplemented"
     )
