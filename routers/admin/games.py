@@ -123,6 +123,7 @@ async def upload_game_image(
 
     stmt = select(Game).filter(Game.id == game_id)
     game = await db.execute(stmt)
+    game = game.scalar()
     if not game:
         return JSONResponse(
             status_code=status.HTTP_400_BAD_REQUEST, content="Game not found"
@@ -130,12 +131,16 @@ async def upload_game_image(
 
     # Delete old file if it exists
     if game.image:
-        old_file_path = os.path.join(directory, game.image)
+        old_file_path = os.path.join(directory, f"{game.image}#{game_id}")
         if os.path.exists(old_file_path):
             os.remove(old_file_path)
 
+    game.image = file.filename
+    db.add(game)
     # Save file to disk
-    file_path = os.path.join(directory, file.filename)
+    filename, file_extension = os.path.splitext(file.filename)
+
+    file_path = os.path.join(directory, f"{filename}#{game_id}{file_extension}")
     with open(file_path, "wb") as f:
         f.write(await file.read())
 
@@ -179,6 +184,7 @@ async def get_purchased_tickets(
         Currency.code
     )
     tickets = await db.execute(stmt)
+    tickets = tickets.scalars().all()
 
     if not tickets:
         return JSONResponse(

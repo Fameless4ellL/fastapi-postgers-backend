@@ -108,3 +108,23 @@ class TestGames:
         )
         assert response.status_code == 200
         assert response.json() == "Success"
+
+    @pytest.mark.parametrize('_type', ['delete', 'cancel'])
+    def test_get_purchased_tickets(
+        self,
+        api: TestClient,
+        admin_token: str,
+        _type: str,
+        game: Game,
+    ):
+        response = api.delete(
+            f"/v1/admin/games/{game.id}",
+            headers={
+                "Authorization": f"Bearer {admin_token}",
+            },
+            params={
+                "_type": _type,
+            },
+        )
+        assert response.status_code == 200
+        assert response.json() == "Success"
