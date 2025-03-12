@@ -294,6 +294,8 @@ class GameSchema(BaseAdmin):
     has_tickets: bool = False
     game_type: str
     status: GameStatus
+    repeat: Optional[bool] = False
+    repeat_days: Optional[list[int]]
     deleted: Optional[bool] = False
     updated_at: datetime
     created_at: datetime

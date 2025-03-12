@@ -77,6 +77,7 @@ async def get_admin_(
 
     if _type == "cancel":
         game.repeat = False
+        game.status = GameStatus.CANCELLED
 
     try:
         scheduler.remove_job(f"game_{game.id}")
