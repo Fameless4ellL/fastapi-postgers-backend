@@ -1,6 +1,8 @@
 import pycountry
 from typing import Annotated
 from pydantic import BaseModel, computed_field, AfterValidator, Field
+from pydantic_extra_types.country import CountryAlpha3
+from pydantic_extra_types.language_code import LanguageAlpha2
 
 
 class UserBalance(BaseModel):
@@ -12,6 +14,11 @@ class UserBalance(BaseModel):
 class KYC(BaseModel):
     first_name: str
     last_name: str
+
+
+class Usersettings(BaseModel):
+    locale: LanguageAlpha2
+    country: CountryAlpha3
 
 
 class Address(BaseModel):

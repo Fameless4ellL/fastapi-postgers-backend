@@ -23,7 +23,7 @@ from schemes.base import BadResponse, Country
 from schemes.game import (
     MyGames, MyGamesType, Tickets, Withdraw
 )
-from schemes.user import KYC, Notifications, Profile, UserBalance
+from schemes.user import KYC, Notifications, Profile, UserBalance, Usersettings
 from utils.workers import add_to_queue
 
 
@@ -446,4 +446,28 @@ async def get_notifications(
     return JSONResponse(
         status_code=status.HTTP_200_OK,
         content=dict(items=data, count=count)
+    )
+
+
+@public.post(
+    "/settings", tags=["user"],
+    responses={400: {"model": BadResponse}, 200: {"model": Notifications}}
+)
+async def set_settings(
+    db: Annotated[AsyncSession, Depends(get_db)],
+    user: Annotated[User, Depends(get_user)],
+    item: Usersettings,
+):
+    """
+    Изменение настроек пользователя
+    """
+
+    user.language_code = item.locale
+    user.country = item.country
+    db.add(user)
+    await db.commit()
+
+    return JSONResponse(
+        status_code=status.HTTP_200_OK,
+        content="OK"
     )
