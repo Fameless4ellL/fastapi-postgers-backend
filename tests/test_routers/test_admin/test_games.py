@@ -2,7 +2,7 @@ from fastapi.testclient import TestClient
 import pytest
 from models.other import Game, GameType, Ticket
 from models.user import User
-from schemes.admin import Category, GameViewType
+from schemes.admin import Category, GameView
 from settings import settings
 
 
@@ -13,7 +13,7 @@ from settings import settings
 class TestGames:
     @pytest.mark.parametrize('game_type', GameType)
     @pytest.mark.parametrize('category', Category)
-    @pytest.mark.parametrize('kind', GameViewType)
+    @pytest.mark.parametrize('kind', GameView)
     @pytest.mark.parametrize('date_from', ['2022-01-01'])
     @pytest.mark.parametrize('date_to', ['2022-01-01'])
     @pytest.mark.parametrize('filter', [None, ''])
@@ -48,7 +48,7 @@ class TestGames:
 
     @pytest.mark.parametrize('game_type', GameType)
     @pytest.mark.parametrize('category', Category)
-    @pytest.mark.parametrize('kind', GameViewType)
+    @pytest.mark.parametrize('kind', GameView)
     @pytest.mark.parametrize('date_from', ['2022-01-01'])
     @pytest.mark.parametrize('date_to', ['2022-01-01'])
     @pytest.mark.parametrize('filter', [None, ''])

@@ -4,7 +4,7 @@ from fastapi.responses import JSONResponse
 from apscheduler.jobstores.base import JobLookupError
 from typing import Annotated, Literal
 
-from sqlalchemy import select, func, orm
+from sqlalchemy import select, func, orm, exists
 from models.user import Role, User
 from models.other import Currency, Game, GameStatus, GameView, Ticket
 from routers import admin
@@ -56,7 +56,7 @@ get_crud_router(
         400: {"model": BadResponse},
     },
 )
-async def get_admin_(
+async def delete_game(
     db: Annotated[AsyncSession, Depends(get_db)],
     game_id: Annotated[int, Path()],
     _type: Literal["delete", "cancel"],
@@ -70,6 +70,15 @@ async def get_admin_(
     if not game:
         return JSONResponse(
             status_code=status.HTTP_400_BAD_REQUEST, content="Game not found"
+        )
+
+    tickets = select(exists().where(Ticket.game_id == game_id))
+    tickets = await db.execute(tickets)
+    tickets = tickets.scalar()
+    if tickets:
+        return JSONResponse(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            content="Game has tickets"
         )
 
     if _type == "delete":

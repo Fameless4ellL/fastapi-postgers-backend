@@ -157,7 +157,7 @@ class ResetPassword(BaseModel):
 
 class NetworkBase(BaseModel):
     model_config = ConfigDict(from_attributes=True)
-    
+
     chain_id: int
     name: str
     symbol: str
@@ -262,7 +262,7 @@ class GameCreate(BaseAdmin):
         return {
             "name": self.name,
             "game_type": self.game_type,
-            "kind": self.kind,
+            "kind": self.kind.value,
             "currency_id": self.currency_id,
             "limit_by_ticket": self.category.label['limit_by_ticket'],
             "max_limit_grid": self.category.label['max_limit_grid'],
@@ -316,7 +316,7 @@ class GameFilter:
         game_type: Annotated[list[Annotated[GameType, Query()]], Query()] = None,
         filter: Annotated[str, Query()] = None,
         category: Annotated[list[Annotated[Category, Query()]], Query()] = None,
-        kind: Annotated[list[Annotated[GameViewType, Query()]], Query()] = None,
+        kind: Annotated[list[Annotated[GameView, Query()]], Query()] = None,
         date_from: Annotated[date, Query()] = None,
         date_to: Annotated[date, Query()] = None,
     ):

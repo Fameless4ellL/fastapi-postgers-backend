@@ -26,8 +26,8 @@ class JackpotType(Enum):
 
 
 class GameView(Enum):
-    MONETARY = "monetary"
-    MATERIAL = "material"
+    MONETARY = "Monetary"
+    MATERIAL = "Clothing"
 
 
 class GameStatus(Enum):
