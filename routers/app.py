@@ -121,6 +121,7 @@ async def game_instances(
             "endtime": _game.scheduled_datetime.timestamp(),
             "created": _game.created_at.timestamp()
         }]
+        count = 1
 
     return JSONResponse(
         status_code=status.HTTP_200_OK,

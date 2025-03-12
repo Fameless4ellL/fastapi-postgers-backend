@@ -15,7 +15,7 @@ from models.db import get_db, get_sync_db
 from sqlalchemy.ext.asyncio import AsyncSession
 from models.user import User, Role
 from web3 import Web3, middleware
-from models.other import Game, GameType, Network, Currency
+from models.other import Game, GameStatus, GameType, Network, Currency
 import settings
 from utils.signature import decode_access_token
 from settings import email, settings
@@ -227,6 +227,7 @@ async def generate_game(
     game = await db.execute(
         select(Game).filter(
             Game.repeat.is_(True),
+            Game.status == GameStatus.PENDING,
             Game.game_type == _type,
             Game.country == country
         )
@@ -234,10 +235,15 @@ async def generate_game(
     game = game.scalars().first()
 
     if not game:
+        currency = await db.execute(
+            select(Currency)
+        )
+        currency = currency.scalar()
+
         game = Game(
             name=f"game #{str(uuid.uuid4())}",
             game_type=_type,
-            currency_id=game.currency_id,
+            currency_id=currency.id,
             description="Default game",
             country=country,
             repeat=True,

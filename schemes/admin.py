@@ -291,6 +291,7 @@ class GameSchema(BaseAdmin):
     limit_by_ticket: int = 15
     max_limit_grid: int = 90
     image: Optional[Image] = "default_image.png"
+    has_tickets: bool = False
     game_type: str
     status: GameStatus
     deleted: Optional[bool] = False

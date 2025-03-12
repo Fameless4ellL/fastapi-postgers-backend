@@ -1,7 +1,8 @@
 from fastapi import APIRouter, Depends, Path, status, Security, Query
 from fastapi.responses import JSONResponse
 from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy import select, func, or_
+from sqlalchemy import select, func, or_, exists
+from models.other import Game, Ticket
 from typing import Type, List, Annotated
 from schemes.admin import ReferralFilter, GameFilter
 from schemes.base import BadResponse
@@ -76,6 +77,9 @@ def get_crud_router(
             if filters.date_to:
                 stmt = stmt.filter(model.created_at <= filters.date_to)
 
+            has_tickets = exists().where(Ticket.game_id == model.id).label("has_tickets")
+            stmt = stmt.add_columns(has_tickets)
+
         if model.__name__ == "ReferralLink":
             filters: ReferralFilter = filters
 
@@ -114,6 +118,11 @@ def get_crud_router(
         id: Annotated[int, Path()],
     ):
         stmt = select(model).where(model.id == id)
+
+        if model.__name__ == "Game":
+            has_tickets = exists().where(Ticket.game_id == model.id).label("has_tickets")
+            stmt = stmt.add_columns(has_tickets)
+
         item = await db.execute(stmt)
         item = item.scalar()
 
