@@ -12,18 +12,18 @@ from eth_account.signers.local import LocalAccount
 from sqlalchemy.orm import joinedload
 from tronpy.keys import to_base58check_address
 from models.db import get_db
-from models.user import Balance, User, Wallet, BalanceChangeHistory
-from models.other import Currency, Game, Jackpot, Ticket
+from models.user import Balance, Notification, User, Wallet, BalanceChangeHistory
+from models.other import Currency, Ticket
 from routers import public
 from globals import aredis
-from routers.utils import get_user, get_currency, url_for
+from routers.utils import get_user, get_currency, url_for, get_user_token
 
 from sqlalchemy.ext.asyncio import AsyncSession
 from schemes.base import BadResponse, Country
 from schemes.game import (
     MyGames, MyGamesType, Tickets, Withdraw
 )
-from schemes.user import KYC, Profile, UserBalance
+from schemes.user import KYC, Notifications, Profile, UserBalance
 from utils.workers import add_to_queue
 
 
@@ -408,4 +408,42 @@ async def get_my_games(
     return JSONResponse(
         status_code=status.HTTP_200_OK,
         content=MyGames(games=data, count=count).model_dump()
+    )
+
+
+@public.get(
+    "/notifications", tags=["user"],
+    responses={400: {"model": BadResponse}, 200: {"model": Notifications}}
+)
+async def get_notifications(
+    db: Annotated[AsyncSession, Depends(get_db)],
+    user: Annotated[User, Depends(get_user_token)],
+    skip: int = 0,
+    limit: int = 10,
+):
+    """
+    Получение уведомлений для пользователя
+    """
+
+    stmt = select(Notification).filter(Notification.user_id == user.id)
+    notifications = await db.execute(stmt.offset(skip).limit(limit))
+    notifications = notifications.scalars().all()
+
+    data = [{
+        "id": n.id,
+        "head": n.head,
+        "body": n.body,
+        "args": json.loads(n.args),
+        "created": n.created_at.timestamp()
+    } for n in notifications]
+
+    count_stmt = select(func.count(Notification.id)).filter(
+        Notification.user_id == user.id
+    )
+    count_result = await db.execute(count_stmt)
+    count = count_result.scalar()
+
+    return JSONResponse(
+        status_code=status.HTTP_200_OK,
+        content=dict(items=data, count=count)
     )

@@ -7,8 +7,8 @@ from typing import Optional
 from datetime import datetime, timedelta
 
 from models.db import get_sync_db
-from models.user import Wallet
-from models.other import Currency, Game, GameStatus, Ticket, Jackpot
+from models.user import Notification, Wallet
+from models.other import Currency, Game, GameStatus, GameView, Ticket, Jackpot
 from utils.web3 import transfer
 from sqlalchemy.orm import joinedload
 from utils import worker
@@ -142,41 +142,56 @@ def proceed_game(game_id: Optional[int] = None):
                     Ticket.id == ticket.id
                 ).first()
                 ticket.won = True
-                ticket.amount = prize_per_ticket
-                db.add(ticket)
+                
+                if game.kind == GameView.MONETARY:
+                    ticket.amount = prize_per_ticket
 
-                user_balance = db.query(Balance).with_for_update().filter(
-                    Balance.user_id == ticket.user_id
-                ).first()
+                    user_balance = db.query(Balance).with_for_update().filter(
+                        Balance.user_id == ticket.user_id
+                    ).first()
 
-                if not user_balance:
-                    user_balance = Balance(
+                    if not user_balance:
+                        user_balance = Balance(
+                            user_id=ticket.user_id,
+                            currency_id=game.currency_id
+                        )
+                        db.add(user_balance)
+                        db.commit()
+
+                    previous_balance = user_balance.balance
+                    balance = user_balance.balance + Decimal(prize)
+
+                    balance_change = BalanceChangeHistory(
                         user_id=ticket.user_id,
-                        currency_id=game.currency_id
+                        balance_id=user_balance.id,
+                        currency_id=game.currency_id,
+                        change_amount=prize_per_ticket,
+                        change_type="win",
+                        previous_balance=previous_balance,
+                        new_balance=balance
                     )
-                    db.add(user_balance)
+
+                    notification = Notification(
+                        user_id=ticket.user_id,
+                        head="You won!",
+                        body=f"You won! {prize_per_ticket} {game.currency.code}",
+                        args=json.dumps({
+                            "game": game.name,
+                            "amount": prize_per_ticket,
+                            "currency": game.currency.code
+                        })
+                    )
+                    db.add(notification)
+                    db.add(balance_change)
                     db.commit()
+                    db.refresh(balance_change)
 
-                previous_balance = user_balance.balance
-                balance = user_balance.balance + Decimal(prize)
+                    deposit(
+                        history_id=balance_change.id,
+                        change_type=balance_change.change_type
+                    )
 
-                balance_change = BalanceChangeHistory(
-                    user_id=ticket.user_id,
-                    balance_id=user_balance.id,
-                    currency_id=game.currency_id,
-                    change_amount=prize_per_ticket,
-                    change_type="win",
-                    previous_balance=previous_balance,
-                    new_balance=balance
-                )
-                db.add(balance_change)
-                db.commit()
-                db.refresh(balance_change)
-
-                deposit(
-                    history_id=balance_change.id,
-                    change_type=balance_change.change_type
-                )
+                db.add(ticket)
 
         game.status = GameStatus.COMPLETED
         db.add(game)
@@ -368,6 +383,19 @@ def proceed_jackpot(jackpot_id: Optional[int] = None):
                     previous_balance=previous_balance,
                     new_balance=balance
                 )
+
+                notification = Notification(
+                    user_id=ticket.user_id,
+                    head="You won!",
+                    body=f"You won! {prize} {jackpot.currency.code}",
+                    args=json.dumps({
+                        "game": jackpot.name,
+                        "amount": prize,
+                        "currency": jackpot.currency.code
+                    })
+                )
+
+                db.add(notification)
                 db.add(balance_change)
                 db.commit()
                 db.refresh(balance_change)

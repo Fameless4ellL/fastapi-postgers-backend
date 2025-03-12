@@ -14,13 +14,14 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from models.db import get_db, get_sync_db
 from schemes.admin import (
     GameFilter,
+    GameUpload,
     GameSchema,
     Games,
     GameCreate,
     GameUpdate,
 )
 from globals import scheduler
-from schemes.base import BadResponse
+from schemes.base import BadResponse, JsonForm
 
 
 get_crud_router(
@@ -28,8 +29,9 @@ get_crud_router(
     prefix="/games",
     schema=Games,
     get_schema=GameSchema,
-    create_schema=GameCreate,
-    update_schema=GameUpdate,
+    create_schema=Annotated[GameCreate, JsonForm()],
+    update_schema=Annotated[GameUpdate, JsonForm()],
+    files=Annotated[GameUpload, Depends(GameUpload)],
     filters=Annotated[GameFilter, Depends(GameFilter)],
     security_scopes=[
         Role.SUPER_ADMIN.value,
@@ -99,67 +101,6 @@ async def delete_game(
     return JSONResponse(
         status_code=status.HTTP_200_OK, content="Success"
     )
-
-
-@admin.post(
-    "/games/{game_id}/upload",
-    dependencies=[Security(
-        get_admin_token,
-        scopes=[
-            Role.GLOBAL_ADMIN.value,
-            Role.LOCAL_ADMIN.value,
-            Role.ADMIN.value,
-            Role.SUPER_ADMIN.value
-        ])],
-    responses={
-        400: {"model": BadResponse},
-    },
-)
-async def upload_game_image(
-    db: Annotated[AsyncSession, Depends(get_db)],
-    game_id: Annotated[int, Path()],
-    file: UploadFile
-):
-    """
-    Загрузка документа
-    """
-    if not file.content_type.startswith("image"):
-        return JSONResponse(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            content="Invalid file type"
-        )
-
-    directory = "static"
-    os.makedirs(directory, exist_ok=True)
-
-    stmt = select(Game).filter(Game.id == game_id)
-    game = await db.execute(stmt)
-    game = game.scalar()
-    if not game:
-        return JSONResponse(
-            status_code=status.HTTP_400_BAD_REQUEST, content="Game not found"
-        )
-
-    # Delete old file if it exists
-    if game.image:
-        old_file_path = os.path.join(directory, f"{game.image}#{game_id}")
-        if os.path.exists(old_file_path):
-            os.remove(old_file_path)
-
-    game.image = file.filename
-    db.add(game)
-    # Save file to disk
-    filename, file_extension = os.path.splitext(file.filename)
-
-    file_path = os.path.join(directory, f"{filename}#{game_id}{file_extension}")
-    with open(file_path, "wb") as f:
-        f.write(await file.read())
-
-    game.image = file.filename
-    db.add(game)
-    await db.commit()
-
-    return JSONResponse(status_code=status.HTTP_200_OK, content="OK")
 
 
 @admin.get(

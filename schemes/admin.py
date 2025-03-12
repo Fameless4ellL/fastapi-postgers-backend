@@ -10,10 +10,10 @@ from pydantic import (
     ConfigDict
 )
 import pytz
-from typing import Optional, Annotated, Any
+from typing import Optional, Annotated, Any, Union
 from datetime import datetime, date
 from pydantic_extra_types.country import CountryAlpha3
-from fastapi import Query
+from fastapi import Query, UploadFile
 
 from models.other import GameStatus, GameType, GameView
 from models.user import BalanceChangeHistory
@@ -262,7 +262,7 @@ class GameCreate(BaseAdmin):
         return {
             "name": self.name,
             "game_type": self.game_type,
-            "kind": self.kind.value,
+            "kind": self.kind,
             "currency_id": self.currency_id,
             "limit_by_ticket": self.category.label['limit_by_ticket'],
             "max_limit_grid": self.category.label['max_limit_grid'],
@@ -292,7 +292,7 @@ class GameSchema(BaseAdmin):
     max_limit_grid: int = 90
     image: Optional[Image] = "default_image.png"
     has_tickets: bool = False
-    game_type: str
+    game_type: GameType
     status: GameStatus
     repeat: Optional[bool] = False
     repeat_days: Optional[list[int]]
@@ -326,6 +326,14 @@ class GameFilter:
         self.category = category
         self.date_from = date_from
         self.date_to = date_to
+
+
+class GameUpload:
+    def __init__(
+        self,
+        image: Union[UploadFile, None] = None,
+    ):
+        self.image = image
 
 
 class Empty:

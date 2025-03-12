@@ -16,7 +16,6 @@ from models.db import get_db
 from schemes.admin import (
     Admin,
     Admins,
-    GameFilter,
     NetworkCreate,
     NetworkSchema,
     Networks,
@@ -25,10 +24,6 @@ from schemes.admin import (
     CurrencyCreate,
     CurrencyUpdate,
     NetworkUpdate,
-    GameSchema,
-    Games,
-    GameCreate,
-    GameUpdate,
     Jackpots,
     JackpotSchema,
     JackpotCreate,

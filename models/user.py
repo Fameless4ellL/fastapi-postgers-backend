@@ -107,3 +107,14 @@ class ReferralLink(Base):
 
     deleted = Column(Boolean, default=False)
     created_at = Column(DateTime, default=datetime.datetime.now)
+
+
+class Notification(Base):
+    __tablename__ = "notifications"
+
+    id = Column(Integer, primary_key=True, index=True)
+    user_id = Column(Integer, ForeignKey('users.id', ondelete='CASCADE'), nullable=True)
+    head = Column(String(256), nullable=False)
+    body = Column(String(256), nullable=False)
+    args = Column(String, nullable=True, default="{}")
+    created_at = Column(DateTime, default=datetime.datetime.now)

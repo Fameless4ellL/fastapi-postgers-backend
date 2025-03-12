@@ -1,3 +1,4 @@
+import os
 from fastapi import APIRouter, Depends, Path, status, Security, Query
 from fastapi.responses import JSONResponse
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -13,6 +14,7 @@ from routers import admin
 from globals import scheduler
 from utils.workers import add_to_queue
 from routers.utils import get_admin_token, Token
+from schemes.admin import Empty
 
 
 def get_crud_router(
@@ -21,7 +23,8 @@ def get_crud_router(
     get_schema: Type[BaseModel],
     create_schema: Type[BaseModel],
     update_schema: Type[BaseModel],
-    filters: Type[BaseModel],
+    filters: Type[BaseModel] = Annotated[Empty, Depends(Empty)],
+    files: Type[BaseModel] = Annotated[Empty, Depends(Empty)],
     prefix: str = "",
     security_scopes: List[str] = [Role.SUPER_ADMIN.value],
     order_by: str = "id"
@@ -108,7 +111,7 @@ def get_crud_router(
         f"{prefix}/{{id}}",
         responses={
             400: {"model": BadResponse},
-            200: {"model": schema}
+            200: {"model": get_schema}
         },
         dependencies=[Security(get_admin_token, scopes=security_scopes)]
     )
@@ -140,15 +143,15 @@ def get_crud_router(
         f"{prefix}/create",
         responses={
             400: {"model": BadResponse},
-            201: {"model": schema}
+            201: {"model": get_schema}
         },
     )
     async def create_item(
         db: Annotated[AsyncSession, Depends(get_db)],
         token: Annotated[Token, Security(get_admin_token, scopes=security_scopes)],
-        item: create_schema
+        item: create_schema,
+        file: files,
     ):
-        print(item.model_dump())
         new_item = model(**item.model_dump())
 
         if model.__name__ == "ReferralLink":
@@ -156,8 +159,39 @@ def get_crud_router(
 
         db.add(new_item)
         await db.commit()
+        await db.refresh(new_item)
 
         if model.__name__ == "Game":
+            if not file.content_type.startswith("image"):
+                return JSONResponse(
+                    status_code=status.HTTP_400_BAD_REQUEST,
+                    content="Invalid file type"
+                )
+
+            directory = "static"
+            os.makedirs(directory, exist_ok=True)
+
+            # Delete old file if it exists
+            if new_item.image:
+                old_file_path = os.path.join(
+                    directory,
+                    f"{new_item.image}_{new_item.id}"
+                )
+                if os.path.exists(old_file_path):
+                    os.remove(old_file_path)
+
+            # Save file to disk
+            filename, file_extension = os.path.splitext(file.filename)
+            new_item.image = f"{filename}#{new_item.id}{file_extension}"
+            db.add(new_item)
+
+            file_path = os.path.join(
+                directory,
+                f"{filename}_{new_item.id}{file_extension}"
+            )
+            with open(file_path, "wb") as f:
+                f.write(await file.read())
+
             scheduler.add_job(
                 func=add_to_queue,
                 trigger="date",
@@ -175,6 +209,8 @@ def get_crud_router(
                 run_date=new_item.scheduled_datetime,
             )
 
+        await db.commit()
+
         return JSONResponse(
             status_code=status.HTTP_201_CREATED,
             content=get_schema.model_validate(new_item).model_dump(mode='json')
@@ -184,20 +220,56 @@ def get_crud_router(
         f"{prefix}/{{id}}/update",
         responses={
             400: {"model": BadResponse},
-            200: {"model": schema}
+            200: {"model": get_schema}
         },
-        dependencies=[Security(get_admin_token, scopes=security_scopes)]
+        # dependencies=[Security(get_admin_token, scopes=security_scopes)]
     )
     async def update_item(
         db: Annotated[AsyncSession, Depends(get_db)],
         id: Annotated[int, Path()],
-        item: update_schema
+        item: update_schema,
+        files: files,
     ):
         stmt = select(model).where(model.id == id)
         db_item = await db.execute(stmt)
         db_item = db_item.scalar()
         for key, value in item.model_dump().items():
             setattr(db_item, key, value)
+
+        if model.__name__ == "Game":
+            file = files.image
+
+            if file:
+                if not file.content_type.startswith("image"):
+                    return JSONResponse(
+                        status_code=status.HTTP_400_BAD_REQUEST,
+                        content="Invalid file type"
+                    )
+
+                directory = "static"
+                os.makedirs(directory, exist_ok=True)
+
+                # Delete old file if it exists
+                if db_item.image:
+                    old_file_path = os.path.join(
+                        directory,
+                        f"{db_item.image}#{db_item.id}"
+                    )
+                    if os.path.exists(old_file_path):
+                        os.remove(old_file_path)
+
+                # Save file to disk
+                filename, file_extension = os.path.splitext(file.filename)
+                db_item.image = f"{filename}#{db_item.id}{file_extension}"
+
+                file_path = os.path.join(
+                    directory,
+                    f"{filename}#{db_item.id}{file_extension}"
+                )
+                with open(file_path, "wb") as f:
+                    f.write(await file.read())
+
+        db.add(db_item)
         await db.commit()
         return JSONResponse(
             status_code=status.HTTP_200_OK,

@@ -1,4 +1,5 @@
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, Json
+from fastapi.params import Form as FormType
 
 
 class BadResponse(BaseModel):
@@ -8,3 +9,7 @@ class BadResponse(BaseModel):
 class Country(BaseModel):
     alpha_3: str
     name: str
+
+
+class JsonForm(Json, FormType):
+    ...
