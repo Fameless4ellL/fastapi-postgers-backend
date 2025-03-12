@@ -8,8 +8,9 @@ from typing import Annotated, Any
 import uuid
 from aiohttp import client_exceptions
 from fastapi import Depends, HTTPException, status, security
+from sqlalchemy.orm import joinedload
 from datetime import datetime, timedelta
-from sqlalchemy import select, orm
+from sqlalchemy import select
 from models.db import get_db, get_sync_db
 from sqlalchemy.ext.asyncio import AsyncSession
 from models.user import User, Role
@@ -236,6 +237,7 @@ async def generate_game(
         game = Game(
             name=f"game #{str(uuid.uuid4())}",
             game_type=_type,
+            currency_id=game.currency_id,
             description="Default game",
             country=country,
             repeat=True,
@@ -246,6 +248,14 @@ async def generate_game(
         db.add(game)
         await db.commit()
         await db.refresh(game)
+
+    stmt = select(Game).filter(
+        Game.id == game.id
+    ).options(
+        joinedload(Game.currency)
+    )
+    game = await db.execute(stmt)
+    game = game.scalar()
 
     scheduler.add_job(
         func=add_to_queue,

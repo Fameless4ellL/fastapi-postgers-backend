@@ -14,6 +14,7 @@ requests
 
 # utils
 pytz
+alembic-postgresql-enum==1.7.0 
 boto3==1.37.0
 pycryptodome==3.21.0
 python-jose==3.3.0

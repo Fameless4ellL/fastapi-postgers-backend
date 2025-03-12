@@ -35,6 +35,7 @@ class GameStatus(Enum):
     ACTIVE = "active"
     COMPLETED = "completed"
     CANCELLED = "cancelled"
+    DELETED = "deleted"
 
 
 class JackpotStatus(Enum):
@@ -153,8 +154,6 @@ class Game(Base):
         default=[0, 1, 2, 3, 4, 5, 6],
         doc="The days of the week when the game instance is repeated, required if repeat is True"
     )
-
-    deleted = Column(Boolean, default=False, doc="Indicates if the instance is deleted")
 
     created_at = Column(DateTime, default=datetime.datetime.now)
     updated_at = Column(DateTime, default=datetime.datetime.now, onupdate=datetime.datetime.now)

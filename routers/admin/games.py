@@ -73,14 +73,15 @@ async def get_admin_(
         )
 
     if _type == "delete":
-        game.deleted = True
+        game.status = GameStatus.DELETED
+
+    if _type == "cancel":
+        game.status = GameStatus.CANCELLED
 
     try:
         scheduler.remove_job(f"game_{game.id}")
     except JobLookupError:
         pass
-
-    game.status = GameStatus.CANCELLED
 
     db.add(game)
     await db.commit()

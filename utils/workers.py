@@ -29,7 +29,7 @@ def generate_game(
     game = db.query(Game).filter(
         Game.repeat.is_(True),
         Game.id == game_id,
-        Game.deleted.is_(False)
+        Game.status != GameStatus.DELETED
     ).first()
 
     if not game:
