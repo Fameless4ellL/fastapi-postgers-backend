@@ -172,8 +172,8 @@ def get_crud_router(
         await db.refresh(new_item)
 
         if model.__name__ == "Game":
-            if files.image:
-                file = files.image
+            file = getattr(file, "image", None)
+            if file:
 
                 if not file.content_type.startswith("image"):
                     return JSONResponse(

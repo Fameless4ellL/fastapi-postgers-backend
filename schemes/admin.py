@@ -1,3 +1,4 @@
+from dataclasses import dataclass
 from pydantic import (
     BaseModel,
     Field,
@@ -328,12 +329,9 @@ class GameFilter:
         self.date_to = date_to
 
 
+@dataclass
 class GameUpload:
-    def __init__(
-        self,
-        image: Union[UploadFile, None] = None,
-    ):
-        self.image = image
+    image: Union[UploadFile, None] = None
 
 
 class Empty:
