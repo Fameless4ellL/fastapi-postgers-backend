@@ -1,5 +1,5 @@
 import os
-from fastapi import APIRouter, Depends, Path, status, Security, Query
+from fastapi import APIRouter, Depends, Path, Request, status, Security, Query
 from fastapi.responses import JSONResponse
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select, func, or_, exists
@@ -156,6 +156,7 @@ def get_crud_router(
         name=f"create_{model.__name__}",
     )
     async def create_item(
+        requests: Request,
         db: Annotated[AsyncSession, Depends(get_db)],
         # token: Annotated[Token, Security(get_admin_token, scopes=security_scopes)],
         item: create_schema,
