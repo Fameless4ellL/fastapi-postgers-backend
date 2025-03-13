@@ -185,18 +185,10 @@ def get_crud_router(
                 directory = "static"
                 os.makedirs(directory, exist_ok=True)
 
-                # Delete old file if it exists
-                if new_item.image:
-                    old_file_path = os.path.join(
-                        directory,
-                        f"{new_item.image}_{new_item.id}"
-                    )
-                    if os.path.exists(old_file_path):
-                        os.remove(old_file_path)
-
                 # Save file to disk
                 filename, file_extension = os.path.splitext(file.filename)
-                new_item.image = f"{filename}#{new_item.id}{file_extension}"
+                filename = filename.replace(" ", "_")
+                new_item.image = f"{filename}_{new_item.id}{file_extension}"
                 db.add(new_item)
 
                 file_path = os.path.join(
@@ -263,23 +255,24 @@ def get_crud_router(
 
                 directory = "static"
                 os.makedirs(directory, exist_ok=True)
+                filename, file_extension = os.path.splitext(file.filename)
+                filename = filename.replace(" ", "_")
 
                 # Delete old file if it exists
                 if db_item.image:
                     old_file_path = os.path.join(
                         directory,
-                        f"{db_item.image}#{db_item.id}"
+                        f"{db_item.image}_{db_item.id}"
                     )
                     if os.path.exists(old_file_path):
                         os.remove(old_file_path)
 
                 # Save file to disk
-                filename, file_extension = os.path.splitext(file.filename)
-                db_item.image = f"{filename}#{db_item.id}{file_extension}"
+                db_item.image = f"{filename}_{db_item.id}{file_extension}"
 
                 file_path = os.path.join(
                     directory,
-                    f"{filename}#{db_item.id}{file_extension}"
+                    f"{filename}_{db_item.id}{file_extension}"
                 )
                 with open(file_path, "wb") as f:
                     f.write(await file.read())

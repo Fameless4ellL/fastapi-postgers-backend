@@ -218,12 +218,12 @@ async def upload_kyc(
 
     # Delete old file if it exists
     if user.document:
-        old_file_path = os.path.join(directory, user.document)
+        old_file_path = os.path.join(directory, f"{filename}_{user.id}{file_extension}")
         if os.path.exists(old_file_path):
             os.remove(old_file_path)
 
     # Save file to disk
-    file_path = os.path.join(directory, file.filename)
+    file_path = os.path.join(directory, f"{filename}_{user.id}{file_extension}")
     with open(file_path, "wb") as f:
         f.write(await file.read())
 
