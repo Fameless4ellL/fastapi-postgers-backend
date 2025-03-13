@@ -46,14 +46,15 @@ get_crud_router(
 
 @admin.delete(
     "/games/{game_id}",
-    dependencies=[Security(
-        get_admin_token,
-        scopes=[
-            Role.GLOBAL_ADMIN.value,
-            Role.LOCAL_ADMIN.value,
-            Role.ADMIN.value,
-            Role.SUPER_ADMIN.value
-        ])],
+    tags=[Action.ADMIN_DELETE],
+    # dependencies=[Security(
+    #     get_admin_token,
+    #     scopes=[
+    #         Role.GLOBAL_ADMIN.value,
+    #         Role.LOCAL_ADMIN.value,
+    #         Role.ADMIN.value,
+    #         Role.SUPER_ADMIN.value
+    #     ])],
     responses={
         400: {"model": BadResponse},
     },
@@ -63,9 +64,6 @@ async def delete_game(
     game_id: Annotated[int, Path()],
     _type: Literal["delete", "cancel"],
 ):
-    """
-    Get all admins
-    """
     stmt = select(Game).filter(Game.id == game_id)
     game = await db.execute(stmt)
     game = game.scalar()
