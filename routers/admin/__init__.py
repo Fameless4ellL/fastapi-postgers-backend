@@ -29,6 +29,7 @@ def get_crud_router(
     security_scopes: List[str] = [
         Role.SUPER_ADMIN.value,
         Role.GLOBAL_ADMIN.value,
+        Role.ADMIN.value,
         Role.LOCAL_ADMIN.value,
         Role.SUPPORT.value,
     ],
@@ -42,6 +43,7 @@ def get_crud_router(
             400: {"model": BadResponse},
             200: {"model": schema}
         },
+        name=f"get_{model.__name__}_list",
         dependencies=[Security(get_admin_token, scopes=security_scopes)]
     )
     async def get_items(
@@ -118,6 +120,7 @@ def get_crud_router(
             400: {"model": BadResponse},
             200: {"model": get_schema}
         },
+        name=f"get_{model.__name__}",
         dependencies=[Security(get_admin_token, scopes=security_scopes)]
     )
     async def get_item(
@@ -150,6 +153,7 @@ def get_crud_router(
             400: {"model": BadResponse},
             201: {"model": get_schema}
         },
+        name=f"create_{model.__name__}",
     )
     async def create_item(
         db: Annotated[AsyncSession, Depends(get_db)],
@@ -167,35 +171,38 @@ def get_crud_router(
         await db.refresh(new_item)
 
         if model.__name__ == "Game":
-            if not file.content_type.startswith("image"):
-                return JSONResponse(
-                    status_code=status.HTTP_400_BAD_REQUEST,
-                    content="Invalid file type"
-                )
+            if files.image:
+                file = files.image
 
-            directory = "static"
-            os.makedirs(directory, exist_ok=True)
+                if not file.content_type.startswith("image"):
+                    return JSONResponse(
+                        status_code=status.HTTP_400_BAD_REQUEST,
+                        content="Invalid file type"
+                    )
 
-            # Delete old file if it exists
-            if new_item.image:
-                old_file_path = os.path.join(
+                directory = "static"
+                os.makedirs(directory, exist_ok=True)
+
+                # Delete old file if it exists
+                if new_item.image:
+                    old_file_path = os.path.join(
+                        directory,
+                        f"{new_item.image}_{new_item.id}"
+                    )
+                    if os.path.exists(old_file_path):
+                        os.remove(old_file_path)
+
+                # Save file to disk
+                filename, file_extension = os.path.splitext(file.filename)
+                new_item.image = f"{filename}#{new_item.id}{file_extension}"
+                db.add(new_item)
+
+                file_path = os.path.join(
                     directory,
-                    f"{new_item.image}_{new_item.id}"
+                    f"{filename}_{new_item.id}{file_extension}"
                 )
-                if os.path.exists(old_file_path):
-                    os.remove(old_file_path)
-
-            # Save file to disk
-            filename, file_extension = os.path.splitext(file.filename)
-            new_item.image = f"{filename}#{new_item.id}{file_extension}"
-            db.add(new_item)
-
-            file_path = os.path.join(
-                directory,
-                f"{filename}_{new_item.id}{file_extension}"
-            )
-            with open(file_path, "wb") as f:
-                f.write(await file.read())
+                with open(file_path, "wb") as f:
+                    f.write(await file.read())
 
             scheduler.add_job(
                 func=add_to_queue,
@@ -227,7 +234,8 @@ def get_crud_router(
             400: {"model": BadResponse},
             200: {"model": get_schema}
         },
-        # dependencies=[Security(get_admin_token, scopes=security_scopes)]
+        name=f"update_{model.__name__}",
+        dependencies=[Security(get_admin_token, scopes=security_scopes)]
     )
     async def update_item(
         db: Annotated[AsyncSession, Depends(get_db)],
