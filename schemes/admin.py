@@ -250,8 +250,12 @@ class GameCreate(BaseAdmin):
     @model_serializer
     def ser_model(self):
         # get the timezone from the zone
-        zone = self.scheduled_datetime.tzinfo
-        tz = pytz.timezone(zone.tzname(self.scheduled_datetime))
+        try:
+            zone = self.scheduled_datetime.tzinfo
+            tz = pytz.timezone(zone.tzname(self.scheduled_datetime))
+        except pytz.UnknownTimeZoneError:
+            tz = pytz.timezone('UTC')
+
         zone = tz.utcoffset(self.scheduled_datetime).total_seconds() // 3600
         scheduled_datetime = self.scheduled_datetime.astimezone(tz).isoformat()
 
