@@ -26,7 +26,12 @@ def get_crud_router(
     filters: Type[BaseModel] = Annotated[Empty, Depends(Empty)],
     files: Type[BaseModel] = Annotated[Empty, Depends(Empty)],
     prefix: str = "",
-    security_scopes: List[str] = [Role.SUPER_ADMIN.value],
+    security_scopes: List[str] = [
+        Role.SUPER_ADMIN.value,
+        Role.GLOBAL_ADMIN.value,
+        Role.LOCAL_ADMIN.value,
+        Role.SUPPORT.value,
+    ],
     order_by: str = "id"
 ) -> APIRouter:
     router = admin
@@ -282,3 +287,4 @@ from .auth import *
 from .users import *
 from .games import *
 from .referral import *
+# from .instabingo import *
