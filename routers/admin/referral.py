@@ -3,6 +3,7 @@ from fastapi.responses import JSONResponse
 from typing import Annotated
 
 from sqlalchemy import select
+from models.log import Action
 from models.user import Role, ReferralLink
 from routers import admin
 from routers.admin import get_crud_router
@@ -39,12 +40,13 @@ get_crud_router(
 
 @admin.delete(
     "/referrals/{referral_id}",
+    tags=[Action.ADMIN_DELETE],
     dependencies=[Security(get_admin_token, scopes=[Role.GLOBAL_ADMIN.value])],
     responses={
         400: {"model": BadResponse},
     },
 )
-async def get_admins(
+async def delete_referral(
     db: Annotated[AsyncSession, Depends(get_db)],
     referral_id: Annotated[int, Path(...)]
 ):
@@ -69,8 +71,8 @@ async def get_admins(
         status_code=status.HTTP_200_OK,
         content="Referral deleted",
     )
-    
-    
+
+
 @admin.get(
     "/referrals/{referral_id}/users",
     dependencies=[Security(get_admin_token, scopes=[Role.GLOBAL_ADMIN.value])],
@@ -78,13 +80,10 @@ async def get_admins(
         400: {"model": BadResponse},
     },
 )
-async def get_admins(
+async def get_referral_user(
     db: Annotated[AsyncSession, Depends(get_db)],
     referral_id: Annotated[int, Path(...)]
 ):
-    """
-    delete referral
-    """
     stmt = select(ReferralLink).filter(ReferralLink.id == referral_id)
     referral = await db.execute(stmt)
     referral = referral.scalar()

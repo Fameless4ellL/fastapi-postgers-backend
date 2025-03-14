@@ -1,12 +1,11 @@
 import datetime
-import json
 import random
 from typing import Annotated, Optional
 from fastapi import Depends, Path, status
 from fastapi.responses import JSONResponse
 from sqlalchemy import func, select, exists
-from web3 import AsyncWeb3
 from models.db import get_db
+from models.log import Action
 from models.user import Balance, BalanceChangeHistory, User, Wallet
 from models.other import (
     Currency,
@@ -18,7 +17,7 @@ from models.other import (
     JackpotType,
 )
 from routers import public
-from routers.utils import generate_game, get_currency, get_user, get_w3, nth, url_for
+from routers.utils import generate_game, get_user, nth, url_for
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import joinedload
 from schemes.base import BadResponse
@@ -231,7 +230,7 @@ async def read_game(
 
 
 @public.post(
-    "/game/{game_id}/tickets", tags=["game"],
+    "/game/{game_id}/tickets", tags=["game", Action.TRANSACTION],
     responses={400: {"model": BadResponse}, 201: {"description": "OK"}}
 )
 async def buy_tickets(

@@ -1,9 +1,26 @@
-from fastapi import FastAPI
+import datetime
+import json
+import logging
+import time
+from fastapi import FastAPI, Request, Response
 from contextlib import asynccontextmanager
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
+from models.log import Action, RequestLog, UserActionLog
 from routers import public, admin, _cron
 from globals import scheduler
+from models.db import get_logs_db
+from utils.signature import decode_access_token
+
+
+logging.basicConfig(level=logging.INFO)
+log = logging.getLogger("LOGS")
+
+console_handler = logging.StreamHandler()
+console_handler.setLevel(logging.INFO)
+formatter = logging.Formatter('%(asctime)s - %(name)s - %(levelname)s - %(message)s')
+console_handler.setFormatter(formatter)
+log.addHandler(console_handler)
 
 
 @asynccontextmanager
@@ -31,3 +48,103 @@ fastapp.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
+
+
+@fastapp.middleware("http")
+async def logger(
+    request: Request,
+    call_next,
+):
+    req_body = await request.body()
+    json_body = {}
+    if request.headers.get("Content-Type") == "application/json":
+        json_body = await request.json()
+
+    if request.url.path == "/docs" or request.url.path == "/redoc":
+        return await call_next(request)
+
+    start = time.perf_counter()
+
+    async for db in get_logs_db():
+        try:
+            response = await call_next(request)
+        except Exception as e:
+            request_log = RequestLog(
+                method=request.method,
+                headers=dict(request.headers),
+                body=req_body,
+                response=str(e),
+                url=request.url.path,
+                status_code=500,
+                response_time=time.perf_counter() - start
+            )
+            db.add(request_log)
+            await db.commit()
+            raise e
+
+        response_body = b""
+        async for chunk in response.body_iterator:
+            response_body += chunk
+
+        request_log = RequestLog(
+            method=request.method,
+            headers=dict(request.headers),
+            body=json_body,
+            response=json.loads(response_body),
+            url=request.url.path,
+            status_code=response.status_code,
+            response_time=time.perf_counter() - start
+        )
+        db.add(request_log)
+        await db.commit()
+
+        actions = set(Action)
+
+        for route in request.app.routes:
+
+            if route.path != request.url.path:
+                continue
+
+            tags = getattr(route, "tags", [])
+            action = next((tag for tag in tags if tag in actions), None)
+            if not action:
+                continue
+
+            token = None
+
+            if action in {Action.LOGIN, Action.REGISTER, Action.ADMIN_LOGIN}:
+                token = request_log.response.get("access_token")
+            else:
+                token = request.headers.get("Authorization", "").split(" ")[-1]
+
+            if not token:
+                continue
+
+            payload = decode_access_token(token)
+
+            if not payload:
+                continue
+
+            user_id = payload.get("id", "")
+            if not user_id:
+                continue
+
+            user_action_log = UserActionLog(
+                user_id=user_id,
+                action=action,
+                request_id=request_log.id,
+                timestamp=datetime.datetime.now()
+            )
+            db.add(user_action_log)
+            await db.commit()
+
+            log.info(f"User {user_id} did {action} action")
+
+        new_response = Response(
+            content=response_body,
+            status_code=response.status_code,
+            headers=dict(response.headers),
+            media_type=response.media_type
+        )
+
+        return new_response

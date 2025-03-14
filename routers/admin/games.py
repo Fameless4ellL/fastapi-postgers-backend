@@ -5,7 +5,7 @@ from apscheduler.jobstores.base import JobLookupError
 from typing import Annotated, Literal
 
 from sqlalchemy import select, func, orm, exists
-# from models.log import Action
+from models.log import Action
 from models.user import Role, User
 from models.other import Currency, Game, GameStatus, GameView, Ticket
 from routers import admin
@@ -47,7 +47,7 @@ get_crud_router(
 
 @admin.delete(
     "/games/{game_id}",
-    # tags=[Action.ADMIN_DELETE],
+    tags=[Action.ADMIN_DELETE],
     # dependencies=[Security(
     #     get_admin_token,
     #     scopes=[
@@ -318,6 +318,7 @@ async def get_winners(
 
 @admin.put(
     "/games/{game_id}/winners/{ticket_id}",
+    tags=[Action.ADMIN_UPDATE],
     dependencies=[Security(
         get_admin_token,
         scopes=[

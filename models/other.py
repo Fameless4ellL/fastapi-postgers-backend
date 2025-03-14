@@ -106,31 +106,27 @@ class Jackpot(Base):
 
     deleted = Column(Boolean, default=False, doc="Indicates if the instance is deleted")
 
-    jackpot_instances = relationship("JackpotInstance", back_populates="jackpot", uselist=False)
     currency = relationship("Currency", uselist=False)
     tickets = relationship("Ticket", back_populates="jackpot", uselist=True)
 
 
-class JackpotInstance(Base):
-    """deprecated"""
-    __tablename__ = "jackpot_instances"
+class InstaBingo(Base):
+    __tablename__ = "instabingos"
 
     id = Column(Integer, primary_key=True, index=True)
-    jackpot_id = Column(Integer, ForeignKey('jackpots.id'), nullable=True)
-    status = Column(SqlEnum(JackpotStatus), default=JackpotStatus.PENDING)
-    scheduled_datetime = Column(DateTime, default=datetime.datetime.now, doc="The date and time when the game instance will be held")
-    created_at = Column(DateTime, default=datetime.datetime.now)
-    updated_at = Column(DateTime, default=datetime.datetime.now, onupdate=datetime.datetime.now)
-
-    jackpot = relationship("Jackpot", back_populates="jackpot_instances", uselist=False)
+    country = Column(String(32), unique=True)
+    price = Column(DECIMAL(10, 2), nullable=False, default=1)
+    prize = Column(DECIMAL(9, 2), nullable=False, default=1000)
+    currency_id = Column(Integer, ForeignKey('currencies.id'), nullable=True)
 
 
 class Game(Base):
-    __tablename__ = "games"
 
     id = Column(Integer, primary_key=True, index=True)
-    name = Column(String(100), nullable=False)
+    __tablename__ = "games"
+
     game_type = Column(SqlEnum(GameType), nullable=False)
+    name = Column(String(100), nullable=False)
     kind = Column(SqlEnum(GameView), default=GameView.MONETARY, doc="The type of the game", nullable=True)
     currency_id = Column(Integer, ForeignKey('currencies.id'), nullable=True)
     limit_by_ticket = Column(Integer, default=9)
@@ -158,24 +154,8 @@ class Game(Base):
     created_at = Column(DateTime, default=datetime.datetime.now)
     updated_at = Column(DateTime, default=datetime.datetime.now, onupdate=datetime.datetime.now)
 
-    game_instances = relationship("GameInstance", back_populates="game", uselist=False)
     currency = relationship("Currency", uselist=False)
     tickets = relationship("Ticket", back_populates="game", uselist=True)
-
-
-class GameInstance(Base):
-    """deprecated"""
-    __tablename__ = "game_instances"
-
-    id = Column(Integer, primary_key=True, index=True)
-    game_id = Column(Integer, ForeignKey('games.id'), nullable=False)
-    status = Column(SqlEnum(GameStatus), default=GameStatus.PENDING)
-    scheduled_datetime = Column(DateTime, default=datetime.datetime.now, doc="The date and time when the game instance will be held")
-    image = Column(String(255), nullable=True, default="default_image.png", doc="The image of the game instance")
-    created_at = Column(DateTime, default=datetime.datetime.now)
-    updated_at = Column(DateTime, default=datetime.datetime.now, onupdate=datetime.datetime.now)
-
-    game = relationship("Game", back_populates="game_instances", uselist=False)
 
 
 class Ticket(Base):

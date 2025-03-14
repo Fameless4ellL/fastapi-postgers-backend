@@ -3,6 +3,7 @@ from fastapi.responses import JSONResponse
 from typing import Annotated
 
 from sqlalchemy import select, or_
+from models.log import Action
 from models.user import User
 from routers import admin
 from routers.utils import Token, get_admin_token, send_mail
@@ -25,6 +26,7 @@ from utils.signature import (
 
 @admin.post(
     "/login",
+    tags=[Action.ADMIN_LOGIN],
     responses={
         400: {"model": BadResponse},
         200: {"model": AccessToken},
@@ -135,6 +137,7 @@ async def reset_password(
 
 @admin.post(
     "/logout",
+    tags=[Action.ADMIN_LOGOUT],
     responses={
         400: {"model": BadResponse},
     },

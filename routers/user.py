@@ -12,6 +12,7 @@ from eth_account.signers.local import LocalAccount
 from sqlalchemy.orm import joinedload
 from tronpy.keys import to_base58check_address
 from models.db import get_db
+from models.log import Action
 from models.user import Balance, Notification, User, Wallet, BalanceChangeHistory
 from models.other import Currency, Ticket
 from routers import public
@@ -129,7 +130,7 @@ async def balance(
     )
 
 
-@public.post("/withdraw", tags=["user"])
+@public.post("/withdraw", tags=["user", Action.WITHDRAW])
 async def withdraw(
     user: Annotated[User, Depends(get_user)],
     db: Annotated[AsyncSession, Depends(get_db)],
@@ -197,7 +198,11 @@ async def withdraw(
     return JSONResponse(status_code=status.HTTP_200_OK, content="OK")
 
 
-@public.post("/upload", tags=["user"])
+@public.post(
+    "/upload",
+    tags=["user", Action.UPDATE],
+    responses={400: {"model": BadResponse}, 200: {"model": str}}
+)
 async def upload_kyc(
     user: Annotated[User, Depends(get_user)],
     db: Annotated[AsyncSession, Depends(get_db)],
@@ -215,6 +220,9 @@ async def upload_kyc(
 
     directory = "static/kyc"
     os.makedirs(directory, exist_ok=True)
+
+    filename, file_extension = os.path.splitext(file.filename)
+    filename = filename.replace(" ", "_")
 
     # Delete old file if it exists
     if user.document:
@@ -450,7 +458,7 @@ async def get_notifications(
 
 
 @public.post(
-    "/settings", tags=["user"],
+    "/settings", tags=["user", Action.UPDATE],
     responses={400: {"model": BadResponse}, 200: {"model": Notifications}}
 )
 async def set_settings(

@@ -41,3 +41,4 @@ from .admin import *  # noqa
 from .auth import *  # noqa
 from .user import *  # noqa
 from .cron import *  # noqa
+from .instabingo import *  # noqa

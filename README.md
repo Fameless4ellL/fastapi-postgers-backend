@@ -2,17 +2,17 @@
 ## alembic
 ### Init
 ```bash
-docker compose -f docker-compose.dev.yaml exec api alembic -c alembic_logs.ini init -t async alembic_logs
+docker compose -f docker-compose.dev.yaml exec api alembic -n {} -t async {name}
 ```
 ```bash
-docker compose -f docker-compose.dev.yaml exec api alembic -c alembic.ini init -t async alembic
+docker compose -f docker-compose.dev.yaml exec api alembic -n {} init -t async {name}
 ```
 ### makemigrations
 ```bash
-docker compose -f docker-compose.dev.yaml exec api alembic -c alembic_logs.ini revision --autogenerate -m "Initial migration for second_db"
+docker compose -f docker-compose.dev.yaml exec api alembic -n {} revision --autogenerate -m "Initial migration for second_db"
 ```
 
 ### migrate
 ```bash
-docker compose -f docker-compose.dev.yaml exec api  alembic -c alembic_logs.ini upgrade head
+docker compose -f docker-compose.dev.yaml exec api  alembic -n {} upgrade head
 ```

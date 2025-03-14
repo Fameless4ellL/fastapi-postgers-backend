@@ -4,6 +4,7 @@ from fastapi.security import OAuth2PasswordRequestForm
 from phonenumbers import parse
 from fastapi import Depends, Request, status
 from models.db import get_db
+from models.log import Action
 from models.user import User, ReferralLink, Wallet
 from typing import Annotated
 from eth_account.signers.local import LocalAccount
@@ -12,7 +13,13 @@ from routers import public
 from fastapi.responses import JSONResponse
 from sqlalchemy import select, or_
 from sqlalchemy.ext.asyncio import AsyncSession
-from schemes.auth import CheckCode, SendCode, UserCreate, UserLogin, AccessToken
+from schemes.auth import (
+    CheckCode,
+    SendCode,
+    UserCreate,
+    UserLogin,
+    AccessToken
+)
 from schemes.base import BadResponse
 from globals import aredis
 
@@ -21,7 +28,7 @@ from utils.signature import create_access_token, verify_password
 
 @public.post(
     "/register",
-    tags=["auth"],
+    tags=["auth", Action.REGISTER],
     responses={
         400: {"model": BadResponse},
         200: {"model": AccessToken},
@@ -131,7 +138,7 @@ async def register(
 
 @public.post(
     "/login",
-    tags=["auth"],
+    tags=["auth", Action.LOGIN],
     responses={
         400: {"model": BadResponse},
         200: {"model": AccessToken},
@@ -204,7 +211,7 @@ async def login(
     )
 
 
-@public.post("/token", include_in_schema=False)
+@public.post("/token", tags=[Action.LOGIN], include_in_schema=False)
 async def token(
     db: Annotated[AsyncSession, Depends(get_db)],
     form: Annotated[OAuth2PasswordRequestForm, Depends(OAuth2PasswordRequestForm)],

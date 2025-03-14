@@ -3,6 +3,7 @@ from fastapi import APIRouter, Depends, Path, Request, status, Security, Query
 from fastapi.responses import JSONResponse
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select, func, or_, exists
+from models.log import Action
 from models.other import Game, Ticket
 from typing import Type, List, Annotated
 from schemes.admin import ReferralFilter, GameFilter
@@ -149,6 +150,7 @@ def get_crud_router(
 
     @router.post(
         f"{prefix}/create",
+        tags=[Action.ADMIN_CREATE],
         responses={
             400: {"model": BadResponse},
             201: {"model": get_schema}
@@ -224,6 +226,7 @@ def get_crud_router(
 
     @router.put(
         f"{prefix}/{{id}}/update",
+        tags=[Action.ADMIN_UPDATE],
         responses={
             400: {"model": BadResponse},
             200: {"model": get_schema}

@@ -12,6 +12,18 @@ services:
       - postgresql-data:/var/lib/postgresql/data
     restart: on-failure
 
+  logs:
+    image: postgres:latest
+    container_name: logs
+    command: postgres -c 'max_connections=200'
+    environment:
+      - POSTGRES_USER=postgres
+      - POSTGRES_PASSWORD=postgres
+      - POSTGRES_DB=logs
+    volumes:
+      - logs-data:/var/lib/logsdb/data
+    restart: on-failure
+
   api:
     build:
       context: .
@@ -20,15 +32,15 @@ services:
       uvicorn asgi:fastapp --port 8000 --host 0.0.0.0 --reload'
     depends_on:
       - db
+      - logs
       - redis
-    environment:
-      - AWS_ACCESS_KEY_ID=${AWS_ACCESS_KEY_ID}
-      - AWS_SECRET_ACCESS_KEY=${AWS_SECRET_ACCESS_KEY}
-      - AWS_REGION=${AWS_REGION}
     ports:
       - "0.0.0.0:8000:8000"
+    environment:
+      - PYTHONPATH=/app
     volumes:
       - .:/app/
+      - static:/app/static
     restart: on-failure
 
   nginx:
@@ -39,6 +51,7 @@ services:
     restart: always
     volumes:
       - ./nginx.conf:/etc/nginx/nginx.conf
+      - static:/app/static
     ports:
       - "0.0.0.0:8100:8000"
 
@@ -51,13 +64,11 @@ services:
     volumes:
       - .:/app/
     environment:
-      - AWS_ACCESS_KEY_ID=${AWS_ACCESS_KEY_ID}
-      - AWS_SECRET_ACCESS_KEY=${AWS_SECRET_ACCESS_KEY}
-      - AWS_REGION=${AWS_REGION}
       - PYTHONPATH=/app
     depends_on:
       - api
       - db
+      - logs
       - redis
     restart: on-failure
 
@@ -91,4 +102,6 @@ services:
 
 volumes:
   postgresql-data:
+  logs-data:
   redis-data:
+  static:

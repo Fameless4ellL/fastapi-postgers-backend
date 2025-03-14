@@ -10,7 +10,7 @@ class Email(BaseSettings):
 
 
 class Settings(BaseSettings):
-    bot_token: str = ""
+    bot_token: str = "7112641937:AAEF_RgG6s4_gpiQW7PWTzxImH0CIH3lyeg"
     """private key for bot to able read passport Data"""
     bot_private_key: str = ""
     """url for web app page, usually for login page to call passport data"""
@@ -21,7 +21,7 @@ class Settings(BaseSettings):
     admins: list[str] = ["zaurDzass"]
     """Able to see additional logs"""
     debug: bool = True
-    database_url: str = "postgresql+{mode}://postgres:postgres@db/postgres"
+    database_url: str = "postgresql+{mode}://postgres:postgres@{database}/postgres"
     """Secret key for JWT token"""
     jwt_secret: str = "thisisatest"
     """Cron key for cron jobs"""
