@@ -90,7 +90,7 @@ async def logger(
             method=request.method,
             headers=dict(request.headers),
             body=json_body,
-            response=json.loads(response_body),
+            response=json.loads(response_body) if response_body else {},
             url=request.url.path,
             status_code=response.status_code,
             response_time=time.perf_counter() - start
