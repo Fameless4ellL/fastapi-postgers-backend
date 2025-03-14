@@ -245,7 +245,7 @@ class GameCreate(BaseAdmin):
     min_ticket_count: int = 1
     scheduled_datetime: Optional[FutureDatetime]
     repeat: Optional[bool] = False
-    repeat_days: Optional[list[int]]
+    repeat_days: Optional[list[int]] = []
 
     @model_serializer
     def ser_model(self):
