@@ -60,7 +60,7 @@ async def logger(
     if request.headers.get("Content-Type") == "application/json":
         json_body = await request.json()
 
-    if request.url.path == "/docs" or request.url.path == "/redoc":
+    if request.url.path == "/docs" or request.url.path == "/redoc" or request.url.path.startswith("/static"):
         return await call_next(request)
 
     start = time.perf_counter()
