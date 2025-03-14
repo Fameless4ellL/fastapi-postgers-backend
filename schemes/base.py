@@ -1,4 +1,6 @@
-from pydantic import BaseModel, Field, Json
+from typing import Annotated, Optional, Union
+import pycountry
+from pydantic import BaseModel, Field, Json, BeforeValidator, computed_field
 from fastapi.params import Form as FormType
 
 
@@ -6,10 +8,19 @@ class BadResponse(BaseModel):
     message: str = Field(default="Bad Request")
 
 
-class Country(BaseModel):
-    alpha_3: str
-    name: str
+class CountryBase(BaseModel):
+    model_config = {"from_attributes": True}
+
+    alpha_3: Optional[str] = Field(default=None)
+    name: Optional[str] = Field(default=None)
+    flag: Optional[str] = Field(default=None)
 
 
 class JsonForm(Json, FormType):
     ...
+
+
+Country = Annotated[
+    Union[CountryBase, None],
+    BeforeValidator(lambda x: pycountry.countries.get(alpha_3=str(x)))
+]

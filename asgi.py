@@ -55,7 +55,6 @@ async def logger(
     request: Request,
     call_next,
 ):
-    req_body = await request.body()
     json_body = {}
     if request.headers.get("Content-Type") == "application/json":
         json_body = await request.json()

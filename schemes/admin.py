@@ -19,6 +19,7 @@ from fastapi import Query, UploadFile
 from models.other import GameStatus, GameType, GameView
 from models.user import BalanceChangeHistory
 from routers.utils import get_currency_by_id, url_for
+from schemes.base import Country
 from utils.datastructure import MultiValueStrEnum
 
 
@@ -292,6 +293,8 @@ class GameSchema(BaseAdmin):
     id: int
     name: str
     kind: Optional[GameView] = GameView.MONETARY
+    description: Optional[str] = ""
+    country: Country
     currency_id: Optional[int] = None
     limit_by_ticket: int = 15
     max_limit_grid: int = 90
