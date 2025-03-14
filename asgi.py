@@ -72,7 +72,7 @@ async def logger(
             request_log = RequestLog(
                 method=request.method,
                 headers=dict(request.headers),
-                body=req_body,
+                body=json_body,
                 response=str(e),
                 url=request.url.path,
                 status_code=500,
@@ -138,7 +138,7 @@ async def logger(
             db.add(user_action_log)
             await db.commit()
 
-            log.info(f"User {user_id} did {action} action")
+            log.info(f"User {user_id} did {action}")
 
         new_response = Response(
             content=response_body,

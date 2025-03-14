@@ -126,30 +126,37 @@ async def get_purchased_tickets(
 
     stmt = select(
         Currency.code,
-        func.sum(Ticket.amount).label("amount")
+        func.sum(Ticket.amount).label("amount"),
+        func.count(Ticket.id).label("pcs"),
+        Game.prize,
     ).join(
-        Currency, Ticket.currency_id == Currency.id
+        Game, Ticket.game_id == Game.id
+    ).join(
+        Currency, Game.currency_id == Currency.id
     ).filter(
-        Ticket.game_id == game_id
+        Ticket.game_id == game_id,
     ).group_by(
-        Currency.code
+        Currency.code,
+        Game.prize
     )
     tickets = await db.execute(stmt)
-    tickets = tickets.scalars().all()
+    tickets = tickets.fetchall()
+    tickets = next(iter(tickets), None)
 
-    data = []
-    total = 0
-    for ticket in tickets:
-        data.append({
-            "currency": ticket.code,
-            "amount": float(ticket.amount)
-        })
-        total += float(ticket.amount)
-
-    data.append({
-        "currency": "total",
-        "amount": total
-    })
+    if not tickets:
+        data = {
+            'pcs': 0,
+            'currency': "USDT",
+            'amount': 0,
+            'prize': 0,
+        }
+    else:
+        data = {
+            'pcs': tickets.pcs,
+            'currency': tickets.code,
+            'amount': float(tickets.amount),
+            'prize': float(tickets.prize),
+        }
 
     return JSONResponse(
         status_code=status.HTTP_200_OK, content=data
