@@ -115,10 +115,13 @@ class InstaBingo(Base):
     __tablename__ = "instabingos"
 
     id = Column(Integer, primary_key=True, index=True)
-    country = Column(String(32), unique=True)
+    country = Column(String(32))
     price = Column(DECIMAL(10, 2), nullable=False, default=1)
     winnings = Column(JSON, nullable=True)
     currency_id = Column(Integer, ForeignKey('currencies.id'), nullable=True)
+
+    deleted = Column(Boolean, default=False, doc="Indicates if the instance is deleted")
+    created_at = Column(DateTime, default=datetime.datetime.now)
 
 
 class Number(Base):
@@ -126,7 +129,7 @@ class Number(Base):
 
     id = Column(Integer, primary_key=True, index=True)
     number = Column(Integer, nullable=False)
-    instabingo_id = Column(Integer, ForeignKey('instabingos.id'), nullable=True)
+    ticket_id = Column(Integer, ForeignKey('tickets.id'), nullable=True)
     start_date = Column(DateTime, default=datetime.datetime.now)
     end_date = Column(DateTime, default=datetime.datetime.now)
     created_at = Column(DateTime, default=datetime.datetime.now)

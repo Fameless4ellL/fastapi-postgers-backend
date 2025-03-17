@@ -167,8 +167,20 @@ def get_crud_router(
         new_item = model(**item.model_dump())
 
         if model.__name__ == "ReferralLink":
-            pass
-            # new_item.generated_by = token.id
+            new_item.generated_by = token.id
+
+        if model.__name__ == "InstaBingo":
+            stmt = select(model).where(
+                model.country == new_item.country,
+                model.deleted.is_(False)
+            )
+            game = await db.execute(stmt)
+            game = game.scalar()
+            if game:
+                return JSONResponse(
+                    status_code=status.HTTP_400_BAD_REQUEST,
+                    content=BadResponse(message=f"{model.__name__} already exists").model_dump()
+                )
 
         db.add(new_item)
         await db.commit()

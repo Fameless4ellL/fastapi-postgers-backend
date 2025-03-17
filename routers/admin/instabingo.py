@@ -1,17 +1,15 @@
-import os
 from fastapi import Depends, Path, status, Security
 from fastapi.responses import JSONResponse
-from apscheduler.jobstores.base import JobLookupError
-from typing import Annotated, Literal
+from typing import Annotated
 
-from sqlalchemy import select, func, orm, exists
+from sqlalchemy import select, func
 from models.user import Role, User
-from models.other import Currency, InstaBingo, GameStatus, GameView, Ticket
+from models.other import Currency, InstaBingo, Ticket, Currency, Number
 from routers import admin
 from routers.admin import get_crud_router
 from routers.utils import get_admin_token
 from sqlalchemy.ext.asyncio import AsyncSession
-from models.db import get_db, get_sync_db
+from models.db import get_db
 from schemes.admin import (
     InstaBingoFilter,
     InstaBingoSchema,
@@ -20,19 +18,18 @@ from schemes.admin import (
     InstaBingoUpdate,
     Empty
 )
-from globals import scheduler
-from schemes.base import BadResponse, JsonForm
+from schemes.base import BadResponse
 
 
 get_crud_router(
     model=InstaBingo,
-    prefix="/instabingo",
+    prefix="/bingo",
     schema=InstaBingos,
     get_schema=InstaBingoSchema,
     create_schema=InstaBingoCreate,
     update_schema=InstaBingoUpdate,
     files=Annotated[Empty, Depends(Empty)],
-    filters=Annotated[InstaBingoFilter, Depends(InstaBingoFilter)],
+    filters=Annotated[Empty, Depends(Empty)],
     security_scopes=[
         Role.SUPER_ADMIN.value,
         Role.ADMIN.value,
@@ -44,60 +41,228 @@ get_crud_router(
 )
 
 
-# @admin.delete(
-#     "/games/{game_id}",
-#     dependencies=[Security(
-#         get_admin_token,
-#         scopes=[
-#             Role.GLOBAL_ADMIN.value,
-#             Role.LOCAL_ADMIN.value,
-#             Role.ADMIN.value,
-#             Role.SUPER_ADMIN.value
-#         ])],
-#     responses={
-#         400: {"model": BadResponse},
-#     },
-# )
-async def delete_game(
+@admin.get(
+    "/instabingos",
+    dependencies=[Security(
+        get_admin_token,
+        scopes=[
+            Role.SUPER_ADMIN.value,
+            Role.ADMIN.value,
+            Role.GLOBAL_ADMIN.value,
+            Role.LOCAL_ADMIN.value,
+            Role.FINANCIER.value,
+            Role.SUPPORT.value
+        ])],
+    responses={
+        400: {"model": BadResponse},
+    },
+)
+async def get_instabingo_list(
     db: Annotated[AsyncSession, Depends(get_db)],
-    game_id: Annotated[int, Path()],
-    _type: Literal["delete", "cancel"],
+    item: Annotated[InstaBingoFilter, Depends(InstaBingoFilter)],
+    offset: int = 0,
+    limit: int = 10,
 ):
     """
-    Get all admins
+    Get all instabingo games
     """
-    stmt = select(Game).filter(Game.id == game_id)
+    stmt = select(
+        Ticket.id,
+        Ticket.user_id,
+        Ticket.won,
+        User.username,
+        User.country,
+        Ticket.created_at,
+        Ticket.amount,
+    ).join(
+        User, Ticket.user_id == User.id
+    ).join(
+        InstaBingo, Ticket.instabingo_id == InstaBingo.id
+    ).filter(
+        InstaBingo.id == Ticket.instabingo_id
+    )
+
+    if item.countries:
+        stmt = stmt.filter(User.country.in_(item.countries))
+
+    if item.date_from:
+        stmt = stmt.filter(Ticket.created_at >= item.date_from)
+
+    if item.date_to:
+        stmt = stmt.filter(Ticket.created_at <= item.date_to)
+
+    if item.filter:
+        stmt = stmt.filter(Ticket.id == item.filter)
+
+    game = await db.execute(stmt.offset(offset).limit(limit))
+    game = game.fetchall()
+
+    count_stmt = stmt.with_only_columns(func.count())
+    count_result = await db.execute(count_stmt)
+    count = count_result.scalar()
+
+    data = [{
+        "id": i.id,
+        "user_id": i.user_id,
+        "username": i.username,
+        "country": i.country,
+        "created_at": i.created_at.strftime("%Y-%m-%d %H:%M:%S"),
+        "won": i.won,
+        "amount": float(i.amount)
+    } for i in game]
+    return JSONResponse(
+        status_code=status.HTTP_200_OK,
+        content={"count": count, "data": data}
+    )
+
+
+@admin.get(
+    "/instabingo/{game_id}",
+    dependencies=[Security(
+        get_admin_token,
+        scopes=[
+            Role.SUPER_ADMIN.value,
+            Role.ADMIN.value,
+            Role.GLOBAL_ADMIN.value,
+            Role.LOCAL_ADMIN.value,
+            Role.FINANCIER.value,
+            Role.SUPPORT.value
+        ])],
+    responses={
+        400: {"model": BadResponse},
+    },
+)
+async def get_instabingo(
+    db: Annotated[AsyncSession, Depends(get_db)],
+    game_id: Annotated[int, Path()],
+):
+    """
+    Get instabingo game
+    """
+    stmt = select(
+        Ticket.id,
+        Ticket.instabingo_id,
+        Ticket.user_id,
+        Ticket.won,
+        User.username,
+        User.country,
+        Currency.code,
+        Ticket.created_at,
+        Ticket.amount,
+        Ticket.numbers,
+    ).join(
+        User, Ticket.user_id == User.id
+    ).join(
+        InstaBingo, Ticket.instabingo_id == InstaBingo.id
+    ).join(
+        Currency, InstaBingo.currency_id == Currency.id
+    ).filter(
+        Ticket.id == game_id
+    )
+
     game = await db.execute(stmt)
-    game = game.scalar()
+    game = game.fetchone()
+
     if not game:
         return JSONResponse(
             status_code=status.HTTP_400_BAD_REQUEST, content="Game not found"
         )
 
-    tickets = select(exists().where(Ticket.game_id == game_id))
-    tickets = await db.execute(tickets)
-    tickets = tickets.scalar()
-    if tickets:
+    data = {
+        "id": game.id,
+        "user_id": game.user_id,
+        "username": game.username,
+        "country": game.country,
+        "numbers": game.numbers,
+        "currency": game.code,
+        "created_at": game.created_at.strftime("%Y-%m-%d %H:%M:%S"),
+        "won": game.won,
+        "amount": float(game.amount)
+    }
+    return JSONResponse(
+        status_code=status.HTTP_200_OK,
+        content=data
+    )
+
+
+@admin.get(
+    "/instabingo/{game_id}/gnumbers",
+    dependencies=[Security(
+        get_admin_token,
+        scopes=[
+            Role.SUPER_ADMIN.value,
+            Role.ADMIN.value,
+            Role.GLOBAL_ADMIN.value,
+            Role.LOCAL_ADMIN.value,
+            Role.FINANCIER.value,
+            Role.SUPPORT.value
+        ])],
+    responses={
+        400: {"model": BadResponse},
+    },
+)
+async def get_generated_numbers(
+    db: Annotated[AsyncSession, Depends(get_db)],
+    game_id: Annotated[int, Path()],
+):
+    """
+    Get generated numbers
+    """
+    stmt = select(Number).filter(Number.ticket_id == game_id)
+    numbers = await db.execute(stmt)
+    numbers = numbers.scalars().all()
+
+    data = [{
+        "id": i.id,
+        "number": i.number,
+        "start_date": i.start_date.strftime("%Y-%m-%d %H:%M:%S"),
+        "end_date": i.end_date.strftime("%Y-%m-%d %H:%M:%S"),
+    } for i in numbers]
+
+    return JSONResponse(
+        status_code=status.HTTP_200_OK,
+        content=data
+    )
+
+
+@admin.delete(
+    "/bingo/{instabingo_id}",
+    dependencies=[Security(
+        get_admin_token,
+        scopes=[
+            Role.SUPER_ADMIN.value,
+            Role.ADMIN.value,
+            Role.GLOBAL_ADMIN.value,
+            Role.LOCAL_ADMIN.value,
+            Role.FINANCIER.value,
+            Role.SUPPORT.value
+        ])],
+    responses={
+        400: {"model": BadResponse},
+    },
+)
+async def set_instabingo_as_deleted(
+    db: Annotated[AsyncSession, Depends(get_db)],
+    instabingo_id: Annotated[int, Path()],
+):
+    """
+    set instabingo as deleted
+    """
+    stmt = select(InstaBingo).filter(InstaBingo.id == instabingo_id)
+    numbers = await db.execute(stmt)
+    numbers = numbers.scalars().all()
+
+    if not numbers:
         return JSONResponse(
             status_code=status.HTTP_400_BAD_REQUEST,
-            content="Game has tickets"
+            content="Instabingo not found"
         )
 
-    if _type == "delete":
-        game.status = GameStatus.DELETED
-
-    if _type == "cancel":
-        game.repeat = False
-        game.status = GameStatus.CANCELLED
-
-    try:
-        scheduler.remove_job(f"game_{game.id}")
-    except JobLookupError:
-        pass
-
-    db.add(game)
+    numbers.deleted = True
+    db.add(numbers)
     await db.commit()
 
     return JSONResponse(
-        status_code=status.HTTP_200_OK, content="Success"
+        status_code=status.HTTP_200_OK,
+        content="Instabingo deleted"
     )

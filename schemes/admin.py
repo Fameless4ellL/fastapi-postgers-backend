@@ -325,22 +325,22 @@ class Games(BaseModel):
     count: int = 0
 
 
-class GameFilter:
-    def __init__(
-        self,
-        game_type: Annotated[list[Annotated[GameType, Query()]], Query()] = None,
-        filter: Annotated[str, Query()] = None,
-        category: Annotated[list[Annotated[Category, Query()]], Query()] = None,
-        kind: Annotated[list[Annotated[GameView, Query()]], Query()] = None,
-        date_from: Annotated[date, Query()] = None,
-        date_to: Annotated[date, Query()] = None,
-    ):
-        self.game_type = game_type
-        self.filter = filter
-        self.kind = kind
-        self.category = category
-        self.date_from = date_from
-        self.date_to = date_to
+@dataclass
+class Search:
+    filter: Optional[int] = Query(None)
+
+
+@dataclass
+class DatePicker:
+    date_from: Optional[date] = Query(None)
+    date_to: Optional[date] = Query(None)
+
+
+@dataclass
+class GameFilter(DatePicker, Search):
+    game_type: Optional[list[GameType]] = Query(None)
+    category: Optional[list[Category]] = Query(None)
+    kind: Optional[list[GameView]] = Query(None)
 
 
 @dataclass
@@ -430,17 +430,56 @@ class ReferralFilter:
 
 
 class InstaBingoBase(BaseAdmin):
+    id: int
     country: Country
     price: float = 1.0
-    prize: float = 1000.0
     currency_id: Optional[int] = None
+    deleted: Optional[bool] = False
 
 
 class InstaBingoCreate(BaseAdmin):
     currency_id: Annotated[int, AfterValidator(get_currency_by_id)]
     price: float = 1.0
-    prize: Optional[float] = 1000.0
+    x15: int = 1
+    x16_20: int = 1
+    x21_25: int = 1
+    x26_30: int = 1
+    x31_35: int = 1
+    x36_40: int = 1
     country: Optional[CountryAlpha3] = None
+
+    @model_serializer
+    def ser_model(self):
+        winnings = {}
+        for i in range(15, 41):
+            start = "15"
+            key = ''
+            if i == 16:
+                start = "16"
+                key = '_20'
+            elif i == 21:
+                start = "21"
+                key = '_25'
+            elif i == 26:
+                start = "26"
+                key = '_30'
+            elif i == 31:
+                start = "31"
+                key = '_35'
+            elif i == 36:
+                start = "36"
+                key = '_40'
+
+            winnings[i] = getattr(self, f"x{start}{key}")
+        
+        print(winnings)
+
+        return {
+            "currency_id": self.currency_id,
+            "price": self.price,
+            "country": self.country,
+            "winnings": winnings
+        }
 
 
 class InstaBingoUpdate(InstaBingoCreate):
@@ -449,6 +488,34 @@ class InstaBingoUpdate(InstaBingoCreate):
 
 class InstaBingoSchema(InstaBingoBase):
     id: int
+    winnings: Optional[dict[int, int]] = Field(default_factory=dict, exclude=True)
+    
+    def get_winnings(self):
+        return self.winnings if self.winnings else {}
+   
+    @computed_field
+    def x15(self) -> int:
+        return self.get_winnings().get(15, 1)
+
+    @computed_field
+    def x16_20(self) -> int:
+        return self.get_winnings().get(16, 1)
+
+    @computed_field
+    def x21_25(self) -> int:
+        return self.get_winnings().get(21, 1)
+
+    @computed_field
+    def x26_30(self) -> int:
+        return self.get_winnings().get(26, 1)
+
+    @computed_field
+    def x31_35(self) -> int:
+        return self.get_winnings().get(31, 1)
+
+    @computed_field
+    def x36_40(self) -> int:
+        return self.get_winnings().get(36, 1)
 
 
 class InstaBingos(BaseModel):
@@ -456,11 +523,6 @@ class InstaBingos(BaseModel):
     count: int = 0
 
 
-class InstaBingoFilter:
-    def __init__(
-        self,
-        query: Optional[str] = "",
-        status: Optional[bool] = None,
-    ):
-        self.query = query
-        self.status = status
+@dataclass
+class InstaBingoFilter(DatePicker, Search):
+    countries: Optional[list[CountryAlpha3]] = Query(None)

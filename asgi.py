@@ -57,7 +57,10 @@ async def logger(
 ):
     json_body = {}
     if request.headers.get("Content-Type") == "application/json":
-        json_body = await request.json()
+        try:
+            json_body = await request.json()
+        except json.JSONDecodeError:
+            pass
 
     if request.url.path == "/docs" or request.url.path == "/redoc" or request.url.path.startswith("/static"):
         return await call_next(request)

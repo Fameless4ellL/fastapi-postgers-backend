@@ -136,7 +136,7 @@ def proceed_game(game_id: Optional[int] = None):
             ]
             if sub_winners:
                 winners.append(sub_winners)
-                
+
         game.numbers = winners
 
         for _tickets in winners:

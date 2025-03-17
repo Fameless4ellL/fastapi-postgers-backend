@@ -73,6 +73,12 @@ async def buy_tickets(
     """
     Для покупки билетов frame:20
     """
+    if len(set(item.numbers)) != 15:
+        return JSONResponse(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            content=BadResponse(message="Invalid numbers, should be 15").model_dump()
+        )
+
     game = await db.execute(
         select(
             Currency.code.label("currency"),
@@ -83,6 +89,9 @@ async def buy_tickets(
         )
         .join(
             Currency, InstaBingo.currency_id == Currency.id
+        ).filter(
+            InstaBingo.country == user.country,
+            InstaBingo.deleted.is_(False)
         )
     )
     game = game.fetchone()
@@ -110,6 +119,9 @@ async def buy_tickets(
             )
             .join(
                 Currency, InstaBingo.currency_id == Currency.id
+            ).filter(
+                InstaBingo.country == user.country,
+                InstaBingo.deleted.is_(False)
             )
         )
         game = game.fetchone()
@@ -118,17 +130,6 @@ async def buy_tickets(
         return JSONResponse(
             status_code=status.HTTP_400_BAD_REQUEST,
             content=BadResponse(message="Game not found").model_dump()
-        )
-
-    if any(len(n) != 15 for n in item.numbers):
-        return JSONResponse(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            content=BadResponse(
-                message=(
-                    f"Invalid ticket numbers, "
-                    f"need {15} for ticket"
-                )
-            ).model_dump()
         )
 
     jackpot_id = None
@@ -172,38 +173,35 @@ async def buy_tickets(
     #     )
 
     win_numbers = []
-    for _ in range(15):
+    while len(win_numbers) < 15:
         start_date = datetime.datetime.now()
-        number = random.randint(0, 99)
-        ticket = Number(
-            number=number,
-            instabingo_id=game.id,
-            start_date=start_date,
-        )
-        db.add(ticket)
-        win_numbers.append(number)
-    await db.commit()
+        number = random.randint(0, 90)
+        end_date = datetime.datetime.now()
+
+        if number in win_numbers:
+            continue
+
+        win_numbers.append((number, start_date, end_date))
 
     won = False
-    for numbers in item.numbers:
-        if not game.winnings:
-            prize = game.price * 2
+    if not game.winnings:
+        prize = game.price * 2
 
-        if all(num in win_numbers for num in numbers):
-            last_number = numbers[-1]
-            prize = next(
-                (game.winnings[p] for p in game.winnings.keys() if p >= last_number),
-                None
+    if all(any(num == win_num[0] for win_num in win_numbers) for num in item.numbers):
+        last_number = numbers[-1]
+        prize = next(
+            (game.winnings[p] for p in game.winnings.keys() if p >= last_number),
+            None
+        )
+        won = True
+
+        if not prize:
+            return JSONResponse(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                content=BadResponse(
+                    message="Prize not found"
+                ).model_dump()
             )
-            won = True
-
-            if not prize:
-                return JSONResponse(
-                    status_code=status.HTTP_400_BAD_REQUEST,
-                    content=BadResponse(
-                        message="Prize not found"
-                    ).model_dump()
-                )
 
     if not won:
         user_balance.balance -= total_price
@@ -249,17 +247,25 @@ async def buy_tickets(
         )
 
     # create ticket
-    tickets = [
-        Ticket(
-            user_id=user.id,
-            instabingo_id=game.id,
-            numbers=numbers,
-            won=won,
-            jackpot_id=jackpot_id,
-        ) for numbers in item.numbers
-    ]
+    ticket = Ticket(
+        user_id=user.id,
+        instabingo_id=game.id,
+        numbers=item.numbers,
+        won=won,
+        jackpot_id=jackpot_id,
+    )
+    db.add(ticket)
+    await db.commit()
+    await db.refresh(ticket)
 
-    db.add_all(tickets)
+    for number, start_date, end_date in win_numbers:
+        number = Number(
+            number=number,
+            ticket_id=ticket.id,
+            start_date=start_date,
+            end_date=end_date
+        )
+        db.add(number)
     await db.commit()
 
     return JSONResponse(
