@@ -21,8 +21,9 @@ class MyGamesType(str, Enum):
 
     model: str
 
-    JACKPOT = "Jackpot", "Jackpot"
+    JACKPOT = "jackpot", "Jackpot"
     GAME = "game", "Game"
+    INSTA_BINGO = "insta_bingo", "InstaBingo"
 
 
 class Game(BaseModel):

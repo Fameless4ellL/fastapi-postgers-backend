@@ -309,6 +309,9 @@ class GameSchema(BaseAdmin):
     repeat: Optional[bool] = False
     repeat_days: Optional[list[int]]
     deleted: Optional[bool] = False
+    numbers: Optional[list[int]] = []
+    event_start: Optional[datetime] = None
+    event_end: Optional[datetime] = None
     updated_at: datetime
     created_at: datetime
 
@@ -417,6 +420,43 @@ class Referrals(BaseModel):
 
 
 class ReferralFilter:
+    def __init__(
+        self,
+        query: Optional[str] = "",
+        status: Optional[bool] = None,
+    ):
+        self.query = query
+        self.status = status
+
+
+class InstaBingoBase(BaseAdmin):
+    country: Country
+    price: float = 1.0
+    prize: float = 1000.0
+    currency_id: Optional[int] = None
+
+
+class InstaBingoCreate(BaseAdmin):
+    currency_id: Annotated[int, AfterValidator(get_currency_by_id)]
+    price: float = 1.0
+    prize: Optional[float] = 1000.0
+    country: Optional[CountryAlpha3] = None
+
+
+class InstaBingoUpdate(InstaBingoCreate):
+    pass
+
+
+class InstaBingoSchema(InstaBingoBase):
+    id: int
+
+
+class InstaBingos(BaseModel):
+    items: list[InstaBingoBase] = []
+    count: int = 0
+
+
+class InstaBingoFilter:
     def __init__(
         self,
         query: Optional[str] = "",

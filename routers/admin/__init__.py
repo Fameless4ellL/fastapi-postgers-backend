@@ -293,4 +293,4 @@ from .auth import *
 from .users import *
 from .games import *
 from .referral import *
-# from .instabingo import *
+from .instabingo import *

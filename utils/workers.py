@@ -104,6 +104,8 @@ def proceed_game(game_id: Optional[int] = None):
         ).with_for_update().all()
 
     for game in pending_games:
+        start_date = datetime.now()
+        game.event_start = start_date
 
         if not game:
             continue
@@ -134,6 +136,8 @@ def proceed_game(game_id: Optional[int] = None):
             ]
             if sub_winners:
                 winners.append(sub_winners)
+                
+        game.numbers = winners
 
         for _tickets in winners:
             # Если комбинация совпала на нескольких билетах,
@@ -194,6 +198,9 @@ def proceed_game(game_id: Optional[int] = None):
                     )
 
                 db.add(ticket)
+
+        end_date = datetime.now()
+        game.event_end = end_date
 
         game.status = GameStatus.COMPLETED
         db.add(game)

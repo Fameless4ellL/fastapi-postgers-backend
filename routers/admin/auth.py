@@ -143,7 +143,7 @@ async def reset_password(
     },
 )
 async def logout(
-    token: Annotated[Token, [Security(get_admin_token)],],
+    token: Annotated[Token, Security(get_admin_token)],
 ):
     """
     Admin logout

@@ -1,3 +1,6 @@
+import datetime
+import json
+import random
 from typing import Annotated
 from fastapi import Depends, status
 from fastapi.responses import JSONResponse
@@ -9,6 +12,7 @@ from models.other import (
     Currency,
     InstaBingo,
     Ticket,
+    Number
 )
 from routers import public
 from routers.utils import get_user
@@ -17,7 +21,7 @@ from schemes.base import BadResponse
 from schemes.game import BuyInstaTicket
 from schemes.instabingo import InstaBingoInfo
 from settings import settings
-from utils.web3 import transfer
+from utils.workers import deposit, withdraw
 
 
 @public.get(
@@ -72,15 +76,45 @@ async def buy_tickets(
     game = await db.execute(
         select(
             Currency.code.label("currency"),
-            InstaBingo
+            InstaBingo.id,
+            InstaBingo.currency_id,
+            InstaBingo.winnings,
+            InstaBingo.price
         )
         .join(
             Currency, InstaBingo.currency_id == Currency.id
         )
     )
-    game = game.scalar()
+    game = game.fetchone()
 
     if game is None:
+        currency = await db.execute(
+            select(Currency)
+        )
+        currency = currency.scalar()
+
+        game = InstaBingo(
+            currency_id=currency.id,
+            country=user.country
+        )
+        db.add(game)
+        await db.commit()
+
+        game = await db.execute(
+            select(
+                Currency.code.label("currency"),
+                InstaBingo.id,
+                InstaBingo.currency_id,
+                InstaBingo.winnings,
+                InstaBingo.price
+            )
+            .join(
+                Currency, InstaBingo.currency_id == Currency.id
+            )
+        )
+        game = game.fetchone()
+
+    if not game:
         return JSONResponse(
             status_code=status.HTTP_400_BAD_REQUEST,
             content=BadResponse(message="Game not found").model_dump()
@@ -131,40 +165,88 @@ async def buy_tickets(
     total_price = game.price * len(item.numbers)
 
     # check if the user has enough balance
-    if user_balance.balance < total_price:
-        return JSONResponse(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            content=BadResponse(message="Insufficient balance").model_dump()
+    # if user_balance.balance < total_price:
+    #     return JSONResponse(
+    #         status_code=status.HTTP_400_BAD_REQUEST,
+    #         content=BadResponse(message="Insufficient balance").model_dump()
+    #     )
+
+    win_numbers = []
+    for _ in range(15):
+        start_date = datetime.datetime.now()
+        number = random.randint(0, 99)
+        ticket = Number(
+            number=number,
+            instabingo_id=game.id,
+            start_date=start_date,
         )
-
-    tx, err = transfer(
-        game.currency,
-        wallet.private_key,
-        total_price,
-        settings.address,
-    )
-
-    if not tx:
-        return JSONResponse(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            content=BadResponse(message=err).model_dump()
-        )
-
-    # deduct the balance and log in balance change history
-    user_balance.balance -= total_price
-    balance_change = BalanceChangeHistory(
-        user_id=user.id,
-        currency_id=game.currency_id,
-        balance_id=user_balance.id,
-        change_amount=-total_price,
-        change_type="ticket purchase",
-        previous_balance=user_balance.balance + total_price,
-        status=BalanceChangeHistory.Status.SUCCESS,
-        new_balance=user_balance.balance,
-        proof=tx
-    )
-    db.add(balance_change)
+        db.add(ticket)
+        win_numbers.append(number)
     await db.commit()
+
+    won = False
+    for numbers in item.numbers:
+        if not game.winnings:
+            prize = game.price * 2
+
+        if all(num in win_numbers for num in numbers):
+            last_number = numbers[-1]
+            prize = next(
+                (game.winnings[p] for p in game.winnings.keys() if p >= last_number),
+                None
+            )
+            won = True
+
+            if not prize:
+                return JSONResponse(
+                    status_code=status.HTTP_400_BAD_REQUEST,
+                    content=BadResponse(
+                        message="Prize not found"
+                    ).model_dump()
+                )
+
+    if not won:
+        user_balance.balance -= total_price
+        balance_change = BalanceChangeHistory(
+            user_id=user.id,
+            currency_id=game.currency_id,
+            balance_id=user_balance.id,
+            change_amount=-total_price,
+            change_type="ticket purchase",
+            previous_balance=user_balance.balance + total_price,
+            status=BalanceChangeHistory.Status.PENDING,
+            args=json.dumps({"address": settings.address}),
+            new_balance=user_balance.balance,
+        )
+        db.add(balance_change)
+        await db.commit()
+        await db.refresh(balance_change)
+
+        withdraw(
+            history_id=balance_change.id,
+            change_type=balance_change.change_type
+        )
+
+    else:
+        user_balance.balance += total_price
+        balance_change = BalanceChangeHistory(
+            user_id=user.id,
+            currency_id=game.currency_id,
+            balance_id=user_balance.id,
+            change_amount=-total_price,
+            change_type="won",
+            previous_balance=user_balance.balance + total_price,
+            status=BalanceChangeHistory.Status.PENDING,
+            new_balance=user_balance.balance,
+        )
+        db.add(balance_change)
+        await db.commit()
+        await db.refresh(balance_change)
+
+        deposit(
+            history_id=balance_change.id,
+            change_type=balance_change.change_type
+        )
 
     # create ticket
     tickets = [
@@ -172,6 +254,7 @@ async def buy_tickets(
             user_id=user.id,
             instabingo_id=game.id,
             numbers=numbers,
+            won=won,
             jackpot_id=jackpot_id,
         ) for numbers in item.numbers
     ]
@@ -181,5 +264,5 @@ async def buy_tickets(
 
     return JSONResponse(
         status_code=status.HTTP_201_CREATED,
-        content="OK"
+        content={"won": won}
     )

@@ -2,6 +2,7 @@ import datetime
 from enum import Enum
 from .db import Base
 from sqlalchemy import (
+    JSON,
     Column,
     DateTime,
     ForeignKey,
@@ -116,8 +117,19 @@ class InstaBingo(Base):
     id = Column(Integer, primary_key=True, index=True)
     country = Column(String(32), unique=True)
     price = Column(DECIMAL(10, 2), nullable=False, default=1)
-    prize = Column(DECIMAL(9, 2), nullable=False, default=1000)
+    winnings = Column(JSON, nullable=True)
     currency_id = Column(Integer, ForeignKey('currencies.id'), nullable=True)
+
+
+class Number(Base):
+    __tablename__ = "numbers"
+
+    id = Column(Integer, primary_key=True, index=True)
+    number = Column(Integer, nullable=False)
+    instabingo_id = Column(Integer, ForeignKey('instabingos.id'), nullable=True)
+    start_date = Column(DateTime, default=datetime.datetime.now)
+    end_date = Column(DateTime, default=datetime.datetime.now)
+    created_at = Column(DateTime, default=datetime.datetime.now)
 
 
 class Game(Base):
@@ -138,6 +150,8 @@ class Game(Base):
     country = Column(String(32), nullable=True)
     min_ticket_count = Column(Integer, default=1, doc="Minimum number of tickets per user")
 
+    numbers = Column(ARRAY(Integer), nullable=True)
+
     image = Column(String(255), nullable=True, default="default_image.png", doc="The image of the game instance")
     status = Column(SqlEnum(GameStatus), default=GameStatus.PENDING)
 
@@ -151,6 +165,8 @@ class Game(Base):
         doc="The days of the week when the game instance is repeated, required if repeat is True"
     )
 
+    event_start = Column(DateTime, default=datetime.datetime.now, doc="The date and time when the game instance will be started")
+    event_end = Column(DateTime, default=datetime.datetime.now, doc="The date and time when the game instance will be ended")
     created_at = Column(DateTime, default=datetime.datetime.now)
     updated_at = Column(DateTime, default=datetime.datetime.now, onupdate=datetime.datetime.now)
 
