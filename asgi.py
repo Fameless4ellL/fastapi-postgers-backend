@@ -86,17 +86,17 @@ async def logger(
             response_body += chunk
 
         try:
-            response_body = json.loads(response_body)
+            body = json.loads(response_body)
         except json.JSONDecodeError:
-            response_body = response_body.decode()
+            body = response_body.decode()
         except Exception as e:
-            response_body = {"error": str(e)}
+            body = {"error": str(e)}
 
         request_log = RequestLog(
             method=request.method,
             headers=dict(request.headers),
             body=json_body,
-            response=response_body,
+            response=body,
             url=request.url.path,
             status_code=response.status_code,
             response_time=time.perf_counter() - start
