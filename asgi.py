@@ -88,7 +88,7 @@ async def logger(
         try:
             body = json.loads(response_body)
         except json.JSONDecodeError:
-            body = response_body.decode()
+            body = response_body.decode("utf-8")
         except Exception as e:
             body = {"error": str(e)}
 
@@ -104,9 +104,16 @@ async def logger(
         db.add(request_log)
         await db.commit()
 
+        # TODO rm
+        log.info(f"{request.method} {request.url.path} {response.status_code} {time.perf_counter() - start:.2f}s")
+        log.info(f"Request: {json_body}")
+        log.info(f"Response: {body}")
+
         actions = set(Action)
 
         for route in request.app.routes:
+            if isinstance(request_log.response, str):
+                continue
 
             if route.path != request.url.path:
                 continue
