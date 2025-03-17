@@ -387,9 +387,17 @@ async def get_my_games(
         # Calculate the sum of Ticket.amount for the chosen game
         sum_stmt = select(func.sum(Ticket.amount)).filter(
             Ticket.user_id == user.id,
-            Ticket.game_id == i.id,
             Ticket.won.is_(True)
         )
+        if item.model == "Game":
+            sum_stmt = sum_stmt.filter(Ticket.game_id == i.id)
+
+        elif item.model == "Jackpot":
+            sum_stmt = sum_stmt.filter(Ticket.jackpot_id == i.id)
+
+        elif item.model == "InstaBingo":
+            sum_stmt = sum_stmt.filter(Ticket.instabingo_id == i.id)
+
         sum_result = await db.execute(sum_stmt)
         total_amount = sum_result.scalar() or 0
 
