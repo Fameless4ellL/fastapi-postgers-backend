@@ -1,4 +1,5 @@
 from decimal import Decimal
+from functools import wraps
 import json
 import requests
 import marshal
@@ -6,7 +7,7 @@ import random
 from typing import Optional
 from datetime import datetime, timedelta
 
-from models.db import get_sync_db
+from models.db import get_sync_db, get_sync_logs_db
 from models.user import Notification, Wallet
 from models.other import Currency, Game, GameStatus, GameView, Ticket, Jackpot
 from utils.web3 import transfer
@@ -16,6 +17,7 @@ from sqlalchemy import func
 from models.user import Balance, BalanceChangeHistory
 from globals import redis
 from settings import settings
+from models.log import TransactionLog
 
 
 @worker.register
@@ -142,7 +144,7 @@ def proceed_game(game_id: Optional[int] = None):
                     Ticket.id == ticket.id
                 ).first()
                 ticket.won = True
-                
+
                 if game.kind == GameView.MONETARY:
                     ticket.amount = prize_per_ticket
 
@@ -416,6 +418,69 @@ def proceed_jackpot(jackpot_id: Optional[int] = None):
     return True
 
 
+class TransactionLogError(Exception):
+    pass
+
+
+def track(action):
+    def decorator(func):
+        @wraps(func)
+        def wrapper(*args, **kwargs):
+            db = next(get_sync_logs_db())
+            transaction_log = TransactionLog(
+                action=action,
+                status=TransactionLog.Status.PENDING,
+            )
+            db.add(transaction_log)
+            db.commit()
+            db.refresh(transaction_log)
+
+            log_args = transaction_log.arguments or {}
+            log_args.setdefault('errors', [])
+            log_args.setdefault('results', "")
+
+            main_db = next(get_sync_db())
+
+            balance_change_history = main_db.query(BalanceChangeHistory).filter(
+                BalanceChangeHistory.id == kwargs.get("history_id"),
+            ).first()
+
+            if not balance_change_history:
+                transaction_log.status = TransactionLog.Status.FAILED
+                log_args['errors'].append("Balance change history not found")
+                transaction_log.arguments = log_args
+                db.add(transaction_log)
+                db.commit()
+                return False
+
+            transaction_log.user_id = balance_change_history.user_id
+            transaction_log.transaction_id = balance_change_history.proof
+
+            result = None
+            try:
+                result = func(*args, **kwargs)
+                transaction_log.status = TransactionLog.Status.SUCCESS
+                log_args['results'] = result
+                transaction_log.arguments = log_args
+            except TransactionLogError as e:
+                transaction_log.status = TransactionLog.Status.FAILED
+                log_args['errors'].append(str(e))
+                transaction_log.arguments = log_args
+            except Exception as e:
+                transaction_log.status = TransactionLog.Status.FAILED
+                log_args['errors'].append(str(e))
+                transaction_log.arguments = log_args
+            finally:
+                transaction_log.timestamp = datetime.now()
+                db.add(transaction_log)
+                db.commit()
+
+            return result
+        return wrapper
+    return decorator
+
+
+@track(TransactionLog.TransactionAction.DEPOSIT)
 @worker.register
 def deposit(
     history_id: int,
@@ -441,9 +506,8 @@ def deposit(
         balance_change_history.args = json.dumps(args)
         balance_change_history.status = BalanceChangeHistory.Status.WEB3_ERROR
         db.add(balance_change_history)
-
         db.commit()
-        return
+        raise TransactionLogError("Max retries exceeded")
 
     wallet = db.query(Wallet).filter(
         Wallet.user_id == balance_change_history.user_id
@@ -455,7 +519,7 @@ def deposit(
         balance_change_history.status = BalanceChangeHistory.Status.CANCELED
         db.add(balance_change_history)
         db.commit()
-        return False
+        raise TransactionLogError("Missing wallet")
 
     currency = db.query(Currency).options(
         joinedload(Currency.network)
@@ -469,7 +533,7 @@ def deposit(
         balance_change_history.status = BalanceChangeHistory.Status.CANCELED
         db.add(balance_change_history)
         db.commit()
-        return False
+        raise TransactionLogError("Missing currency or network")
 
     tx = balance_change_history.proof or ""
 
@@ -492,24 +556,23 @@ def deposit(
             ["deposit", history_id, counter + 1],
             datetime.now() + timedelta(minutes=1)
         )
-        return False
+        raise TransactionLogError(str(err))
 
     balance = db.query(Balance).filter(
-        Balance.user_id == balance_change_history.user_id
+        Balance.user_id == balance_change_history.user_id,
+        Balance.currency_id == balance_change_history.currency_id
     ).with_for_update().first()
 
     if not balance:
         balance = Balance(
             user_id=balance_change_history.user_id,
-            currency_id=balance_change_history.currency_id
+            currency_id=balance_change_history.currency_id,
+            balance=Decimal(balance_change_history.change_amount)
         )
-
-        status = BalanceChangeHistory.Status.CANCELED
-
     else:
         balance.balance += Decimal(balance_change_history.change_amount)
 
-        status = BalanceChangeHistory.Status.SUCCESS
+    status = BalanceChangeHistory.Status.SUCCESS
 
     balance_change_history.status = status
     balance_change_history.proof = tx
@@ -518,7 +581,10 @@ def deposit(
     db.add(balance_change_history)
     db.commit()
 
+    return tx
 
+
+@track(TransactionLog.TransactionAction.WITHDRAW)
 @worker.register
 def withdraw(
     history_id: int,
@@ -614,7 +680,8 @@ def withdraw(
         return False
 
     balance = db.query(Balance).filter(
-        Balance.user_id == balance_change_history.user_id
+        Balance.user_id == balance_change_history.user_id,
+        Balance.currency_id == balance_change_history.currency_id
     ).with_for_update().first()
 
     if not balance:
@@ -636,6 +703,8 @@ def withdraw(
     db.add(balance)
     db.add(balance_change_history)
     db.commit()
+
+    return tx
 
 
 # def buy_tickets():

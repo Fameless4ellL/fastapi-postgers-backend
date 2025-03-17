@@ -45,11 +45,22 @@ class RequestLog(LogsBase):
 class TransactionLog(LogsBase):
     __tablename__ = 'transaction_logs'
 
+    class Status(Enum):
+        PENDING = 'pending'
+        SUCCESS = 'success'
+        FAILED = 'failed'
+
+    class TransactionAction(Enum):
+        DEPOSIT = 'deposit'
+        WITHDRAW = 'withdraw'
+        TRANSFER = 'transfer'
+
     id = Column(Integer, primary_key=True, index=True)
     transaction_id = Column(String, index=True)
     user_id = Column(Integer, index=True)
-    amount = Column(DECIMAL(10, 2))
-    status = Column(String, index=True)
+    action = Column(EnumColumn(TransactionAction), index=True)
+    status = Column(EnumColumn(Status), index=True)
+    arguments = Column(JSON)
     timestamp = Column(DateTime, default=datetime.datetime.now)
 
 
