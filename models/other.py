@@ -164,6 +164,7 @@ class Ticket(Base):
     id = Column(Integer, primary_key=True, index=True)
     user_id = Column(Integer, ForeignKey('users.id'), nullable=False)
     game_id = Column(Integer, ForeignKey('games.id'), nullable=True)
+    instabingo_id = Column(Integer, ForeignKey('instabingos.id'), nullable=True)
     jackpot_id = Column(Integer, ForeignKey('jackpots.id'), nullable=True)
     currency_id = Column(Integer, ForeignKey('currencies.id'), nullable=True)
     numbers = Column(ARRAY(Integer), nullable=False)

@@ -1,6 +1,6 @@
-from decimal import Decimal
 from typing import Annotated, Optional
 from pydantic import BaseModel, Field, AfterValidator
+from annotated_types import Len
 from enum import Enum
 
 
@@ -57,6 +57,10 @@ class Games(BaseModel):
 class BuyTicket(BaseModel):
     numbers: list[set[int]]
     demo: bool = False
+
+
+class BuyInstaTicket(BaseModel):
+    numbers: Annotated[list[set[int]], Len(1, 1)]
 
 
 class EditTicket(BaseModel):
