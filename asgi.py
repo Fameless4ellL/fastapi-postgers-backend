@@ -39,14 +39,14 @@ fastapp.include_router(admin)
 fastapp.include_router(_cron)
 fastapp.mount("/static", app=StaticFiles(directory="static"), name="static")
 
-origins = ["*"]
+origins = ['*']
 
 fastapp.add_middleware(
     CORSMiddleware,
     allow_origins=origins,
     allow_credentials=True,
-    allow_methods=["*"],
-    allow_headers=["*"],
+    allow_methods=['*'],
+    allow_headers=['*'],
 )
 
 
