@@ -45,7 +45,7 @@ def get_crud_router(
             200: {"model": schema}
         },
         name=f"get_{model.__name__}_list",
-        # dependencies=[Security(get_admin_token, scopes=security_scopes)]
+        dependencies=[Security(get_admin_token, scopes=security_scopes)]
     )
     async def get_items(
         db: Annotated[AsyncSession, Depends(get_db)],
@@ -122,7 +122,7 @@ def get_crud_router(
             200: {"model": get_schema}
         },
         name=f"get_{model.__name__}",
-        # dependencies=[Security(get_admin_token, scopes=security_scopes)]
+        dependencies=[Security(get_admin_token, scopes=security_scopes)]
     )
     async def get_item(
         db: Annotated[AsyncSession, Depends(get_db)],
@@ -160,7 +160,7 @@ def get_crud_router(
     async def create_item(
         requests: Request,
         db: Annotated[AsyncSession, Depends(get_db)],
-        # token: Annotated[Token, Security(get_admin_token, scopes=security_scopes)],
+        token: Annotated[Token, Security(get_admin_token, scopes=security_scopes)],
         item: create_schema,
         file: files,
     ):
@@ -232,7 +232,7 @@ def get_crud_router(
             200: {"model": get_schema}
         },
         name=f"update_{model.__name__}",
-        # dependencies=[Security(get_admin_token, scopes=security_scopes)]
+        dependencies=[Security(get_admin_token, scopes=security_scopes)]
     )
     async def update_item(
         db: Annotated[AsyncSession, Depends(get_db)],

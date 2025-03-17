@@ -298,6 +298,10 @@ class GameSchema(BaseAdmin):
     currency_id: Optional[int] = None
     limit_by_ticket: int = 15
     max_limit_grid: int = 90
+    max_win_amount: Optional[float] = 8.0
+    min_ticket_count: int = 1
+    price: float = 1.0
+    prize: Optional[float] = 1000.0
     image: Optional[Image] = "default_image.png"
     has_tickets: bool = False
     game_type: GameType

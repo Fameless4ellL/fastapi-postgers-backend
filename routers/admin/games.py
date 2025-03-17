@@ -48,14 +48,14 @@ get_crud_router(
 @admin.delete(
     "/games/{game_id}",
     tags=[Action.ADMIN_DELETE],
-    # dependencies=[Security(
-    #     get_admin_token,
-    #     scopes=[
-    #         Role.GLOBAL_ADMIN.value,
-    #         Role.LOCAL_ADMIN.value,
-    #         Role.ADMIN.value,
-    #         Role.SUPER_ADMIN.value
-    #     ])],
+    dependencies=[Security(
+        get_admin_token,
+        scopes=[
+            Role.GLOBAL_ADMIN.value,
+            Role.LOCAL_ADMIN.value,
+            Role.ADMIN.value,
+            Role.SUPER_ADMIN.value
+        ])],
     responses={
         400: {"model": BadResponse},
     },
@@ -180,6 +180,8 @@ async def get_purchased_tickets(
 async def get_participants(
     db: Annotated[AsyncSession, Depends(get_db)],
     game_id: Annotated[int, Path()],
+    offset: int = 0,
+    limit: int = 10,
 ):
     """
     participants total by one Game
@@ -203,7 +205,7 @@ async def get_participants(
         Ticket.created_at,
         User.username
     )
-    tickets = await db.execute(stmt)
+    tickets = await db.execute(stmt.offset(offset).limit(limit))
     tickets = tickets.fetchall()
 
     data = [{
@@ -238,6 +240,8 @@ async def get_participant_tickets(
     db: Annotated[AsyncSession, Depends(get_db)],
     game_id: Annotated[int, Path()],
     user_id: Annotated[int, Path()],
+    offset: int = 0,
+    limit: int = 10,
 ):
     """
     get tickets by user_id from game_id
@@ -254,7 +258,7 @@ async def get_participant_tickets(
         Ticket.game_id == game_id,
         Ticket.user_id == user_id
     )
-    tickets = await db.execute(stmt)
+    tickets = await db.execute(stmt.offset(offset).limit(limit))
     tickets = tickets.fetchall()
 
     data = [{
@@ -287,6 +291,8 @@ async def get_participant_tickets(
 async def get_winners(
     db: Annotated[orm.Session, Depends(get_sync_db)],
     game_id: Annotated[int, Path()],
+    offset: int = 0,
+    limit: int = 10,
 ):
     """
     get winners by  game_id
@@ -307,7 +313,8 @@ async def get_winners(
         Ticket.user_id,
         Ticket.created_at,
         User.username
-    ).all()
+    ).offset(offset).limit(limit)
+    tickets = tickets.all()
 
     data = [{
         "id": ticket.id,
