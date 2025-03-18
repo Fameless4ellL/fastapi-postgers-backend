@@ -5,7 +5,7 @@ import pycountry
 import json
 from decimal import Decimal
 from typing import Annotated, List
-from fastapi import Depends, status, UploadFile
+from fastapi import Depends, Query, status, UploadFile
 from fastapi.responses import JSONResponse
 from sqlalchemy import func, select
 from eth_account.signers.local import LocalAccount
@@ -307,7 +307,9 @@ async def get_tickets(
     "/countries", tags=["settings"],
     responses={400: {"model": BadResponse}, 200: {"model": Country}}
 )
-async def get_countries():
+async def get_countries(
+    q: str = Query('', description="Search query")
+):
     """
     Получение список стран
     """
@@ -315,9 +317,8 @@ async def get_countries():
         "alpha_3": country.alpha_3,
         "name": country.name,
         "flag": country.flag
-    } for country in pycountry.countries]
+    } for country in pycountry.countries.search_fuzzy(q)]
 
-    # по запросу фронта, ага
     return JSONResponse(
         status_code=status.HTTP_200_OK,
         content=data
