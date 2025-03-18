@@ -306,3 +306,5 @@ from .users import *
 from .games import *
 from .referral import *
 from .instabingo import *
+from .kyc import *
+from .profile import *

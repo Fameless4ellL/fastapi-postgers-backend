@@ -50,7 +50,7 @@ class User(BaseModel):
     username: str
     id: int
     phone_number: Optional[str] = None
-    country: Optional[str] = "EN"
+    country: Country
 
 
 class Users(BaseModel):
@@ -533,3 +533,12 @@ class KycBase(BaseAdmin):
 
 class KycCreate(BaseAdmin):
     countries: list[CountryAlpha3] = []
+
+
+class Profile(BaseAdmin):
+    id: int
+    fullname: str
+    telegram: str
+    email: str
+    role: str
+    phone_number: str
