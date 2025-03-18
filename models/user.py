@@ -46,6 +46,13 @@ class User(Base):
     updated_at = Column(DateTime, default=datetime.datetime.now, onupdate=datetime.datetime.now)
 
 
+class Kyc(Base):
+    __tablename__ = "kyc"
+
+    id = Column(Integer, primary_key=True, index=True)
+    country = Column(String(32))
+
+
 class Wallet(Base):
     __tablename__ = "wallet"
 

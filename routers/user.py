@@ -13,7 +13,7 @@ from sqlalchemy.orm import joinedload
 from tronpy.keys import to_base58check_address
 from models.db import get_db
 from models.log import Action
-from models.user import Balance, Notification, User, Wallet, BalanceChangeHistory
+from models.user import Balance, Kyc, Notification, User, Wallet, BalanceChangeHistory
 from models.other import Currency, Ticket
 from routers import public
 from globals import aredis
@@ -140,6 +140,16 @@ async def withdraw(
     """
     Вывод средств
     """
+    # check kyc status
+    stmt = select(Kyc).filter(Kyc.country == user.country)
+    kyc = await db.execute(stmt)
+    kyc = kyc.scalar()
+    if kyc and not user.kyc:
+        return JSONResponse(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            content="KYC required"
+        )
+
     wallet_result = await db.execute(
         select(Wallet)
         .filter(Wallet.user_id == user.id)

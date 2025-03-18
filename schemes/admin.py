@@ -471,8 +471,6 @@ class InstaBingoCreate(BaseAdmin):
                 key = '_40'
 
             winnings[i] = getattr(self, f"x{start}{key}")
-        
-        print(winnings)
 
         return {
             "currency_id": self.currency_id,
@@ -489,10 +487,10 @@ class InstaBingoUpdate(InstaBingoCreate):
 class InstaBingoSchema(InstaBingoBase):
     id: int
     winnings: Optional[dict[int, int]] = Field(default_factory=dict, exclude=True)
-    
+
     def get_winnings(self):
         return self.winnings if self.winnings else {}
-   
+
     @computed_field
     def x15(self) -> int:
         return self.get_winnings().get(15, 1)
@@ -526,3 +524,12 @@ class InstaBingos(BaseModel):
 @dataclass
 class InstaBingoFilter(DatePicker, Search):
     countries: Optional[list[CountryAlpha3]] = Query(None)
+
+
+class KycBase(BaseAdmin):
+    id: int
+    countries: list[CountryAlpha3] = []
+
+
+class KycCreate(BaseAdmin):
+    countries: list[CountryAlpha3] = []
