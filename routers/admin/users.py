@@ -33,14 +33,14 @@ from schemes.base import BadResponse
 )
 async def get_users(
     db: Annotated[AsyncSession, Depends(get_db)],
-    token: Annotated[Token, [Security(get_admin_token, scopes=[
+    token: Annotated[Token, Security(get_admin_token, scopes=[
         Role.GLOBAL_ADMIN.value,
         Role.ADMIN.value,
         Role.SUPER_ADMIN.value,
         Role.LOCAL_ADMIN.value,
         Role.FINANCIER.value,
         Role.SUPPORT.value
-    ])],],
+    ]),],
     query: Annotated[Optional[str], Query(...)] = None,
     country: Annotated[Optional[CountryAlpha3], Query(...)] = None,
     offset: int = 0,
@@ -95,14 +95,14 @@ async def get_users(
 )
 async def get_user(
     db: Annotated[AsyncSession, Depends(get_db)],
-    token: Annotated[Token, [Security(get_admin_token, scopes=[
+    token: Annotated[Token, Security(get_admin_token, scopes=[
         Role.GLOBAL_ADMIN.value,
         Role.ADMIN.value,
         Role.SUPER_ADMIN.value,
         Role.LOCAL_ADMIN.value,
         Role.FINANCIER.value,
         Role.SUPPORT.value
-    ])],],
+    ]),],
     user_id: Annotated[int, Path()],
 ):
     """
@@ -160,14 +160,14 @@ async def get_user(
 )
 async def get_user_games(
     db: Annotated[AsyncSession, Depends(get_db)],
-    token: Annotated[Token, [Security(get_admin_token, scopes=[
+    token: Annotated[Token, Security(get_admin_token, scopes=[
         Role.GLOBAL_ADMIN.value,
         Role.ADMIN.value,
         Role.SUPER_ADMIN.value,
         Role.LOCAL_ADMIN.value,
         Role.FINANCIER.value,
         Role.SUPPORT.value
-    ])],],
+    ]),],
     user_id: Annotated[int, Path()],
     offset: int = 0,
     limit: int = 10,
