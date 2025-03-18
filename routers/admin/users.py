@@ -42,7 +42,7 @@ async def get_users(
         Role.SUPPORT.value
     ]),],
     query: Annotated[Optional[str], Query(...)] = None,
-    country: Annotated[Optional[CountryAlpha3], Query(...)] = None,
+    country: Annotated[Optional[list[CountryAlpha3]], Query(...)] = None,
     offset: int = 0,
     limit: int = 10,
 ):
@@ -50,9 +50,9 @@ async def get_users(
     Get all users
     """
     stmt = select(User).filter(User.role == "user")
-
     if country:
-        stmt = stmt.filter(User.country == country)
+        # list of countries
+        stmt = stmt.filter(User.country.in_(country))
 
     if Role.LOCAL_ADMIN in token.scopes:
         stmt = stmt.filter(User.country == token.country)
