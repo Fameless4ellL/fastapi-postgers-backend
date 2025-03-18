@@ -94,13 +94,14 @@ def get_crud_router(
             filters: ReferralFilter = filters
 
             if filters.status:
-                stmt = stmt.filter(model.deleted == filters.status)
+                deleted = [status.label for status in filters.status]
+                stmt = stmt.filter(model.deleted.in_(deleted))
 
-            if filters.query:
+            if filters.filter:
                 stmt = stmt.filter(
                     or_(
-                        model.name.ilike(f"%{filters.query}%"),
-                        model.comment.ilike(f"%{filters.query}%"),
+                        model.name.ilike(f"%{filters.filter}%"),
+                        model.comment.ilike(f"%{filters.filter}%"),
                     )
                 )
 

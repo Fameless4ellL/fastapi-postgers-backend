@@ -92,7 +92,7 @@ async def get_instabingo_list(
         stmt = stmt.filter(Ticket.created_at <= item.date_to)
 
     if item.filter:
-        stmt = stmt.filter(Ticket.id == item.filter)
+        stmt = stmt.filter(Ticket.id == int(item.filter))
 
     game = await db.execute(stmt.offset(offset).limit(limit))
     game = game.fetchall()

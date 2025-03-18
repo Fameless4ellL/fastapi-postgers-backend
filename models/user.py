@@ -105,11 +105,10 @@ class ReferralLink(Base):
     __tablename__ = "referral_links"
 
     id = Column(Integer, primary_key=True, index=True)
-    name = Column(String(256), nullable=False, unique=True)
+    name = Column(String(256), nullable=False)
     comment = Column(String(256), nullable=True)
-    link = Column(String(256), nullable=False)
+    link = Column(String(256), nullable=False, index=True)
     generated_by = Column(Integer, ForeignKey('users.id'), nullable=False)
-    placement = Column(String(256), nullable=True, doc="placement of the link")
     user_count = Column(Integer, default=0)
 
     deleted = Column(Boolean, default=False)

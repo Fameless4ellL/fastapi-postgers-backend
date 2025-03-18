@@ -2,9 +2,9 @@ from fastapi import Depends, Path, status, Security
 from fastapi.responses import JSONResponse
 from typing import Annotated
 
-from sqlalchemy import select
+from sqlalchemy import func, select
 from models.log import Action
-from models.user import Role, ReferralLink
+from models.user import BalanceChangeHistory, Role, ReferralLink, User
 from routers import admin
 from routers.admin import get_crud_router
 from routers.utils import get_admin_token
@@ -13,6 +13,7 @@ from models.db import get_db
 from schemes.admin import (
     ReferralFilter,
     ReferralSchema,
+    ReferralUsersList,
     Referrals,
     ReferralCreate,
     ReferralUpdate,
@@ -41,7 +42,13 @@ get_crud_router(
 @admin.delete(
     "/referrals/{referral_id}",
     tags=[Action.ADMIN_DELETE],
-    dependencies=[Security(get_admin_token, scopes=[Role.GLOBAL_ADMIN.value])],
+    dependencies=[Security(get_admin_token, scopes=[
+        Role.SUPER_ADMIN.value,
+        Role.ADMIN.value,
+        Role.LOCAL_ADMIN.value,
+        Role.GLOBAL_ADMIN.value,
+        Role.SMM.value,
+    ],)],
     responses={
         400: {"model": BadResponse},
     },
@@ -75,30 +82,60 @@ async def delete_referral(
 
 @admin.get(
     "/referrals/{referral_id}/users",
-    dependencies=[Security(get_admin_token, scopes=[Role.GLOBAL_ADMIN.value])],
+    dependencies=[Security(get_admin_token, scopes=[
+        Role.SUPER_ADMIN.value,
+        Role.ADMIN.value,
+        Role.LOCAL_ADMIN.value,
+        Role.GLOBAL_ADMIN.value,
+        Role.SMM.value,
+    ],)],
     responses={
         400: {"model": BadResponse},
+        200: {"model": ReferralUsersList},
     },
 )
-async def get_referral_user(
+async def get_referral_users(
     db: Annotated[AsyncSession, Depends(get_db)],
-    referral_id: Annotated[int, Path(...)]
+    referral_id: Annotated[int, Path(...)],
+    offset: int = 0,
+    limit: int = 10,
 ):
-    stmt = select(ReferralLink).filter(ReferralLink.id == referral_id)
-    referral = await db.execute(stmt)
-    referral = referral.scalar()
-
-    if not referral:
-        return JSONResponse(
-            status_code=status.HTTP_404_NOT_FOUND,
-            content={"message": "Referral not found"}
+    """
+    get referral users by referral id
+    """
+    stmt = (
+        select(
+            User.id,
+            User.username,
+            User.country,
+            BalanceChangeHistory.change_amount.label("first_deposit"),
         )
+        .join(BalanceChangeHistory, BalanceChangeHistory.user_id == 4)
+        .filter(User.referral_id == referral_id)
+        .filter(BalanceChangeHistory.change_type == "deposit")
+        .order_by(User.id, BalanceChangeHistory.created_at)
+        .distinct(User.id)
+    )
+    result = await db.execute(stmt.offset(offset).limit(limit))
+    referral_users = result.fetchall()
 
-    referral.deleted = True
-    db.add(referral)
-    await db.commit()
+    data = [{
+        "id": user.id,
+        "username": user.username,
+        "country": user.country,
+        "first_deposit": user.first_deposit,
+    } for user in referral_users]
+
+    count_stmt = select(func.count()).select_from(
+        stmt.with_only_columns(User.id).order_by(None).subquery()
+    )
+    count_result = await db.execute(count_stmt)
+    count = count_result.scalar()
 
     return JSONResponse(
         status_code=status.HTTP_200_OK,
-        content="Referral deleted",
+        content=ReferralUsersList(
+            items=data,
+            count=count,
+        ).model_dump(),
     )

@@ -1,4 +1,5 @@
 from dataclasses import dataclass
+from secrets import token_urlsafe
 from pydantic import (
     BaseModel,
     Field,
@@ -20,6 +21,7 @@ from models.other import GameStatus, GameType, GameView
 from models.user import BalanceChangeHistory
 from routers.utils import get_currency_by_id, url_for
 from schemes.base import Country
+from settings import settings
 from utils.datastructure import MultiValueStrEnum
 
 
@@ -327,7 +329,7 @@ class Games(BaseModel):
 
 @dataclass
 class Search:
-    filter: Optional[int] = Query(None)
+    filter: Optional[str] = Query(None)
 
 
 @dataclass
@@ -395,15 +397,29 @@ class Jackpots(BaseModel):
 class ReferralBase(BaseAdmin):
     name: str
     deleted: bool
-    link: str
+    link: str = Field(exclude=True)
+    user_count: int = 0
     comment: Optional[str]
     created_at: datetime
+
+    @computed_field
+    def url(self) -> str:
+        return f"{settings.web_app_url}/?ref={self.link}"
 
 
 class ReferralCreate(BaseAdmin):
     name: str
-    link: str
     comment: Optional[str]
+
+    @model_serializer
+    def ser_model(self):
+        code = token_urlsafe(5)
+
+        return {
+            "name": self.name,
+            "comment": self.comment,
+            "link": code
+        }
 
 
 class ReferralUpdate(ReferralCreate):
@@ -419,14 +435,14 @@ class Referrals(BaseModel):
     count: int = 0
 
 
-class ReferralFilter:
-    def __init__(
-        self,
-        query: Optional[str] = "",
-        status: Optional[bool] = None,
-    ):
-        self.query = query
-        self.status = status
+class ReferralStatus(MultiValueStrEnum):
+    ACTIVE = "Active", False
+    INACTIVE = "Removed", True
+
+
+@dataclass
+class ReferralFilter(Search):
+    status: Optional[list[ReferralStatus]] = Query(None)
 
 
 class InstaBingoBase(BaseAdmin):
@@ -542,3 +558,15 @@ class Profile(BaseAdmin):
     email: str
     role: str
     phone_number: str
+
+
+class ReferralUsers(BaseAdmin):
+    id: int
+    username: str
+    country: Country
+    first_deposit: float
+
+
+class ReferralUsersList(BaseModel):
+    items: list[ReferralUsers] = []
+    count: int = 0
