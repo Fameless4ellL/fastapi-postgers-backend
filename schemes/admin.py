@@ -309,7 +309,7 @@ class GameSchema(BaseAdmin):
     repeat: Optional[bool] = False
     repeat_days: Optional[list[int]]
     deleted: Optional[bool] = False
-    numbers: Optional[list[int]] = []
+    numbers: Optional[list[Union[int, list[int]]]] = []
     event_start: Optional[datetime] = None
     event_end: Optional[datetime] = None
     updated_at: datetime
