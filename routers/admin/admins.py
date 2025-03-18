@@ -1,7 +1,9 @@
+import os
 import random
-from fastapi import Depends, Path, Query, background, status, Security
+from fastapi import Depends, Path, Query, background, status, Security, UploadFile
 from fastapi.responses import JSONResponse
-from typing import Annotated, Optional
+from typing import Annotated, Optional, Union
+from models.log import Action
 from pydantic_extra_types.country import CountryAlpha3
 
 from sqlalchemy import func, select, or_
@@ -9,13 +11,15 @@ from models.user import User, Role
 from models.other import Game, Jackpot, Network, Currency
 from routers import admin
 from routers.admin import get_crud_router
-from routers.utils import get_admin_token, send_mail
+from routers.utils import get_admin_token, send_mail, url_for
 from globals import scheduler, aredis
 from sqlalchemy.ext.asyncio import AsyncSession
 from models.db import get_db
 from schemes.admin import (
     Admin,
+    AdminCreate,
     Admins,
+    AdminFilter,
     NetworkCreate,
     NetworkSchema,
     Networks,
@@ -28,9 +32,10 @@ from schemes.admin import (
     JackpotSchema,
     JackpotCreate,
     JackpotUpdate,
-    Empty
+    Empty,
+    Profile
 )
-from schemes.base import BadResponse
+from schemes.base import BadResponse, JsonForm
 
 
 @admin.get(
@@ -85,17 +90,22 @@ get_crud_router(
 
 @admin.get(
     "/admins",
-    dependencies=[Security(get_admin_token, scopes=[Role.GLOBAL_ADMIN.value])],
+    # dependencies=[Security(get_admin_token, scopes=[
+    #     Role.SUPER_ADMIN.value,
+    #     Role.ADMIN.value,
+    #     Role.GLOBAL_ADMIN.value,
+    #     Role.LOCAL_ADMIN.value,
+    #     Role.FINANCIER.value,
+    #     Role.SUPPORT.value
+    # ])],
     responses={
         400: {"model": BadResponse},
         200: {"model": Admins},
     },
 )
-async def get_admins(
+async def get_admin_list(
     db: Annotated[AsyncSession, Depends(get_db)],
-    query: Annotated[Optional[str], Query(...)] = None,
-    country: Annotated[Optional[CountryAlpha3], Query(...)] = None,
-    role: Optional[Role] = None,
+    item: Annotated[AdminFilter, Depends(AdminFilter)],
     offset: int = 0,
     limit: int = 10,
 ):
@@ -103,17 +113,18 @@ async def get_admins(
     Get all admins
     """
     stmt = select(User).filter(User.role != "user")
-    if role:
-        stmt = stmt.filter(User.role == role.value)
+    if item.role:
+        roles = [role.label for role in item.role]
+        stmt = stmt.filter(User.role.in_(roles))
 
-    if country:
-        stmt = stmt.filter(User.country == country)
+    if item.countries:
+        stmt = stmt.filter(User.country.in_(item.countries))
 
-    if query:
+    if item.filter:
         stmt = stmt.filter(
             or_(
-                User.username.ilike(f"%{query}%"),
-                User.phone_number.ilike(f"%{query}%"),
+                User.username.ilike(f"%{item.filter}%"),
+                User.phone_number.ilike(f"%{item.filter}%"),
             )
         )
 
@@ -126,7 +137,7 @@ async def get_admins(
     data = [
         {
             "id": admin.id,
-            "username": admin.username,
+            "username": f"{admin.firstname} {admin.lastname}",
             "phone_number": admin.phone_number,
             "email": admin.email,
             "role": admin.role,
@@ -142,13 +153,20 @@ async def get_admins(
 
 @admin.get(
     "/admins/{admin_id}",
-    dependencies=[Security(get_admin_token, scopes=[Role.GLOBAL_ADMIN.value])],
+    # dependencies=[Security(get_admin_token, scopes=[
+    #     Role.SUPER_ADMIN.value,
+    #     Role.ADMIN.value,
+    #     Role.GLOBAL_ADMIN.value,
+    #     Role.LOCAL_ADMIN.value,
+    #     Role.FINANCIER.value,
+    #     Role.SUPPORT.value
+    # ])],
     responses={
         400: {"model": BadResponse},
-        200: {"model": Admin},
+        200: {"model": Profile},
     },
 )
-async def get_admin_(
+async def get_admin(
     db: Annotated[AsyncSession, Depends(get_db)],
     admin_id: Annotated[int, Path()],
 ):
@@ -156,8 +174,8 @@ async def get_admin_(
     Get all admins
     """
     stmt = select(User).filter(User.id == admin_id, User.role != "user")
-    admin = await db.execute(stmt)
-    admin = admin.scalars().first()
+    user = await db.execute(stmt)
+    user = user.scalar()
 
     if not admin:
         return JSONResponse(
@@ -166,23 +184,35 @@ async def get_admin_(
         )
 
     data = {
-        "id": admin.id,
-        "username": f"{admin.firtname} {admin.lastname}",
-        "phone_number": admin.phone_number,
-        "country": admin.country,
-        "email": admin.email,
-        "role": admin.role,
-        "created_at": admin.created_at.strftime("%Y-%m-%d %H:%M:%S"),
-        "updated_at": admin.updated_at.strftime("%Y-%m-%d %H:%M:%S"),
+        "id": user.id,
+        "telegram": user.telegram,
+        "fullname": f"{user.firstname} {user.lastname}",
+        "language_code": user.language_code,
+        "phone_number": user.phone_number,
+        "country": user.country,
+        "email": user.email,
+        "role": user.role,
+        "active": user.active,
+        "kyc": user.kyc,
+        "avatar": url_for('static/avatars', filename=user.avatar) if user.avatar else None,
+        "document": url_for('static/kyc', filename=user.document) if user.document else None,
     }
     return JSONResponse(
-        status_code=status.HTTP_200_OK, content=Admin(**data).model_dump()
+        status_code=status.HTTP_200_OK, content=Profile(**data).model_dump()
     )
 
 
 @admin.post(
     "/admins/create",
-    dependencies=[Security(get_admin_token, scopes=[Role.GLOBAL_ADMIN.value])],
+    tags=[Action.ADMIN_CREATE],
+    dependencies=[Security(get_admin_token, scopes=[
+        Role.SUPER_ADMIN.value,
+        Role.ADMIN.value,
+        Role.GLOBAL_ADMIN.value,
+        Role.LOCAL_ADMIN.value,
+        Role.FINANCIER.value,
+        Role.SUPPORT.value
+    ])],
     responses={
         400: {"model": BadResponse},
         201: {"model": Admin},
@@ -190,13 +220,39 @@ async def get_admin_(
 )
 async def create_admin(
     db: Annotated[AsyncSession, Depends(get_db)],
-    item: Admin,
+    item: Annotated[AdminCreate, JsonForm],
     bg: background.BackgroundTasks,
+    avatar: UploadFile,
+    document: UploadFile
 ):
     """
     Create new admin
     """
     new_admin = User(**item.model_dump(exclude={"id"}))
+    db.add(new_admin)
+    await db.commit()
+    await db.refresh(new_admin)
+
+    if not avatar.content_type.startswith("image"):
+        return JSONResponse(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            content="Invalid file type"
+        )
+
+    if not document.content_type.startswith("image"):
+        return JSONResponse(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            content="Invalid file type"
+        )
+
+    if avatar:
+        avatar = await save_file(new_admin, avatar, "static/avatars", "avatar")
+    if document:
+        document = await save_file(new_admin, document, "static/kyc", "document")
+
+    new_admin.avatar = avatar
+    new_admin.document = document
+
     db.add(new_admin)
     await db.commit()
 
@@ -211,5 +267,140 @@ async def create_admin(
     )
 
     return JSONResponse(
-        status_code=status.HTTP_201_CREATED, content="created", background=bg
+        status_code=status.HTTP_201_CREATED, content="OK", background=bg
+    )
+
+
+@admin.post(
+    "/admins/{admin_id}/update",
+    tags=[Action.ADMIN_CREATE],
+    dependencies=[Security(get_admin_token, scopes=[
+        Role.SUPER_ADMIN.value,
+        Role.ADMIN.value,
+        Role.GLOBAL_ADMIN.value,
+        Role.LOCAL_ADMIN.value,
+        Role.FINANCIER.value,
+        Role.SUPPORT.value
+    ])],
+    responses={
+        400: {"model": BadResponse},
+        201: {"model": Admin},
+    },
+)
+async def update_admin(
+    db: Annotated[AsyncSession, Depends(get_db)],
+    item: Annotated[AdminCreate, JsonForm()],
+    admin_id: Annotated[int, Path()],
+    avatar: Union[UploadFile, None] = None,
+    document: Union[UploadFile, None] = None
+):
+    """
+    Update admin
+    """
+    admin = await db.execute(select(User).filter(User.id == admin_id))
+    admin = admin.scalar()
+
+    if not admin:
+        return JSONResponse(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            content={"message": "Admin not found"},
+        )
+
+    for key, value in item.model_dump().items():
+        setattr(admin, key, value)
+
+    if avatar:
+        if not avatar.content_type.startswith("image"):
+            return JSONResponse(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                content="Invalid file type"
+            )
+        if admin.avatar:
+            try:
+                os.remove(f"static/avatars/{admin.avatar}")
+            except FileNotFoundError:
+                pass
+
+        avatar = await save_file(admin, avatar, "static/avatars", "avatar")
+    if document:
+        if not document.content_type.startswith("image"):
+            return JSONResponse(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                content="Invalid file type"
+            )
+        if admin.document:
+            try:
+                os.remove(f"static/kyc/{admin.document}")
+            except FileNotFoundError:
+                pass
+
+        document = await save_file(admin, document, "static/kyc", "document")
+
+    admin.avatar = avatar
+    admin.document = document
+
+    db.add(admin)
+    await db.commit()
+
+    return JSONResponse(
+        status_code=status.HTTP_201_CREATED, content="OK"
+    )
+
+
+async def save_file(model: object, file: UploadFile, directory: str, field: str):
+    os.makedirs(directory, exist_ok=True)
+
+    # Save file to disk
+    filename, file_extension = os.path.splitext(file.filename)
+    filename = filename.replace(" ", "_")
+    setattr(model, field, f"{filename}_{model.id}{file_extension}")
+
+    file_path = os.path.join(
+        directory,
+        f"{filename}_{model.id}{file_extension}"
+    )
+    with open(file_path, "wb") as f:
+        f.write(await file.read())
+    return f"{filename}_{model.id}{file_extension}"
+
+
+@admin.delete(
+    "/admins/{admin_id}",
+    tags=[Action.ADMIN_DELETE],
+    dependencies=[Security(get_admin_token, scopes=[
+        Role.SUPER_ADMIN.value,
+        Role.ADMIN.value,
+        Role.GLOBAL_ADMIN.value,
+        Role.LOCAL_ADMIN.value,
+        Role.FINANCIER.value,
+        Role.SUPPORT.value
+    ])],
+    responses={
+        400: {"model": BadResponse},
+        200: {"model": Admin},
+    },
+)
+async def delete_admin(
+    db: Annotated[AsyncSession, Depends(get_db)],
+    admin_id: Annotated[int, Path()],
+):
+    """
+    Delete admin
+    """
+    admin = await db.execute(select(User).filter(User.id == admin_id))
+    admin = admin.scalar()
+
+    if not admin:
+        return JSONResponse(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            content={"message": "Admin not found"},
+        )
+
+    admin.active = False
+    db.add(admin)
+    await db.commit()
+    await aredis.delete(f"TOKEN:ADMINS:{admin.id}")
+
+    return JSONResponse(
+        status_code=status.HTTP_200_OK, content="OK"
     )

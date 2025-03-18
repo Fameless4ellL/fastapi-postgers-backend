@@ -1,5 +1,8 @@
+import pycountry
 from dataclasses import dataclass
 from secrets import token_urlsafe
+from pydantic_extra_types.phone_numbers import PhoneNumber
+from phonenumbers import parse, geocoder
 from pydantic import (
     BaseModel,
     Field,
@@ -554,10 +557,15 @@ class KycCreate(BaseAdmin):
 class Profile(BaseAdmin):
     id: int
     fullname: str
-    telegram: str
-    email: str
+    telegram: Optional[str] = None
+    language_code: Optional[str] = None
+    country: Country
+    email: Optional[str] = None
     role: str
-    phone_number: str
+    phone_number: Optional[str] = None
+    kyc: Optional[bool] = None
+    avatar: Optional[str] = None
+    document: Optional[str] = None
 
 
 class ReferralUsers(BaseAdmin):
@@ -570,3 +578,55 @@ class ReferralUsers(BaseAdmin):
 class ReferralUsersList(BaseModel):
     items: list[ReferralUsers] = []
     count: int = 0
+
+
+class AdminRoles(MultiValueStrEnum):
+    SUPER_ADMIN = "Super Admin", "super_admin"
+    ADMIN = "Admin", "admin"
+    GLOBAL_ADMIN = "Global Admin", "global_admin"
+    LOCAL_ADMIN = "Local Admin", "local_admin"
+    SUPPORT = "Support manager", "support"
+    FINANCE = "Financier", "financier"
+    SMM = "SMM", "smm"
+
+
+class AdminStatus(MultiValueStrEnum):
+    ACTIVE = "Active", False
+    INACTIVE = "Inactive", True
+
+
+@dataclass
+class AdminFilter(Search):
+    role: Optional[list[AdminRoles]] = Query(None)
+    countries: Optional[list[CountryAlpha3]] = Query(None)
+    status: Optional[list[AdminStatus]] = Query(None)
+
+
+class AdminCreate(BaseAdmin):
+    firstname: str
+    lastname: str
+    email: str
+    phone_number: PhoneNumber
+    role: AdminRoles
+    telegram: Optional[str] = None
+    country: CountryAlpha3
+
+    @model_serializer
+    def ser_model(self):
+        # get country from phone_number
+        country_code = parse(self.phone_number)
+        # country = geocoder.region_code_for_number(country_code)
+        phone_number = f"{country_code.country_code}{country_code.national_number}"
+
+        country = geocoder.region_code_for_number(country_code)
+        alpha2 = pycountry.countries.get(alpha_2=country).alpha_3
+
+        return {
+            "firstname": self.firstname,
+            "lastname": self.lastname,
+            "email": self.email,
+            "phone_number": phone_number,
+            "role": self.role,
+            "telegram": self.telegram,
+            "country": alpha2,
+        }

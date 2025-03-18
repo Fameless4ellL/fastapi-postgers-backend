@@ -25,6 +25,7 @@ class User(Base):
     __tablename__ = "users"
 
     id = Column(Integer, primary_key=True, index=True)
+    telegram = Column(String(64))
     telegram_id = Column(Integer, unique=True, nullable=True)
     username = Column(String(64), unique=True)
     firstname = Column(String(64), nullable=True)
@@ -39,6 +40,7 @@ class User(Base):
 
     kyc = Column(Boolean, default=False)
     document = Column(String(256), nullable=True)
+    avatar = Column(String(256), nullable=True)
 
     referral_id = Column(Integer, ForeignKey('referral_links.id'), nullable=True)
 

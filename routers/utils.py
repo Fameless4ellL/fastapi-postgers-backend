@@ -113,7 +113,10 @@ async def get_admin_token(
 
     for scope in _token.scopes:
         if scope not in security_scopes.scopes:
-            raise invalid_token
+            raise HTTPException(
+                status_code=status.HTTP_401_UNAUTHORIZED,
+                detail="Not enough permissions"
+            )
 
     if not await aredis.exists(f"TOKEN:ADMINS:{_token.id}"):
         raise invalid_token

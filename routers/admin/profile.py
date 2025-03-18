@@ -33,8 +33,8 @@ async def get_profile(
     """
     data = {
         "id": user.id,
-        "telegram_id": user.telegram_id,
-        "lastname": f"{user.firstname} {user.lastname}",
+        "telegram": user.telegram,
+        "fullname": f"{user.firstname} {user.lastname}",
         "language_code": user.language_code,
         "phone_number": user.phone_number,
         "country": user.country,
@@ -42,7 +42,8 @@ async def get_profile(
         "role": user.role,
         "active": user.active,
         "kyc": user.kyc,
+        "avatar": url_for('static/avatars', filename=user.avatar) if user.avatar else None,
         "document": url_for('static/kyc', filename=user.document) if user.document else None,
     }
 
-    return JSONResponse(content=data, status_code=status.HTTP_200_OK)
+    return JSONResponse(content=Profile(**data), status_code=status.HTTP_200_OK)

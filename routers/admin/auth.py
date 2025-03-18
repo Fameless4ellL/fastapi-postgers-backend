@@ -44,7 +44,8 @@ async def login(
             User.email == user.login,
             User.username == user.login
         ),
-        User.role != "user"
+        User.role != "user",
+        User.active.is_(True)
     )
     userdb = await db.execute(stmt)
     userdb = userdb.scalar()
