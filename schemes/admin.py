@@ -16,11 +16,11 @@ from pydantic import (
 )
 import pytz
 from typing import Optional, Annotated, Any, Union
-from datetime import datetime, date
+from datetime import datetime, date, timedelta
 from pydantic_extra_types.country import CountryAlpha3
 from fastapi import Query, UploadFile
 
-from models.other import GameStatus, GameType, GameView
+from models.other import GameStatus, GameType, GameView, JackpotType
 from models.user import BalanceChangeHistory
 from routers.utils import get_currency_by_id, url_for
 from schemes.base import Country
@@ -68,13 +68,21 @@ class Ticket(BaseModel):
 
 
 class Winnings(BaseModel):
-    winnings: int = 0
+    cash: int = 0
+    material: str = ""
 
 
 class UserInfo(User):
-    telegram_id: Optional[int]
-    language_code: Optional[str]
-    email: Optional[str]
+    firstname: Optional[str] = None
+    lastname: Optional[str] = None
+    patronymic: Optional[str] = None
+    telegram: Optional[str] = None
+    telegram_id: Optional[int] = None
+    language_code: Optional[str] = None
+    email: Optional[str] = None
+    wallet: Optional[str] = None
+    kyc_status: Optional[bool] = None
+    document: Optional[str] = None
     role: str
     created_at: str
     updated_at: str
@@ -312,8 +320,7 @@ class GameSchema(BaseAdmin):
     game_type: GameType
     status: GameStatus
     repeat: Optional[bool] = False
-    repeat_days: Optional[list[int]]
-    deleted: Optional[bool] = False
+    repeat_days: Optional[list[int]] = []
     numbers: Optional[list[Union[int, list[int]]]] = []
     event_start: Optional[datetime] = None
     event_end: Optional[datetime] = None
@@ -358,43 +365,104 @@ class Empty:
 
 
 class JackpotBase(BaseAdmin):
+    id: int
     name: str
-    _type: GameType
-    percentage: float = 10.0
-    image: Optional[Image] = "default_jackpot.png"
-    country: Optional[str]
-    scheduled_datetime: datetime
-    tzone: int = 1
-    repeat: bool = False
-    status: GameStatus
-    repeat_days: list[int] = [0, 1, 2, 3, 4, 5, 6]
-
+    country: Country
+    currency_id: Optional[int] = None
+    percentage: Optional[float] = 10.0
+    price: float = 1.0
+    image: Optional[Image] = "default_image.png"
+    has_tickets: bool = False
+    game_type: JackpotType = Field(..., alias="_type")
+    status: Optional[GameStatus] = None
+    repeat: Optional[bool] = False
+    repeat_days: Optional[list[int]] = []
+    scheduled_datetime: Optional[datetime] = None
+    fundraising_date: Optional[datetime] = Field(exclude=True)
+    numbers: Optional[list[Union[int, list[int]]]] = []
+    event_start: Optional[datetime] = None
+    event_end: Optional[datetime] = None
     updated_at: datetime
     created_at: datetime
+
+    def get_fundraising_date(self):
+        return self.fundraising_date if self.fundraising_date else datetime.now()
+
+    @computed_field
+    def fundraising_period(self) -> str:
+        return f"{self.get_fundraising_date()} - {self.scheduled_datetime - timedelta(days=1)}"
 
 
 class JackpotCreate(BaseModel):
     name: str
-    _type: str
     percentage: float = 10.0
-    country: Optional[str]
-    scheduled_datetime: datetime
-    tzone: int = 1
-    repeat: bool = False
-    repeat_days: list[int] = [0, 1, 2, 3, 4, 5, 6]
+    game_type: GameType
+    currency_id: Annotated[int, AfterValidator(get_currency_by_id)]
+    country: Optional[CountryAlpha3] = None
+    scheduled_datetime: Optional[FutureDatetime]
+    repeat: Optional[bool] = False
+    repeat_days: Optional[list[int]] = [5, 6]
+
+    @model_serializer
+    def ser_model(self):
+        # get the timezone from the zone
+        try:
+            zone = self.scheduled_datetime.tzinfo
+            tz = pytz.timezone(zone.tzname(self.scheduled_datetime))
+        except pytz.UnknownTimeZoneError:
+            tz = pytz.timezone('UTC')
+
+        zone = tz.utcoffset(self.scheduled_datetime).total_seconds() // 3600
+        scheduled_datetime = self.scheduled_datetime.astimezone(tz).isoformat()
+
+        if self.scheduled_datetime and self.scheduled_datetime.tzinfo is not None:
+            scheduled_datetime = self.scheduled_datetime.replace(tzinfo=None)
+        else:
+            scheduled_datetime = self.scheduled_datetime
+
+        return {
+            "name": self.name,
+            "_type": self.game_type,
+            "kind": self.kind,
+            "currency_id": self.currency_id,
+            "limit_by_ticket": self.category.label['limit_by_ticket'],
+            "max_limit_grid": self.category.label['max_limit_grid'],
+            "price": self.price,
+            "description": self.description,
+            "max_win_amount": self.max_win_amount,
+            "prize": self.prize,
+            "country": self.country,
+            "min_ticket_count": self.min_ticket_count,
+            "scheduled_datetime": scheduled_datetime,
+            "zone": zone,
+            "repeat": self.repeat,
+            "repeat_days": self.repeat_days,
+        }
 
 
 class JackpotUpdate(JackpotCreate):
     pass
 
 
-class JackpotSchema(JackpotBase):
+class JackpotSchema(BaseAdmin):
     id: int
+    name: str
+    game_type: JackpotType = Field(..., alias="_type")
+    image: Optional[Image] = "default_jackpot.png"
+    country: Country
+    status: Optional[GameStatus] = None
+    created_at: datetime
 
 
 class Jackpots(BaseModel):
     items: list[JackpotSchema] = []
     count: int = 0
+
+
+@dataclass
+class JackpotFilter(DatePicker, Search):
+    game_type: Optional[list[JackpotType]] = Query(None)
+    countries: Optional[list[CountryAlpha3]] = Query(None)
 
 
 class ReferralBase(BaseAdmin):

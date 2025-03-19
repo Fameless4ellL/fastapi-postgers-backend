@@ -1,14 +1,16 @@
+from eth_account import Account
 from fastapi import Depends, Path, Query, status, Security
 from fastapi.responses import JSONResponse
 from typing import Annotated, Optional
 from pydantic_extra_types.country import CountryAlpha3
 
-from sqlalchemy import func, select, or_
+from sqlalchemy import and_, func, select, or_
 from models.user import Balance, User, Role, Wallet, BalanceChangeHistory
-from models.other import Game, Ticket, Jackpot
+from models.other import Currency, Game, Ticket, Jackpot
 from routers import admin
-from sqlalchemy.orm import joinedload
-from routers.utils import Token, get_admin_token
+from eth_account.signers.local import LocalAccount
+from globals import aredis
+from routers.utils import Token, get_admin_token, url_for
 from sqlalchemy.ext.asyncio import AsyncSession
 from models.db import get_db
 from schemes.admin import (
@@ -134,17 +136,25 @@ async def get_user(
 
     data = {
         "id": user.id,
+        "firstname": user.firstname,
+        "lastname": user.lastname,
         "username": user.username,
+        "telegram": user.telegram,
         "telegram_id": user.telegram_id,
         "language_code": user.language_code,
         "phone_number": user.phone_number,
         "country": user.country,
         "email": user.email,
         "role": user.role,
+        "kyc_status": user.kyc,
+        "document": url_for('static/kyc', filename=user.document) if user.document else None,
         "created_at": user.created_at.strftime("%Y-%m-%d %H:%M:%S"),
         "updated_at": user.updated_at.strftime("%Y-%m-%d %H:%M:%S"),
         "tickets": {"purchased": tickets or 0},
-        "winnings": {"winnings": winnings or 0},
+        "winnings": {
+            "cash": winnings or 0,
+            "material": None
+        },
     }
     return JSONResponse(
         status_code=status.HTTP_200_OK, content=UserScheme(**data).model_dump()
@@ -454,7 +464,7 @@ async def get_user_transactions(
     limit: int = 10,
 ):
     """
-    Get user's balance history
+    Get user's transactions
     """
     stmt = select(BalanceChangeHistory).filter(BalanceChangeHistory.user_id == user_id)
 
@@ -485,9 +495,12 @@ async def get_user_transactions(
 @admin.get(
     "/users/{user_id}/wallet",
     dependencies=[Security(get_admin_token, scopes=[
+        Role.GLOBAL_ADMIN.value,
         Role.ADMIN.value,
         Role.SUPER_ADMIN.value,
+        Role.LOCAL_ADMIN.value,
         Role.FINANCIER.value,
+        Role.SUPPORT.value
     ])],
     responses={
         400: {"model": BadResponse},
@@ -499,7 +512,7 @@ async def get_user_wallet(
     user_id: Annotated[int, Path()],
 ):
     """
-    Get user's balance history
+    Get user wallet
     """
     stmt = select(Wallet).filter(Wallet.user_id == user_id)
 
@@ -507,10 +520,17 @@ async def get_user_wallet(
     wallet = result.scalar()
 
     if not wallet:
-        return JSONResponse(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            content={"message": "Wallet not found"},
+        acc: LocalAccount = Account.create()
+
+        wallet = Wallet(
+            user_id=user_id,
+            address=acc.address,
+            private_key=acc.key.hex()
         )
+        db.add(wallet)
+        await db.commit()
+
+        await aredis.sadd("BLOCKER:WALLETS", wallet.address)
 
     data = {
         "id": wallet.id,
@@ -546,22 +566,38 @@ async def get_user_balance(
     """
     Get user's balance
     """
-    stmt = select(Balance).options(
-        joinedload(Balance.currency)
-    ).filter(Balance.user_id == user_id)
+    stmt = (
+        select(
+            Currency.id,
+            Currency.code,
+            func.coalesce(func.sum(Balance.balance), 0).label("balance")
+        )
+        .outerjoin(Balance, and_(Balance.currency_id == Currency.id, Balance.user_id == user_id))
+        .group_by(Currency.id, Currency.code)
+    )
 
     result = await db.execute(stmt)
-    balance = result.scalars().all()
+    balances = result.fetchall()
+
+    data, total = [], 0
+    for b in balances:
+        data.append({
+            "id": b.id,
+            "balance": float(b.balance),
+            "currency": b.code
+        })
+
+        total += float(b.balance)
 
     data = [
         {
             "id": b.id,
             "balance": float(b.balance),
-            "currency": b.currency.code if b.currency else None,
-        } for b in balance
+            "currency": b.code
+        } for b in balances
     ]
 
     return JSONResponse(
         status_code=status.HTTP_200_OK,
-        content=data,
+        content={"balances": data, "total": total},
     )
