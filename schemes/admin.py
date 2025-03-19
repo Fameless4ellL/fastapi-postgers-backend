@@ -69,7 +69,7 @@ class Ticket(BaseModel):
 
 class Winnings(BaseModel):
     cash: int = 0
-    material: str = ""
+    material: Optional[str] = None
 
 
 class UserInfo(User):
