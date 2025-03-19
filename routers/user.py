@@ -314,7 +314,7 @@ async def get_countries(
     Получение список стран
     """
     try:
-        countries = pycountry.countries.lookup(q)
+        countries = pycountry.countries.search_fuzzy(q)
     except LookupError:
         return JSONResponse(
             status_code=status.HTTP_200_OK,
