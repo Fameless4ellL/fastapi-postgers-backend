@@ -2,13 +2,13 @@ import os
 import random
 from fastapi import Depends, Path, Query, background, status, Security, UploadFile
 from fastapi.responses import JSONResponse
-from typing import Annotated, Optional, Union
+from typing import Annotated, Union
 from models.log import Action
 from pydantic_extra_types.country import CountryAlpha3
 
 from sqlalchemy import func, select, or_
 from models.user import User, Role
-from models.other import Game, Jackpot, Network, Currency
+from models.other import Network, Currency
 from routers import admin
 from routers.admin import get_crud_router
 from routers.utils import get_admin_token, send_mail, url_for
@@ -28,10 +28,6 @@ from schemes.admin import (
     CurrencyCreate,
     CurrencyUpdate,
     NetworkUpdate,
-    Jackpots,
-    JackpotSchema,
-    JackpotCreate,
-    JackpotUpdate,
     Empty,
     Profile
 )
@@ -77,27 +73,18 @@ get_crud_router(
     update_schema=CurrencyUpdate,
     filters=Annotated[Empty, Depends(Empty)]
 )
-get_crud_router(
-    model=Jackpot,
-    prefix="/jackpots",
-    schema=Jackpots,
-    get_schema=JackpotSchema,
-    create_schema=JackpotCreate,
-    update_schema=JackpotUpdate,
-    filters=Annotated[Empty, Depends(Empty)]
-)
 
 
 @admin.get(
     "/admins",
-    # dependencies=[Security(get_admin_token, scopes=[
-    #     Role.SUPER_ADMIN.value,
-    #     Role.ADMIN.value,
-    #     Role.GLOBAL_ADMIN.value,
-    #     Role.LOCAL_ADMIN.value,
-    #     Role.FINANCIER.value,
-    #     Role.SUPPORT.value
-    # ])],
+    dependencies=[Security(get_admin_token, scopes=[
+        Role.SUPER_ADMIN.value,
+        Role.ADMIN.value,
+        Role.GLOBAL_ADMIN.value,
+        Role.LOCAL_ADMIN.value,
+        Role.FINANCIER.value,
+        Role.SUPPORT.value
+    ])],
     responses={
         400: {"model": BadResponse},
         200: {"model": Admins},
@@ -153,14 +140,14 @@ async def get_admin_list(
 
 @admin.get(
     "/admins/{admin_id}",
-    # dependencies=[Security(get_admin_token, scopes=[
-    #     Role.SUPER_ADMIN.value,
-    #     Role.ADMIN.value,
-    #     Role.GLOBAL_ADMIN.value,
-    #     Role.LOCAL_ADMIN.value,
-    #     Role.FINANCIER.value,
-    #     Role.SUPPORT.value
-    # ])],
+    dependencies=[Security(get_admin_token, scopes=[
+        Role.SUPER_ADMIN.value,
+        Role.ADMIN.value,
+        Role.GLOBAL_ADMIN.value,
+        Role.LOCAL_ADMIN.value,
+        Role.FINANCIER.value,
+        Role.SUPPORT.value
+    ])],
     responses={
         400: {"model": BadResponse},
         200: {"model": Profile},
@@ -271,9 +258,9 @@ async def create_admin(
     )
 
 
-@admin.post(
+@admin.put(
     "/admins/{admin_id}/update",
-    tags=[Action.ADMIN_CREATE],
+    tags=[Action.ADMIN_UPDATE],
     dependencies=[Security(get_admin_token, scopes=[
         Role.SUPER_ADMIN.value,
         Role.ADMIN.value,

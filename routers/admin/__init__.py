@@ -6,7 +6,7 @@ from sqlalchemy import select, func, or_, exists
 from models.log import Action
 from models.other import Game, Ticket
 from typing import Type, List, Annotated
-from schemes.admin import ReferralFilter, GameFilter
+from schemes.admin import ReferralFilter, GameFilter, JackpotFilter
 from schemes.base import BadResponse
 from pydantic import BaseModel
 from models.db import get_db
@@ -104,6 +104,24 @@ def get_crud_router(
                         model.comment.ilike(f"%{filters.filter}%"),
                     )
                 )
+
+        if model.__name__ == "Jackpot":
+            filters: JackpotFilter = filters
+
+            if filters.filter:
+                stmt = stmt.filter(model.name.ilike(f"%{filters.filter}%"))
+
+            if filters.date_from:
+                stmt = stmt.filter(model.created_at >= filters.date_from)
+
+            if filters.date_to:
+                stmt = stmt.filter(model.created_at <= filters.date_to)
+
+            if filters.game_type:
+                stmt = stmt.filter(model._type.in_(filters.game_type))
+
+            if filters.countries:
+                stmt = stmt.filter(model.country.in_(filters.countries))
 
         items = await db.execute(stmt.order_by(model.id.desc()).offset(offset).limit(limit))
         items = items.scalars().all()
@@ -259,7 +277,20 @@ def get_crud_router(
         for key, value in item.model_dump().items():
             setattr(db_item, key, value)
 
+        if model.__name__ == "Jackpot":
+            if item.scheduled_datetime:
+                scheduler.reschedule_job(
+                    job_id=f"jackpot_{db_item.id}",
+                    run_date=item.scheduled_datetime
+                )
+
         if model.__name__ == "Game":
+            if item.scheduled_datetime:
+                scheduler.reschedule_job(
+                    job_id=f"game_{db_item.id}",
+                    run_date=item.scheduled_datetime
+                )
+
             file = files.image
 
             if file:
@@ -309,3 +340,4 @@ from .referral import *
 from .instabingo import *
 from .kyc import *
 from .profile import *
+from .jackpots import *

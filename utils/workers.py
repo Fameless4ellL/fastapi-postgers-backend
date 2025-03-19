@@ -336,6 +336,9 @@ def proceed_jackpot(jackpot_id: Optional[int] = None):
         if not jackpot:
             continue
 
+        start_date = datetime.now()
+        jackpot.event_start = start_date
+
         tickets = db.query(Ticket).filter(
             Ticket.game_id == jackpot.id
         ).all()
@@ -365,6 +368,8 @@ def proceed_jackpot(jackpot_id: Optional[int] = None):
             ]
             if sub_winners:
                 winners.append(sub_winners)
+
+        jackpot.numbers = winners
 
         for _tickets in winners:
             for ticket in _tickets:
@@ -413,6 +418,9 @@ def proceed_jackpot(jackpot_id: Optional[int] = None):
                     history_id=balance_change.id,
                     change_type=balance_change.change_type
                 )
+
+        end_date = datetime.now()
+        jackpot.event_end = end_date
 
         jackpot.status = GameStatus.COMPLETED
         db.add(jackpot)

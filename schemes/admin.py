@@ -372,36 +372,38 @@ class JackpotBase(BaseAdmin):
     percentage: Optional[float] = 10.0
     price: float = 1.0
     image: Optional[Image] = "default_image.png"
-    has_tickets: bool = False
     game_type: JackpotType = Field(..., alias="_type")
     status: Optional[GameStatus] = None
     repeat: Optional[bool] = False
     repeat_days: Optional[list[int]] = []
     scheduled_datetime: Optional[datetime] = None
-    fundraising_date: Optional[datetime] = Field(exclude=True)
+    fund_start: Optional[datetime] = Field(exclude=True)
+    fund_end: Optional[datetime] = Field(exclude=True)
     numbers: Optional[list[Union[int, list[int]]]] = []
     event_start: Optional[datetime] = None
     event_end: Optional[datetime] = None
     updated_at: datetime
     created_at: datetime
-
-    def get_fundraising_date(self):
-        return self.fundraising_date if self.fundraising_date else datetime.now()
+    
+    tickets_pcs: int = 0
+    amount: float = 0.0
 
     @computed_field
     def fundraising_period(self) -> str:
-        return f"{self.get_fundraising_date()} - {self.scheduled_datetime - timedelta(days=1)}"
+        return f"{self.fund_start} - {self.fund_end}"
 
 
 class JackpotCreate(BaseModel):
     name: str
     percentage: float = 10.0
-    game_type: GameType
+    game_type: JackpotType
     currency_id: Annotated[int, AfterValidator(get_currency_by_id)]
     country: Optional[CountryAlpha3] = None
     scheduled_datetime: Optional[FutureDatetime]
     repeat: Optional[bool] = False
     repeat_days: Optional[list[int]] = [5, 6]
+    fund_start: Optional[datetime] = None
+    fund_end: Optional[FutureDatetime] = None
 
     @model_serializer
     def ser_model(self):
@@ -420,21 +422,26 @@ class JackpotCreate(BaseModel):
         else:
             scheduled_datetime = self.scheduled_datetime
 
+        fund_start = self.fund_start
+        if fund_start and isinstance(fund_start, datetime):
+            if fund_start.tzinfo is not None:
+                fund_start = fund_start.replace(tzinfo=None)
+
+        fund_end = self.fund_end
+        if fund_end and isinstance(fund_end, datetime):
+            if fund_end.tzinfo is not None:
+                fund_end = fund_end.replace(tzinfo=None)
+
         return {
             "name": self.name,
             "_type": self.game_type,
-            "kind": self.kind,
             "currency_id": self.currency_id,
-            "limit_by_ticket": self.category.label['limit_by_ticket'],
-            "max_limit_grid": self.category.label['max_limit_grid'],
-            "price": self.price,
-            "description": self.description,
-            "max_win_amount": self.max_win_amount,
-            "prize": self.prize,
+            "percentage": self.percentage,
             "country": self.country,
-            "min_ticket_count": self.min_ticket_count,
             "scheduled_datetime": scheduled_datetime,
-            "zone": zone,
+            "tzone": zone,
+            "fund_start": fund_start,
+            "fund_end": fund_end,
             "repeat": self.repeat,
             "repeat_days": self.repeat_days,
         }

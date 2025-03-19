@@ -102,10 +102,14 @@ class Jackpot(Base):
     image = Column(String(255), nullable=True, default="default_image.png", doc="The image of the game instance")
     status = Column(SqlEnum(GameStatus), default=GameStatus.PENDING)
 
+    numbers = Column(ARRAY(Integer), nullable=True)
+    fund_start = Column(DateTime, default=datetime.datetime.now, doc="The date and time when the fundraising will be held")
+    fund_end = Column(DateTime, default=datetime.datetime.now, doc="The date and time when the fundraising will be ended")
+
+    event_start = Column(DateTime, default=datetime.datetime.now, doc="The date and time when the game instance will be started")
+    event_end = Column(DateTime, default=datetime.datetime.now, doc="The date and time when the game instance will be ended")
     created_at = Column(DateTime, default=datetime.datetime.now)
     updated_at = Column(DateTime, default=datetime.datetime.now, onupdate=datetime.datetime.now)
-
-    deleted = Column(Boolean, default=False, doc="Indicates if the instance is deleted")
 
     currency = relationship("Currency", uselist=False)
     tickets = relationship("Ticket", back_populates="jackpot", uselist=True)
