@@ -11,7 +11,7 @@ from models.user import User, Role
 from models.other import Network, Currency
 from routers import admin
 from routers.admin import get_crud_router
-from routers.utils import get_admin_token, send_mail, url_for
+from routers.utils import Token, get_admin_token, send_mail, url_for
 from globals import scheduler, aredis
 from sqlalchemy.ext.asyncio import AsyncSession
 from models.db import get_db
@@ -36,7 +36,7 @@ from schemes.base import BadResponse, JsonForm
 
 @admin.get(
     "/jobs",
-    dependencies=[Security(get_admin_token, scopes=[Role.GLOBAL_ADMIN.value])]
+    dependencies=[Security(get_admin_token, scopes=[Role.SUPER_ADMIN.value])]
 )
 async def get_jobs():
     """
@@ -62,7 +62,8 @@ get_crud_router(
     get_schema=NetworkSchema,
     create_schema=NetworkCreate,
     update_schema=NetworkUpdate,
-    filters=Annotated[Empty, Depends(Empty)]
+    filters=Annotated[Empty, Depends(Empty)],
+    security_scopes=[Role.SUPER_ADMIN.value]
 )
 get_crud_router(
     model=Currency,
@@ -71,20 +72,13 @@ get_crud_router(
     get_schema=CurrencySchema,
     create_schema=CurrencyCreate,
     update_schema=CurrencyUpdate,
-    filters=Annotated[Empty, Depends(Empty)]
+    filters=Annotated[Empty, Depends(Empty)],
+    security_scopes=[Role.SUPER_ADMIN.value]
 )
 
 
 @admin.get(
     "/admins",
-    dependencies=[Security(get_admin_token, scopes=[
-        Role.SUPER_ADMIN.value,
-        Role.ADMIN.value,
-        Role.GLOBAL_ADMIN.value,
-        Role.LOCAL_ADMIN.value,
-        Role.FINANCIER.value,
-        Role.SUPPORT.value
-    ])],
     responses={
         400: {"model": BadResponse},
         200: {"model": Admins},
@@ -93,6 +87,14 @@ get_crud_router(
 async def get_admin_list(
     db: Annotated[AsyncSession, Depends(get_db)],
     item: Annotated[AdminFilter, Depends(AdminFilter)],
+    token: Annotated[Token, Security(
+        get_admin_token,
+        security_scopes=[
+            Role.SUPER_ADMIN.value,
+            Role.ADMIN.value,
+            Role.GLOBAL_ADMIN.value,
+        ]
+    )],
     offset: int = 0,
     limit: int = 10,
 ):
@@ -121,12 +123,14 @@ async def get_admin_list(
     count = await db.execute(stmt.with_only_columns(func.count(User.id)))
     count = count.scalar()
 
+    scope = next(iter(token.scopes), None)
+
     data = [
         {
             "id": admin.id,
             "username": f"{admin.firstname} {admin.lastname}",
-            "phone_number": admin.phone_number,
-            "email": admin.email,
+            "phone_number": admin.phone_number if scope == Role.GLOBAL_ADMIN.value else None,
+            "email": admin.email if scope == Role.GLOBAL_ADMIN.value else None,
             "role": admin.role,
             "country": admin.country,
         }
@@ -143,10 +147,6 @@ async def get_admin_list(
     dependencies=[Security(get_admin_token, scopes=[
         Role.SUPER_ADMIN.value,
         Role.ADMIN.value,
-        Role.GLOBAL_ADMIN.value,
-        Role.LOCAL_ADMIN.value,
-        Role.FINANCIER.value,
-        Role.SUPPORT.value
     ])],
     responses={
         400: {"model": BadResponse},
@@ -192,14 +192,6 @@ async def get_admin(
 @admin.post(
     "/admins/create",
     tags=[Action.ADMIN_CREATE],
-    dependencies=[Security(get_admin_token, scopes=[
-        Role.SUPER_ADMIN.value,
-        Role.ADMIN.value,
-        Role.GLOBAL_ADMIN.value,
-        Role.LOCAL_ADMIN.value,
-        Role.FINANCIER.value,
-        Role.SUPPORT.value
-    ])],
     responses={
         400: {"model": BadResponse},
         201: {"model": Admin},
@@ -207,6 +199,14 @@ async def get_admin(
 )
 async def create_admin(
     db: Annotated[AsyncSession, Depends(get_db)],
+    token: Annotated[Token, Security(
+        get_admin_token,
+        security_scopes=[
+            Role.SUPER_ADMIN.value,
+            Role.ADMIN.value,
+            Role.GLOBAL_ADMIN.value,
+        ]
+    )],
     item: Annotated[AdminCreate, JsonForm],
     bg: background.BackgroundTasks,
     avatar: UploadFile,
@@ -215,6 +215,16 @@ async def create_admin(
     """
     Create new admin
     """
+    scope = next(iter(token.scopes), None)
+    if (
+        scope == Role.GLOBAL_ADMIN.value
+        and item.role in {Role.SUPER_ADMIN.value, Role.ADMIN.value}
+    ):
+        return JSONResponse(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            content={"message": "You can't create this admin"},
+        )
+
     new_admin = User(**item.model_dump(exclude={"id"}))
     db.add(new_admin)
     await db.commit()
@@ -264,10 +274,6 @@ async def create_admin(
     dependencies=[Security(get_admin_token, scopes=[
         Role.SUPER_ADMIN.value,
         Role.ADMIN.value,
-        Role.GLOBAL_ADMIN.value,
-        Role.LOCAL_ADMIN.value,
-        Role.FINANCIER.value,
-        Role.SUPPORT.value
     ])],
     responses={
         400: {"model": BadResponse},
@@ -354,14 +360,6 @@ async def save_file(model: object, file: UploadFile, directory: str, field: str)
 @admin.delete(
     "/admins/{admin_id}",
     tags=[Action.ADMIN_DELETE],
-    dependencies=[Security(get_admin_token, scopes=[
-        Role.SUPER_ADMIN.value,
-        Role.ADMIN.value,
-        Role.GLOBAL_ADMIN.value,
-        Role.LOCAL_ADMIN.value,
-        Role.FINANCIER.value,
-        Role.SUPPORT.value
-    ])],
     responses={
         400: {"model": BadResponse},
         200: {"model": Admin},
@@ -369,11 +367,24 @@ async def save_file(model: object, file: UploadFile, directory: str, field: str)
 )
 async def delete_admin(
     db: Annotated[AsyncSession, Depends(get_db)],
+    token: Annotated[Token, Security(
+        get_admin_token,
+        security_scopes=[
+            Role.SUPER_ADMIN.value,
+            Role.ADMIN.value,
+        ]
+    )],
     admin_id: Annotated[int, Path()],
 ):
     """
     Delete admin
     """
+    if token.id == admin_id:
+        return JSONResponse(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            content={"message": "You can't delete yourself"},
+        )
+
     admin = await db.execute(select(User).filter(User.id == admin_id))
     admin = admin.scalar()
 
@@ -383,7 +394,14 @@ async def delete_admin(
             content={"message": "Admin not found"},
         )
 
-    admin.active = False
+    scope = next(iter(token.scopes), None)
+    if scope == Role.ADMIN.value and admin.role in {Role.SUPER_ADMIN.value, Role.ADMIN.value}:
+        return JSONResponse(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            content={"message": "You can't delete this admin"},
+        )
+
+    admin.active = not admin.active
     db.add(admin)
     await db.commit()
     await aredis.delete(f"TOKEN:ADMINS:{admin.id}")
