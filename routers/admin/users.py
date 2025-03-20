@@ -6,7 +6,7 @@ from pydantic_extra_types.country import CountryAlpha3
 
 from sqlalchemy import and_, func, select, or_
 from models.user import Balance, User, Role, Wallet, BalanceChangeHistory
-from models.other import Currency, Game, Ticket, Jackpot
+from models.other import Currency, Game, Network, Ticket, Jackpot
 from routers import admin
 from eth_account.signers.local import LocalAccount
 from globals import aredis
@@ -546,14 +546,14 @@ async def get_user_wallet(
 
 @admin.get(
     "/users/{user_id}/balance",
-    dependencies=[Security(get_admin_token, scopes=[
-        Role.GLOBAL_ADMIN.value,
-        Role.ADMIN.value,
-        Role.SUPER_ADMIN.value,
-        Role.LOCAL_ADMIN.value,
-        Role.FINANCIER.value,
-        Role.SUPPORT.value
-    ])],
+    # dependencies=[Security(get_admin_token, scopes=[
+    #     Role.GLOBAL_ADMIN.value,
+    #     Role.ADMIN.value,
+    #     Role.SUPER_ADMIN.value,
+    #     Role.LOCAL_ADMIN.value,
+    #     Role.FINANCIER.value,
+    #     Role.SUPPORT.value
+    # ])],
     responses={
         400: {"model": BadResponse},
         200: {"model": BalanceBase},
@@ -570,10 +570,12 @@ async def get_user_balance(
         select(
             Currency.id,
             Currency.code,
+            Network.symbol,
             func.coalesce(func.sum(Balance.balance), 0).label("balance")
         )
         .outerjoin(Balance, and_(Balance.currency_id == Currency.id, Balance.user_id == user_id))
-        .group_by(Currency.id, Currency.code)
+        .outerjoin(Network, Currency.network_id == Network.id)
+        .group_by(Currency.id, Currency.code, Network.symbol)
     )
 
     result = await db.execute(stmt)
@@ -584,18 +586,11 @@ async def get_user_balance(
         data.append({
             "id": b.id,
             "balance": float(b.balance),
+            "network": b.symbol,
             "currency": b.code
         })
 
         total += float(b.balance)
-
-    data = [
-        {
-            "id": b.id,
-            "balance": float(b.balance),
-            "currency": b.code
-        } for b in balances
-    ]
 
     return JSONResponse(
         status_code=status.HTTP_200_OK,
