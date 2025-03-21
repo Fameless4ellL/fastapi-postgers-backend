@@ -87,7 +87,7 @@ async def game_instances(
         "currency": g.currency.code if g.currency else None,
         "status": g.status.value,
         "price": float(g.price),
-        "prize": float(g.prize),
+        "prize": float(g.prize) if g.prize.isnumeric() else g.prize,
         "max_limit_grid": g.max_limit_grid,
         "endtime": g.scheduled_datetime.timestamp(),
         "created": g.created_at.timestamp()
@@ -115,7 +115,7 @@ async def game_instances(
             "image": url_for("static", path=_game.image),
             "status": _game.status.value,
             "price": float(_game.price),
-            "prize": float(_game.prize),
+            "prize": float(_game.prize) if _game.prize.isnumeric() else _game.prize,
             "max_limit_grid": _game.max_limit_grid,
             "endtime": _game.scheduled_datetime.timestamp(),
             "created": _game.created_at.timestamp()
@@ -218,7 +218,7 @@ async def read_game(
         "min_ticket_count": game.min_ticket_count,
         "max_limit_grid": game.max_limit_grid,
         "price": float(game.price or 0),
-        "prize": float(game.prize or 0),
+        "prize": float(game.prize or 0) if game.prize.isnumeric() else game.prize,
         "endtime": game.scheduled_datetime.timestamp(),
         "created": game.created_at.timestamp()
     }

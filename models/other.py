@@ -39,6 +39,12 @@ class GameStatus(Enum):
     DELETED = "deleted"
 
 
+class TicketStatus(Enum):
+    PENDING = "pending"
+    COMPLETED = "completed"
+    CANCELLED = "cancelled"
+
+
 class JackpotStatus(Enum):
     PENDING = "pending"
     ACTIVE = "active"
@@ -153,7 +159,7 @@ class Game(Base):
     price = Column(DECIMAL(10, 2), nullable=False, default=1)
     description = Column(String(500), nullable=True, doc="Description of the game")
     max_win_amount = Column(DECIMAL(9, 2), nullable=True, default=8)
-    prize = Column(DECIMAL(9, 2), nullable=True, default=1000)
+    prize = Column(String(256), nullable=True, default="1000", doc="The prize of the game instance")
     country = Column(String(32), nullable=True)
     min_ticket_count = Column(Integer, default=1, doc="Minimum number of tickets per user")
 
@@ -193,6 +199,7 @@ class Ticket(Base):
     numbers = Column(ARRAY(Integer), nullable=False)
     won = Column(Boolean, default=False)
     amount = Column(DECIMAL(9, 2), default=0)
+    status = Column(SqlEnum(TicketStatus), default=TicketStatus.PENDING)
     demo = Column(Boolean, default=False)
     created_at = Column(DateTime, default=datetime.datetime.now)
     updated_at = Column(DateTime, default=datetime.datetime.now, onupdate=datetime.datetime.now)

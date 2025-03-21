@@ -1,4 +1,4 @@
-from typing import Annotated, Optional
+from typing import Annotated, Optional, Union
 from pydantic import BaseModel, Field, AfterValidator
 from annotated_types import Len
 from enum import Enum
@@ -33,7 +33,7 @@ class Game(BaseModel):
     currency: Optional[str] = None
     status: str
     price: float
-    prize: float
+    prize: Union[float, str] = None
     max_limit_grid: int
     endtime: float
     created: float
@@ -46,7 +46,7 @@ class GameInstance(Game):
     min_ticket_count: int
     max_limit_grid: int
     price: float
-    prize: float
+    prize: Union[float, str] = None
     min_ticket_count: int
 
 

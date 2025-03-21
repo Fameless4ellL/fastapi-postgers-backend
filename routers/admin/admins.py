@@ -89,7 +89,7 @@ async def get_admin_list(
     item: Annotated[AdminFilter, Depends(AdminFilter)],
     token: Annotated[Token, Security(
         get_admin_token,
-        security_scopes=[
+        scopes=[
             Role.SUPER_ADMIN.value,
             Role.ADMIN.value,
             Role.GLOBAL_ADMIN.value,
@@ -201,7 +201,7 @@ async def create_admin(
     db: Annotated[AsyncSession, Depends(get_db)],
     token: Annotated[Token, Security(
         get_admin_token,
-        security_scopes=[
+        scopes=[
             Role.SUPER_ADMIN.value,
             Role.ADMIN.value,
             Role.GLOBAL_ADMIN.value,
@@ -369,7 +369,7 @@ async def delete_admin(
     db: Annotated[AsyncSession, Depends(get_db)],
     token: Annotated[Token, Security(
         get_admin_token,
-        security_scopes=[
+        scopes=[
             Role.SUPER_ADMIN.value,
             Role.ADMIN.value,
         ]

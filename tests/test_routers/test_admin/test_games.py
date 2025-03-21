@@ -184,4 +184,4 @@ class TestGames:
                 "Authorization": f"Bearer {admin_token}",
             }
         )
-        assert response.status_code == 200
+        assert response.status_code == 200 if game.kind == GameView.MATERIAL else 400

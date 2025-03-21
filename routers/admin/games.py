@@ -7,7 +7,7 @@ from typing import Annotated, Literal
 from sqlalchemy import select, func, orm, exists
 from models.log import Action
 from models.user import Role, User
-from models.other import Currency, Game, GameStatus, GameView, Ticket
+from models.other import Currency, Game, GameStatus, GameView, TicketStatus, Ticket
 from routers import admin
 from routers.admin import get_crud_router
 from routers.utils import get_admin_token
@@ -148,14 +148,14 @@ async def get_purchased_tickets(
             'pcs': 0,
             'currency': "USDT",
             'amount': 0,
-            'prize': 0,
+            'prize': "0",
         }
     else:
         data = {
             'pcs': tickets.pcs,
             'currency': tickets.code,
             'amount': float(tickets.amount),
-            'prize': float(tickets.prize),
+            'prize': tickets.prize,
         }
 
     return JSONResponse(
@@ -302,9 +302,12 @@ async def get_winners(
         Ticket.user_id,
         func.sum(Ticket.amount).label("amount"),
         Ticket.created_at,
-        User.username
+        User.username,
+        Game.prize,
     ).join(
         User, Ticket.user_id == User.id
+    ).join(
+        Game, Ticket.game_id == Game.id
     ).filter(
         Ticket.game_id == game_id,
         Ticket.won.is_(True)
@@ -312,7 +315,8 @@ async def get_winners(
         Ticket.id,
         Ticket.user_id,
         Ticket.created_at,
-        User.username
+        User.username,
+        Game.prize
     ).offset(offset).limit(limit)
     tickets = tickets.all()
 
@@ -367,9 +371,9 @@ async def set_ticket_status(
             status_code=status.HTTP_400_BAD_REQUEST, content="Ticket not found"
         )
 
-    # TODO set ticket prize has been paid
-
+    ticket.status = TicketStatus.COMPLETED
+    db.commit()
 
     return JSONResponse(
-        status_code=status.HTTP_200_OK, content="Unimplemented"
+        status_code=status.HTTP_200_OK, content="OK"
     )

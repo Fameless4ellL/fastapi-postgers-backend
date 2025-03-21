@@ -11,6 +11,7 @@ from models.user import Balance, BalanceChangeHistory, User, Wallet
 from models.other import (
     Currency,
     InstaBingo,
+    TicketStatus,
     Ticket,
     Number
 )
@@ -38,7 +39,6 @@ async def get_instabingo(
     stmt = select(
         InstaBingo.id,
         InstaBingo.price,
-        InstaBingo.prize,
         Currency.code
     ).join(
         Currency, InstaBingo.currency_id == Currency.id
@@ -166,11 +166,11 @@ async def buy_tickets(
     total_price = game.price * len(item.numbers)
 
     # check if the user has enough balance
-    # if user_balance.balance < total_price:
-    #     return JSONResponse(
-    #         status_code=status.HTTP_400_BAD_REQUEST,
-    #         content=BadResponse(message="Insufficient balance").model_dump()
-    #     )
+    if user_balance.balance < total_price:
+        return JSONResponse(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            content=BadResponse(message="Insufficient balance").model_dump()
+        )
 
     win_numbers = []
     while len(win_numbers) < 15:
@@ -188,7 +188,7 @@ async def buy_tickets(
         prize = game.price * 2
 
     if all(any(num == win_num[0] for win_num in win_numbers) for num in item.numbers):
-        last_number = numbers[-1]
+        last_number = item.numbers[-1]
         prize = next(
             (game.winnings[p] for p in game.winnings.keys() if p >= last_number),
             None
@@ -253,6 +253,7 @@ async def buy_tickets(
         numbers=item.numbers,
         won=won,
         jackpot_id=jackpot_id,
+        status=TicketStatus.COMPLETED
     )
     db.add(ticket)
     await db.commit()

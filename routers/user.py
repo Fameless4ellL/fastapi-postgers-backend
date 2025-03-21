@@ -430,7 +430,7 @@ async def get_my_games(
             "image": url_for("static", path=i.image),
             "status": str(i.status),
             "price": float(i.price),
-            "prize": float(i.prize),
+            "prize": float(i.prize) if i.prize.isnumeric() else i.prize,
             "won": float(total_amount),
             "endtime": i.scheduled_datetime.timestamp(),
             "created": i.created_at.timestamp(),

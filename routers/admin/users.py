@@ -134,6 +134,17 @@ async def get_user(
     )
     winnings = winnings.scalar()
 
+    material_winnings = select(
+        Game.prize
+    ).join(
+        Ticket, Ticket.game_id == Game.id
+    ).filter(
+        Ticket.user_id == user_id,
+        Ticket.won.is_(True)
+    ).offset(0).limit(3)
+    material_winnings = await db.execute(material_winnings)
+    material_winnings = material_winnings.scalars().all()
+
     data = {
         "id": user.id,
         "firstname": user.firstname,
@@ -147,13 +158,13 @@ async def get_user(
         "email": user.email,
         "role": user.role,
         "kyc_status": user.kyc,
-        "document": url_for('static/kyc', filename=user.document) if user.document else None,
+        "document": [url_for('static/kyc', filename=user.document) if user.document else None],
         "created_at": user.created_at.strftime("%Y-%m-%d %H:%M:%S"),
         "updated_at": user.updated_at.strftime("%Y-%m-%d %H:%M:%S"),
         "tickets": {"purchased": tickets or 0},
         "winnings": {
             "cash": winnings or 0,
-            "material": None
+            "material": [i for i in material_winnings]
         },
     }
     return JSONResponse(

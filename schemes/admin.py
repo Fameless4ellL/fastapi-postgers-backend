@@ -12,7 +12,8 @@ from pydantic import (
     FutureDatetime,
     model_serializer,
     AfterValidator,
-    ConfigDict
+    ConfigDict,
+    field_validator
 )
 import pytz
 from typing import Optional, Annotated, Any, Union
@@ -69,7 +70,7 @@ class Ticket(BaseModel):
 
 class Winnings(BaseModel):
     cash: int = 0
-    material: Optional[str] = None
+    material: Optional[list[Optional[str]]] = []
 
 
 class UserInfo(User):
@@ -82,7 +83,7 @@ class UserInfo(User):
     email: Optional[str] = None
     wallet: Optional[str] = None
     kyc_status: Optional[bool] = None
-    document: Optional[str] = None
+    document: Optional[list[Optional[str]]] = []
     role: str
     created_at: str
     updated_at: str
@@ -233,7 +234,7 @@ class GameBase(BaseAdmin):
     price: float = 1.0
     description: Optional[str]
     max_win_amount: Optional[float] = 8.0
-    prize: Optional[float] = 1000.0
+    prize: Union[float, str] = 1000
     image: Optional[Image] = "default_image.png"
     country: Optional[str]
     min_ticket_count: int = 1
@@ -254,7 +255,7 @@ class GameCreate(BaseAdmin):
     price: float = 1.0
     description: Optional[str] = Field("", max_length=500)
     max_win_amount: Optional[float] = 8.0
-    prize: Optional[float] = 1000.0
+    prize: Union[float, str] = 1000
     country: Optional[CountryAlpha3] = None
     min_ticket_count: int = 1
     scheduled_datetime: Optional[FutureDatetime]
@@ -277,6 +278,9 @@ class GameCreate(BaseAdmin):
             scheduled_datetime = self.scheduled_datetime.replace(tzinfo=None)
         else:
             scheduled_datetime = self.scheduled_datetime
+
+        if self.kind == GameView.MATERIAL:
+            self.prize = str(self.prize)
 
         return {
             "name": self.name,
@@ -314,7 +318,7 @@ class GameSchema(BaseAdmin):
     max_win_amount: Optional[float] = 8.0
     min_ticket_count: int = 1
     price: float = 1.0
-    prize: Optional[float] = 1000.0
+    prize: Union[float, str] = 1000.0
     image: Optional[Image] = "default_image.png"
     has_tickets: bool = False
     game_type: GameType
@@ -330,6 +334,10 @@ class GameSchema(BaseAdmin):
     @computed_field
     def category(self) -> str:
         return f"{self.limit_by_ticket}/{self.max_limit_grid}"
+
+    @field_validator("prize")
+    def validate_prize(cls, value: Union[float, str]) -> Union[float, str]:
+        return str(value)
 
 
 class Games(BaseModel):

@@ -1,7 +1,7 @@
 from fastapi.testclient import TestClient
 import pytest
 from sqlalchemy.orm.session import Session
-from models.other import Currency, Game, GameType, Network, Ticket
+from models.other import Currency, Game, GameType, Network, Ticket, GameView
 from models.user import User, Balance
 from globals import redis
 from utils.signature import get_password_hash
@@ -119,12 +119,22 @@ def currency(db: Session, network: Network):
     yield currency
 
 
+@pytest.fixture(params=GameView)
+def game_view(
+    request: pytest.FixtureRequest
+):
+    yield request.param, "YourMom"
+
+
 @pytest.fixture(params=GameType)
 def game(
     db: Session,
     currency: Currency,
-    request: pytest.FixtureRequest
+    request: pytest.FixtureRequest,
+    game_view: GameView
 ):
+    view, prize = game_view
+
     db.query(Game).filter(
         Game.name == "Test Game"
     ).delete()
@@ -134,6 +144,8 @@ def game(
         name="Test Game",
         currency_id=currency.id,
         game_type=request.param,
+        kind=view,
+        prize=prize,
         scheduled_datetime="2025-01-30T12:57:40",
     )
     db.add(game)

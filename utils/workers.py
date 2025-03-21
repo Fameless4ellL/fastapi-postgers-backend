@@ -9,7 +9,7 @@ from datetime import datetime, timedelta
 
 from models.db import get_sync_db, get_sync_logs_db
 from models.user import Notification, Wallet
-from models.other import Currency, Game, GameStatus, GameView, Ticket, Jackpot
+from models.other import Currency, Game, GameStatus, GameView, Ticket, Jackpot, TicketStatus
 from utils.web3 import transfer
 from sqlalchemy.orm import joinedload
 from utils import worker
@@ -57,21 +57,16 @@ def generate_game(
 
     game_inst = Game(
         name=f"game #{str(game.id)}",
-        game_type=game.game_type,
-        description=game.description,
-        country=game.country,
-        repeat=True,
-        repeat_days=game.repeat_days,
-        scheduled_datetime=scheduled_datetime,
-        price=game.price,
-        max_win_amount=game.max_win_amount,
-        prize=game.prize,
-        currency_id=game.currency_id,
-        limit_by_ticket=game.limit_by_ticket,
-        max_limit_grid=game.max_limit_grid,
-        min_ticket_count=game.min_ticket_count,
-        image=game.image,
         status=GameStatus.PENDING,
+        scheduled_datetime=scheduled_datetime,
+        **{
+            key: getattr(game, key)
+            for key in Game.__table__.columns.keys()
+            if key not in {
+                "id", "name", "scheduled_datetime",
+                "event_start", "event_end", 'status'
+            }
+        }
     )
     db.add(game_inst)
     db.commit()
@@ -114,8 +109,11 @@ def proceed_game(game_id: Optional[int] = None):
             Ticket.game_id == game.id
         ).all()
 
-        prize = float(game.prize or 1000)
-        prize_per_winner = prize // float(game.max_win_amount or 8)
+        if game.kind == GameView.MONETARY:
+            prize = float(game.prize or 1000)
+            prize_per_winner = prize // float(game.max_win_amount or 8)
+        else:
+            prize_per_winner = 1
 
         winners = []
         _tickets = [ticket.numbers for ticket in tickets]
@@ -151,6 +149,7 @@ def proceed_game(game_id: Optional[int] = None):
 
                 if game.kind == GameView.MONETARY:
                     ticket.amount = prize_per_ticket
+                    ticket.status = TicketStatus.COMPLETED
 
                     user_balance = db.query(Balance).with_for_update().filter(
                         Balance.user_id == ticket.user_id
@@ -283,23 +282,23 @@ def generate_jackpot(
         minute=jackpot.scheduled_datetime.minute,
     )
 
+    fund_start = scheduled_datetime - timedelta(days=7)
+    fund_end = scheduled_datetime - timedelta(days=1)
+
     jackpot_inst = Jackpot(
-        name=f"game #{str(jackpot.id + 1)}",
-        game_type=jackpot.game_type,
-        description=jackpot.description,
-        country=jackpot.country,
-        repeat=True,
-        repeat_days=jackpot.repeat_days,
+        name=f"Jackpot #{str(jackpot.id + 1)}",
         scheduled_datetime=scheduled_datetime,
-        price=jackpot.price,
-        max_win_amount=jackpot.max_win_amount,
-        prize=jackpot.prize,
-        currency_id=jackpot.currency_id,
-        limit_by_ticket=jackpot.limit_by_ticket,
-        max_limit_grid=jackpot.max_limit_grid,
-        min_ticket_count=jackpot.min_ticket_count,
-        image=jackpot.image,
-        status=GameStatus.PENDING,
+        fund_start=fund_start,
+        fund_end=fund_end,
+        **{
+            key: getattr(jackpot, key)
+            for key in Jackpot.__table__.columns.keys()
+            if key not in {
+                "id", "name", "scheduled_datetime",
+                "fund_start", "fund_end", "event_start",
+                "event_end", "status"
+            }
+        }
     )
     db.add(jackpot_inst)
     db.commit()
