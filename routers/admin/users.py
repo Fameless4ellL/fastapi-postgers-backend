@@ -6,7 +6,7 @@ from pydantic_extra_types.country import CountryAlpha3
 
 from sqlalchemy import and_, func, select, or_
 from models.user import Balance, User, Role, Wallet, BalanceChangeHistory
-from models.other import Currency, Game, Network, Ticket, Jackpot
+from models.other import Currency, Game, GameView, Network, Ticket, Jackpot, InstaBingo
 from routers import admin
 from eth_account.signers.local import LocalAccount
 from globals import aredis
@@ -243,7 +243,7 @@ async def get_user_games(
                 else None
             ),
             "tickets_purchased": game_instance.tickets_purchased,
-            "amount": float(game_instance.won_amount),
+            "amount": float(game_instance.won_amount) if game_instance.won_amount else 0,
         }
         for game_instance in game_instances
     ]
@@ -606,4 +606,108 @@ async def get_user_balance(
     return JSONResponse(
         status_code=status.HTTP_200_OK,
         content={"balances": data, "total": total},
+    )
+
+
+@admin.get(
+    "/users/{user_id}/winings",
+    dependencies=[Security(get_admin_token, scopes=[
+        Role.GLOBAL_ADMIN.value,
+        Role.ADMIN.value,
+        Role.SUPER_ADMIN.value,
+        Role.LOCAL_ADMIN.value,
+        Role.FINANCIER.value,
+        Role.SUPPORT.value
+    ])],
+    responses={
+        400: {"model": BadResponse},
+    },
+)
+async def get_user_winings(
+    db: Annotated[AsyncSession, Depends(get_db)],
+    user_id: Annotated[int, Path()],
+    offset: int = 0,
+    limit: int = 10,
+):
+    """
+    Get user's winings Tickets
+    """
+    # get ticket with join jackpot, game, instabingo
+    stmt = (
+        select(
+            Ticket.id,
+            Currency.code,
+            Ticket.instabingo_id,
+            Ticket.jackpot_id,
+            Ticket.game_id,
+            Ticket.numbers,
+            Ticket.amount,
+            Ticket.won
+        )
+        .join(Currency, Currency.id == Ticket.currency_id)
+        .filter(
+            Ticket.user_id == user_id,
+            Ticket.won.is_(True)
+        )
+    )
+
+    result = await db.execute(stmt.offset(offset).limit(limit))
+    tickets = result.fetchall()
+
+    count = await db.execute(stmt.with_only_columns(func.count(Ticket.id)))
+    count = count.scalar() or 0
+
+    data = []
+    for ticket in tickets:
+        if ticket.instabingo_id:
+            instabingo = await db.execute(
+                select(InstaBingo).filter(
+                    InstaBingo.id == ticket.instabingo_id
+                )
+            )
+            instabingo = instabingo.scalar()
+
+            game_id = instabingo.id
+            game_name = "InstaBingo"
+
+            amount = f"{ticket.amount} {ticket.code}"
+
+        elif ticket.jackpot_id:
+            jackpot = await db.execute(
+                select(Jackpot).filter(Jackpot.id == ticket.jackpot_id)
+            )
+            jackpot = jackpot.scalar()
+
+            game_id = jackpot.id
+            game_name = "Jackpot"
+
+            amount = f"{jackpot.amount} {ticket.code}"
+
+        elif ticket.game_id:
+            game = await db.execute(
+                select(Game).filter(Game.id == ticket.game_id)
+            )
+            game = game.scalar()
+
+            game_id = game.id
+            game_name = "Game"
+
+            if game.kind == GameView.MONETARY:
+                amount = f"{ticket.amount} {ticket.code}"
+            else:
+                amount = game.prize
+
+        else:
+            continue
+
+        data.append({
+            "id": ticket.id,
+            "numbers": ticket.numbers,
+            "game_id": game_id,
+            "type": game_name,
+            "amount": str(amount),
+        })
+    return JSONResponse(
+        status_code=status.HTTP_200_OK,
+        content={"tickets": data, "count": count},
     )
