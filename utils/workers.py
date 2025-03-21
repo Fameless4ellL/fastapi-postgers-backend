@@ -316,7 +316,7 @@ def generate_jackpot(
 @worker.register
 def proceed_jackpot(jackpot_id: Optional[int] = None):
     """
-    Proceed the game instance and distribute the prize money
+    Proceed the jackpot instance and distribute the prize money
     """
     db = next(get_sync_db())
 
@@ -339,13 +339,15 @@ def proceed_jackpot(jackpot_id: Optional[int] = None):
         jackpot.event_start = start_date
 
         tickets = db.query(Ticket).filter(
-            Ticket.game_id == jackpot.id
+            Ticket.jackpot_id == jackpot.id
         ).all()
         total_prize = db.query(func.sum(Ticket.amount)).filter(
             Ticket.game_id == jackpot.id
         ).scalar() or 0
 
         percentage = jackpot.percentage or 10
+        if percentage == 0:
+            raise ValueError("Percentage cannot be zero")
         prize = total_prize * (percentage / 100)
 
         winners = []
@@ -383,6 +385,7 @@ def proceed_jackpot(jackpot_id: Optional[int] = None):
                     )
                     db.add(user_balance)
                     db.commit()
+                    db.refresh(user_balance)
 
                 previous_balance = user_balance.balance
                 balance = user_balance.balance + Decimal(prize)
@@ -425,7 +428,7 @@ def proceed_jackpot(jackpot_id: Optional[int] = None):
         db.add(jackpot)
 
         if jackpot.repeat:
-            generate_jackpot(jackpot.id)
+            generate_jackpot(jackpot.id + 1)
 
     db.commit()
 
