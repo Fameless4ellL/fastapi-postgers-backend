@@ -17,14 +17,14 @@ from pydantic import (
 )
 import pytz
 from typing import Optional, Annotated, Any, Union
-from datetime import datetime, date, timedelta
+from datetime import datetime, date
 from pydantic_extra_types.country import CountryAlpha3
 from fastapi import Query, UploadFile
 
 from models.other import GameStatus, GameType, GameView, JackpotType
 from models.user import BalanceChangeHistory
 from routers.utils import get_currency_by_id, url_for
-from schemes.base import Country
+from schemes.base import Country, Country_by_name
 from settings import settings
 from utils.datastructure import MultiValueStrEnum
 
@@ -475,9 +475,13 @@ class Jackpots(BaseModel):
 
 
 @dataclass
-class JackpotFilter(DatePicker, Search):
+class Countries:
+    countries: Optional[list[Country_by_name]] = Query(None)
+
+
+@dataclass
+class JackpotFilter(DatePicker, Search, Countries):
     game_type: Optional[list[JackpotType]] = Query(None)
-    countries: Optional[list[CountryAlpha3]] = Query(None)
 
 
 class ReferralBase(BaseAdmin):
@@ -624,8 +628,8 @@ class InstaBingos(BaseModel):
 
 
 @dataclass
-class InstaBingoFilter(DatePicker, Search):
-    countries: Optional[list[CountryAlpha3]] = Query(None)
+class InstaBingoFilter(DatePicker, Search, Countries):
+    pass
 
 
 class KycBase(BaseAdmin):
@@ -679,9 +683,8 @@ class AdminStatus(MultiValueStrEnum):
 
 
 @dataclass
-class AdminFilter(Search):
+class AdminFilter(Search, Countries):
     role: Optional[list[AdminRoles]] = Query(None)
-    countries: Optional[list[CountryAlpha3]] = Query(None)
     status: Optional[list[AdminStatus]] = Query(None)
 
 
