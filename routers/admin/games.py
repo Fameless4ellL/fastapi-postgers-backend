@@ -20,6 +20,7 @@ from schemes.admin import (
     Games,
     GameCreate,
     GameUpdate,
+    Winners,
 )
 from globals import scheduler
 from schemes.base import BadResponse, JsonForm
@@ -286,6 +287,7 @@ async def get_participant_tickets(
         ])],
     responses={
         400: {"model": BadResponse},
+        200: {"model": Winners},
     },
 )
 async def get_winners(
@@ -300,6 +302,7 @@ async def get_winners(
     tickets = db.query(
         Ticket.id,
         Ticket.user_id,
+        Ticket.status,
         func.sum(Ticket.amount).label("amount"),
         Ticket.created_at,
         User.username,
@@ -324,13 +327,21 @@ async def get_winners(
         "id": ticket.id,
         "user_id": ticket.user_id,
         "user": ticket.user.username,
-        "status": "paid" if ticket.amount > 0 else "not paid",
+        "status": ticket.status if not ticket.status else TicketStatus.COMPLETED,
         "amount": float(ticket.amount),
         "date": ticket.created_at.strftime("%Y-%m-%d %H:%M:%S")
     } for ticket in tickets]
 
+    count = db.query(
+        func.count(Ticket.id)
+    ).filter(
+        Ticket.game_id == game_id,
+        Ticket.won.is_(True)
+    ).scalar() or 0
+
     return JSONResponse(
-        status_code=status.HTTP_200_OK, content=data
+        status_code=status.HTTP_200_OK,
+        content={"count": count, "items": data}
     )
 
 
