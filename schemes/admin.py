@@ -705,7 +705,7 @@ class AdminCreate(BaseAdmin):
         phone_number = f"{country_code.country_code}{country_code.national_number}"
 
         country = geocoder.region_code_for_number(country_code)
-        alpha2 = pycountry.countries.get(alpha_2=country).alpha_3
+        alpha3 = pycountry.countries.get(alpha_2=country).alpha_3
 
         return {
             "firstname": self.firstname,
@@ -714,7 +714,7 @@ class AdminCreate(BaseAdmin):
             "phone_number": phone_number,
             "role": self.role,
             "telegram": self.telegram,
-            "country": alpha2,
+            "country": alpha3,
         }
 
 

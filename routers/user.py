@@ -20,7 +20,7 @@ from globals import aredis
 from routers.utils import get_user, get_currency, url_for, get_user_token
 
 from sqlalchemy.ext.asyncio import AsyncSession
-from schemes.base import BadResponse, Country
+from schemes.base import BadResponse, Country, JsonForm
 from schemes.game import (
     MyGames, MyGamesType, Tickets, Withdraw
 )
@@ -216,7 +216,7 @@ async def withdraw(
 async def upload_kyc(
     user: Annotated[User, Depends(get_user)],
     db: Annotated[AsyncSession, Depends(get_db)],
-    item: KYC,
+    item: Annotated[KYC, JsonForm()],
     file: UploadFile
 ):
     """
