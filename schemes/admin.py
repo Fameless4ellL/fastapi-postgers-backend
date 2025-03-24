@@ -713,3 +713,17 @@ class AdminCreate(BaseAdmin):
             "telegram": self.telegram,
             "country": alpha2,
         }
+
+
+class UserTicketWinner(BaseModel):
+    id: int
+    user_id: int
+    user: Optional[str] = None
+    status: str
+    amount: float
+    date: str
+
+
+class Winners(BaseModel):
+    items: list[UserTickets] = []
+    count: int = 0

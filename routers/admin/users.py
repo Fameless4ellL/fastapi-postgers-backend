@@ -360,14 +360,17 @@ async def get_user_jackpots(
     result = await db.execute(stmt.offset(offset).limit(limit))
     game_instances = result.fetchall()
 
-    count = await db.execute(
-        stmt.with_only_columns(func.count(Jackpot.id))
+    count_stmt = (
+        select(func.count(Jackpot.id.distinct()))
+        .join(Ticket, Ticket.jackpot_id == Jackpot.id)
+        .filter(Ticket.user_id == user_id)
     )
-    count = count.scalar() or 0
+    count_result = await db.execute(count_stmt)
+    count = count_result.scalar() or 0
 
     data = [
         {
-            "game_instance_id": game_instance.id,
+            "jackpot_instance_id": game_instance.id,
             "game_name": game_instance.name,
             "scheduled_datetime": (
                 game_instance.scheduled_datetime.strftime("%Y-%m-%d %H:%M:%S")
@@ -381,7 +384,7 @@ async def get_user_jackpots(
 
     return JSONResponse(
         status_code=status.HTTP_200_OK,
-        content=UserJackpots(games=data, count=count).model_dump(),
+        content=UserJackpots(jackpots=data, count=count).model_dump(),
     )
 
 
@@ -557,14 +560,14 @@ async def get_user_wallet(
 
 @admin.get(
     "/users/{user_id}/balance",
-    # dependencies=[Security(get_admin_token, scopes=[
-    #     Role.GLOBAL_ADMIN.value,
-    #     Role.ADMIN.value,
-    #     Role.SUPER_ADMIN.value,
-    #     Role.LOCAL_ADMIN.value,
-    #     Role.FINANCIER.value,
-    #     Role.SUPPORT.value
-    # ])],
+    dependencies=[Security(get_admin_token, scopes=[
+        Role.GLOBAL_ADMIN.value,
+        Role.ADMIN.value,
+        Role.SUPER_ADMIN.value,
+        Role.LOCAL_ADMIN.value,
+        Role.FINANCIER.value,
+        Role.SUPPORT.value
+    ])],
     responses={
         400: {"model": BadResponse},
         200: {"model": BalanceBase},
