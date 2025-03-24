@@ -99,11 +99,15 @@ def proceed_game(game_id: Optional[int] = None):
         ).with_for_update().all()
 
     for game in pending_games:
-        start_date = datetime.now()
-        game.event_start = start_date
-
         if not game:
             continue
+
+        game.status = GameStatus.ACTIVE
+        db.add(game)
+        db.commit()
+
+        start_date = datetime.now()
+        game.event_start = start_date
 
         tickets = db.query(Ticket).filter(
             Ticket.game_id == game.id
@@ -723,6 +727,25 @@ def withdraw(
 
     return tx
 
+
+@worker.register
+def set_pending_jackpot(
+    jackpot_id: int,
+    status: GameStatus
+):
+    db = next(get_sync_db())
+    jackpot = db.query(Jackpot).filter(
+        Jackpot.id == jackpot_id
+    ).first()
+
+    if not jackpot:
+        return False
+
+    jackpot.status = status
+    db.add(jackpot)
+    db.commit()
+
+    return True
 
 # def buy_tickets():
 #     db = next(get_sync_db())
