@@ -248,6 +248,14 @@ def get_crud_router(
                 run_date=new_item.scheduled_datetime,
             )
 
+            scheduler.add_job(
+                func=add_to_queue,
+                id=f"jackpot_status_{new_item.id}",
+                trigger="date",
+                args=["proceed_jackpot_status", new_item.id, GameStatus.PENDING],
+                run_date=new_item.fund_start,
+            )
+
         await db.commit()
 
         return JSONResponse(
@@ -282,6 +290,11 @@ def get_crud_router(
                 scheduler.reschedule_job(
                     job_id=f"jackpot_{db_item.id}",
                     run_date=item.scheduled_datetime
+                )
+            if item.fidn_start:
+                scheduler.reschedule_job(
+                    job_id=f"jackpot_status_{db_item.id}",
+                    run_date=item.fund_start
                 )
 
         if model.__name__ == "Game":

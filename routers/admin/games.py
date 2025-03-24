@@ -1,5 +1,4 @@
-import os
-from fastapi import Depends, Path, UploadFile, status, Security
+from fastapi import Depends, Path, status, Security
 from fastapi.responses import JSONResponse
 from apscheduler.jobstores.base import JobLookupError
 from typing import Annotated, Literal
@@ -358,6 +357,7 @@ async def get_winners(
         ])],
     responses={
         400: {"model": BadResponse},
+        200: {"description": "OK"},
     },
 )
 async def set_ticket_status(

@@ -46,4 +46,7 @@ async def get_profile(
         "document": url_for('static/kyc', filename=user.document) if user.document else None,
     }
 
-    return JSONResponse(content=Profile(**data), status_code=status.HTTP_200_OK)
+    return JSONResponse(
+        content=Profile(**data).model_dump(),
+        status_code=status.HTTP_200_OK
+    )

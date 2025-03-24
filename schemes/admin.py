@@ -410,7 +410,7 @@ class JackpotCreate(BaseModel):
     scheduled_datetime: Optional[FutureDatetime]
     repeat: Optional[bool] = False
     repeat_days: Optional[list[int]] = [5, 6]
-    fund_start: Optional[datetime] = None
+    fund_start: Optional[FutureDatetime] = None
     fund_end: Optional[FutureDatetime] = None
 
     @model_serializer

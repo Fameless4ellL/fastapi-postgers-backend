@@ -32,6 +32,7 @@ class GameView(Enum):
 
 
 class GameStatus(Enum):
+    NEW = "new"
     PENDING = "pending"
     ACTIVE = "active"
     COMPLETED = "completed"
@@ -106,7 +107,7 @@ class Jackpot(Base):
     amount = Column(DECIMAL(9, 2), nullable=True, default=0)
 
     image = Column(String(255), nullable=True, default="default_image.png", doc="The image of the game instance")
-    status = Column(SqlEnum(GameStatus), default=GameStatus.PENDING)
+    status = Column(SqlEnum(GameStatus), default=GameStatus.NEW)
 
     numbers = Column(ARRAY(Integer), nullable=True)
     fund_start = Column(DateTime, default=datetime.datetime.now, doc="The date and time when the fundraising will be held")

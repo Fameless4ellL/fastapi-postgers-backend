@@ -28,10 +28,10 @@ def user(db: Session):
 
     hashed_password = get_password_hash("test_password")
     user = User(
-        phone_number="+77079898911",
+        phone_number="77079898911",
         username="test_user1",
         password=hashed_password,
-        country="KZ",
+        country="KAZ",
     )
     db.add(user)
     db.commit()
