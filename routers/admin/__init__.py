@@ -123,6 +123,9 @@ def get_crud_router(
             if filters.countries:
                 stmt = stmt.filter(model.country.in_(filters.countries))
 
+            has_tickets = exists().where(Ticket.jackpot_id == model.id).label("has_tickets")
+            stmt = stmt.add_columns(has_tickets)
+
         items = await db.execute(stmt.order_by(model.id.desc()).offset(offset).limit(limit))
         items = items.scalars().all()
 
@@ -151,6 +154,10 @@ def get_crud_router(
 
         if model.__name__ == "Game":
             has_tickets = exists().where(Ticket.game_id == model.id).label("has_tickets")
+            stmt = stmt.add_columns(has_tickets)
+
+        if model.__name__ == "Jackpot":
+            has_tickets = exists().where(Ticket.jackpot_id == model.id).label("has_tickets")
             stmt = stmt.add_columns(has_tickets)
 
         item = await db.execute(stmt)

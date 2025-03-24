@@ -384,6 +384,7 @@ class JackpotBase(BaseAdmin):
     status: Optional[GameStatus] = None
     repeat: Optional[bool] = False
     repeat_days: Optional[list[int]] = []
+    has_tickets: bool = False
     scheduled_datetime: Optional[datetime] = None
     fund_start: Optional[datetime] = Field(exclude=True)
     fund_end: Optional[datetime] = Field(exclude=True)
@@ -464,6 +465,7 @@ class JackpotSchema(BaseAdmin):
     name: str
     game_type: JackpotType = Field(..., alias="_type")
     image: Optional[Image] = "default_jackpot.png"
+    has_tickets: bool = False
     country: Country
     status: Optional[GameStatus] = None
     created_at: datetime
