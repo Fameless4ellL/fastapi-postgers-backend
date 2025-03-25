@@ -1,5 +1,5 @@
 import pycountry
-from typing import Annotated
+from typing import Annotated, Optional
 from pydantic import BaseModel, computed_field, AfterValidator, Field
 from pydantic_extra_types.country import CountryAlpha3
 from pydantic_extra_types.language_code import LanguageAlpha2
@@ -14,6 +14,7 @@ class UserBalance(BaseModel):
 class KYC(BaseModel):
     first_name: str
     last_name: str
+    patronomic: Optional[str] = None
 
 
 class Usersettings(BaseModel):

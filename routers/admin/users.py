@@ -150,6 +150,7 @@ async def get_user(
         "firstname": user.firstname,
         "lastname": user.lastname,
         "username": user.username,
+        "patronymic": user.patronomic,
         "telegram": user.telegram,
         "telegram_id": user.telegram_id,
         "language_code": user.language_code,

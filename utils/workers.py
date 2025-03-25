@@ -262,7 +262,6 @@ def generate_jackpot(
     jackpot = db.query(Jackpot).filter(
         Jackpot.repeat.is_(True),
         Jackpot.id == jackpot_id,
-        Jackpot.deleted.is_(False)
     ).first()
 
     if not jackpot:
@@ -291,6 +290,7 @@ def generate_jackpot(
 
     jackpot_inst = Jackpot(
         name=f"Jackpot #{str(jackpot.id + 1)}",
+        status=GameStatus.PENDING,
         scheduled_datetime=scheduled_datetime,
         fund_start=fund_start,
         fund_end=fund_end,

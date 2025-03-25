@@ -29,6 +29,7 @@ class User(Base):
     telegram_id = Column(Integer, unique=True, nullable=True)
     username = Column(String(64), unique=True)
     firstname = Column(String(64), nullable=True)
+    patronomic = Column(String(64), nullable=True)
     lastname = Column(String(64), nullable=True)
     language_code = Column(String(8), nullable=True)
     phone_number = Column(String(32), unique=True)
