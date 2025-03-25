@@ -31,7 +31,10 @@ from utils.workers import add_to_queue
 @public.get(
     "/profile",
     tags=["user"],
-    responses={400: {"model": BadResponse}, 200: {"model": Profile}}
+    responses={
+        400: {"model": BadResponse},
+        200: {"model": Profile}
+    }
 )
 async def profile(
     user: Annotated[User, Depends(get_user)],
@@ -66,10 +69,20 @@ async def profile(
 
         await aredis.sadd("BLOCKER:WALLETS", wallet.address)
 
+    data = None
+    if user.kyc:
+        data = {
+            "first_name": user.firstname,
+            "patronomic": user.patronomic,
+            "last_name": user.lastname,
+            "document": url_for("static/kyc", path=user.document),
+        }
+
     return JSONResponse(
         status_code=status.HTTP_200_OK,
         content=Profile(
             balance=balance,
+            kyc=data,
             locale=user.language_code or "EN",
             address={
                 "base58": to_base58check_address(wallet.address),

@@ -27,8 +27,14 @@ class Address(BaseModel):
     evm: str
 
 
+class KYCProfile(KYC):
+    document: Optional[str] = None
+
+
 class Profile(BaseModel):
     username: str
+    kyc: Optional[KYCProfile] = None
+    kyc_approved: bool = False
     balance: float
     address: Address
     locale: str
