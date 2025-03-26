@@ -70,7 +70,7 @@ async def profile(
         await aredis.sadd("BLOCKER:WALLETS", wallet.address)
 
     data = None
-    if user.kyc:
+    if user.document:
         data = {
             "first_name": user.firstname,
             "patronomic": user.patronomic,
