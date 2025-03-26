@@ -1,5 +1,5 @@
 import os
-from fastapi import APIRouter, Depends, Path, Request, status, Security, Query
+from fastapi import APIRouter, Depends, Path, Request, status, Query
 from fastapi.responses import JSONResponse
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select, func, or_, exists
@@ -14,7 +14,6 @@ from models.user import Role
 from routers import admin
 from globals import scheduler
 from utils.workers import add_to_queue
-from routers.utils import get_admin_token, Token
 from schemes.admin import Empty
 
 

@@ -78,10 +78,9 @@ sidebars = {
         ])],
     responses={
         400: {"model": BadResponse},
-        200: {"model": Profile}
     },
 )
-async def get_profile(
+async def sidebar(
     token: Annotated[Token, Security(get_admin_token, scopes=[
         Role.GLOBAL_ADMIN.value,
         Role.ADMIN.value,
