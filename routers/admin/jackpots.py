@@ -6,7 +6,7 @@ from models.log import Action
 
 from sqlalchemy import func, select, or_
 from models.user import User, Role
-from models.other import Game, GameStatus, Jackpot, Network, Currency, Ticket
+from models.other import Game, GameStatus, Jackpot, Ticket, RepeatType
 from routers import admin
 from routers.admin import get_crud_router
 from routers.utils import get_admin_token, send_mail, url_for
@@ -76,7 +76,7 @@ async def delete_jackpot(
         game.status = GameStatus.DELETED
 
     if _type == "cancel":
-        game.repeat = False
+        game.repeat_type = RepeatType.NONE
         game.status = GameStatus.CANCELLED
 
     try:

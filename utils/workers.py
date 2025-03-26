@@ -9,7 +9,7 @@ from datetime import datetime, timedelta
 
 from models.db import get_sync_db, get_sync_logs_db
 from models.user import Notification, Wallet
-from models.other import Currency, Game, GameStatus, GameView, Ticket, Jackpot, TicketStatus
+from models.other import Currency, Game, GameStatus, GameView, Ticket, Jackpot, TicketStatus, RepeatType
 from utils.web3 import transfer
 from sqlalchemy.orm import joinedload
 from utils import worker
@@ -260,25 +260,19 @@ def generate_jackpot(
     """
     db = next(get_sync_db())
     jackpot = db.query(Jackpot).filter(
-        Jackpot.repeat.is_(True),
+        Jackpot.repeat_type != RepeatType.NONE,
         Jackpot.id == jackpot_id,
     ).first()
 
     if not jackpot:
         return False
 
-    tz = timedelta(hours=jackpot.tzone)
-    now = datetime.now() + tz
-    next_day = now
+    # tz = timedelta(hours=jackpot.tzone)
+    # now = datetime.now() + tz
 
-    while True:
-        next_day += timedelta(days=1)
-
-        if next_day.weekday() in jackpot.repeat_days:
-            break
-
-        if next_day - now > timedelta(days=14):
-            return False
+    next_day = jackpot.next_scheduled_date()
+    if not next_day:
+        return False
 
     scheduled_datetime = next_day.replace(
         hour=jackpot.scheduled_datetime.hour,
@@ -431,8 +425,8 @@ def proceed_jackpot(jackpot_id: Optional[int] = None):
         jackpot.status = GameStatus.COMPLETED
         db.add(jackpot)
 
-        if jackpot.repeat:
-            generate_jackpot(jackpot.id + 1)
+        if jackpot.repeat_type != RepeatType.NONE:
+            generate_jackpot(jackpot.id)
 
     db.commit()
 

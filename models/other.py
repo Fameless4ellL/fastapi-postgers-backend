@@ -26,6 +26,13 @@ class JackpotType(Enum):
     LOCAL = "Local"
 
 
+class RepeatType(Enum):
+    NONE = "none"
+    WEEKLY = "weekly"
+    MONTHLY = "monthly"
+    YEARLY = "yearly"
+
+
 class GameView(Enum):
     MONETARY = "Monetary"
     MATERIAL = "Clothing"
@@ -97,12 +104,7 @@ class Jackpot(Base):
 
     scheduled_datetime = Column(DateTime, default=datetime.datetime.now, doc="The date and time when the game instance will be held")
     tzone = Column(Integer, default=1, doc="The timezone of the game instance in UTC format")
-    repeat = Column(Boolean, default=False, doc="Indicates if the instance is repeated")
-    repeat_days = Column(
-        ARRAY(Integer),
-        default=[0, 1, 2, 3, 4, 5, 6],
-        doc="The days of the week when the instance is repeated, required if repeat is True"
-    )
+    repeat_type = Column(SqlEnum(RepeatType), default=RepeatType.NONE, doc="The type of repetition (weekly, monthly, yearly)")
 
     amount = Column(DECIMAL(9, 2), nullable=True, default=0)
 
@@ -120,6 +122,15 @@ class Jackpot(Base):
 
     currency = relationship("Currency", uselist=False)
     tickets = relationship("Ticket", back_populates="jackpot", uselist=True)
+
+    def next_scheduled_date(self):
+        if self.repeat_type == RepeatType.WEEKLY:
+            return self.scheduled_datetime + datetime.timedelta(weeks=1)
+        elif self.repeat_type == RepeatType.MONTHLY:
+            return self.scheduled_datetime + datetime.timedelta(days=30)
+        elif self.repeat_type == RepeatType.YEARLY:
+            return self.scheduled_datetime + datetime.timedelta(days=365)
+        return None
 
 
 class InstaBingo(Base):

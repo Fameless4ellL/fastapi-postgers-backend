@@ -1,7 +1,5 @@
 from fastapi.testclient import TestClient
-import pycountry
 import pytest
-from models.user import User
 from settings import settings
 
 

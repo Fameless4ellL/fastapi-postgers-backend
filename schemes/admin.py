@@ -21,7 +21,7 @@ from datetime import datetime, date
 from pydantic_extra_types.country import CountryAlpha3
 from fastapi import Query, UploadFile
 
-from models.other import GameStatus, GameType, GameView, JackpotType
+from models.other import GameStatus, GameType, GameView, JackpotType, RepeatType
 from models.user import BalanceChangeHistory
 from routers.utils import get_currency_by_id, url_for
 from schemes.base import Country, Country_by_name
@@ -382,8 +382,7 @@ class JackpotBase(BaseAdmin):
     image: Optional[Image] = "default_image.png"
     game_type: JackpotType = Field(..., alias="_type")
     status: Optional[GameStatus] = None
-    repeat: Optional[bool] = False
-    repeat_days: Optional[list[int]] = []
+    repeat: RepeatType = RepeatType.NONE
     has_tickets: bool = False
     scheduled_datetime: Optional[datetime] = None
     fund_start: Optional[datetime] = Field(exclude=True)
@@ -393,7 +392,7 @@ class JackpotBase(BaseAdmin):
     event_end: Optional[datetime] = None
     updated_at: datetime
     created_at: datetime
-    
+
     tickets_pcs: int = 0
     amount: float = 0.0
 
@@ -409,8 +408,7 @@ class JackpotCreate(BaseModel):
     currency_id: Annotated[int, AfterValidator(get_currency_by_id)]
     country: Optional[CountryAlpha3] = None
     scheduled_datetime: Optional[FutureDatetime]
-    repeat: Optional[bool] = False
-    repeat_days: Optional[list[int]] = [5, 6]
+    repeat: RepeatType = RepeatType.NONE
     fund_start: Optional[FutureDatetime] = None
     fund_end: Optional[FutureDatetime] = None
 
@@ -451,8 +449,7 @@ class JackpotCreate(BaseModel):
             "tzone": zone,
             "fund_start": fund_start,
             "fund_end": fund_end,
-            "repeat": self.repeat,
-            "repeat_days": self.repeat_days,
+            "repeat_type": self.repeat,
         }
 
 
