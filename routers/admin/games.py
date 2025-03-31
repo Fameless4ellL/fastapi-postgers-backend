@@ -249,6 +249,7 @@ async def get_participant_tickets(
     stmt = select(
         Ticket.id,
         Ticket.user_id,
+        Ticket.number,
         Ticket.numbers,
         Ticket.created_at,
         User.username
@@ -264,6 +265,7 @@ async def get_participant_tickets(
     data = [{
         "id": ticket.id,
         "user_id": ticket.user_id,
+        "number": ticket.number,
         "user": ticket.username,
         "tickets": ticket.numbers,
         "date": ticket.created_at.strftime("%Y-%m-%d %H:%M:%S")
@@ -296,10 +298,11 @@ async def get_winners(
     limit: int = 10,
 ):
     """
-    get winners by  game_id
+    get winners by game_id
     """
     tickets = db.query(
         Ticket.id,
+        Ticket.number,
         Ticket.user_id,
         Ticket.status,
         func.sum(Ticket.amount).label("amount"),
@@ -325,6 +328,7 @@ async def get_winners(
     data = [{
         "id": ticket.id,
         "user_id": ticket.user_id,
+        "numbers": ticket.number,
         "user": ticket.user.username,
         "status": ticket.status if not ticket.status else TicketStatus.COMPLETED,
         "amount": float(ticket.amount),

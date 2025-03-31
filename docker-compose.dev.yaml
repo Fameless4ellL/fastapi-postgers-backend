@@ -32,6 +32,7 @@ services:
       - db
       - logs
       - redis
+      - rng
     ports:
       - "0.0.0.0:8000:8000"
     environment:
@@ -68,6 +69,7 @@ services:
       - db
       - logs
       - redis
+      - rng
     restart: on-failure
 
   blocker:
@@ -80,6 +82,14 @@ services:
     volumes:
       - ./blocker/:/app/
     restart: always
+
+  rng:
+    build:
+      context: ./RNG
+      dockerfile: Dockerfile
+    ports:
+      - "0.0.0.0:8001:8000"
+    restart: on-failure
 
   redis:
     image: redis

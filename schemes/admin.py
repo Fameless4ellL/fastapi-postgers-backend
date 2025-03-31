@@ -119,6 +119,7 @@ class UserJackpots(BaseModel):
 class UserTickets(BaseModel):
     id: int
     game_name: str
+    number: Optional[str] = None
     numbers: list[int]
     date_and_time: str
     won: bool

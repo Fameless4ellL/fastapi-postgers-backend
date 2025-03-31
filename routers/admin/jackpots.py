@@ -182,11 +182,12 @@ async def get_tickets(
         Ticket.jackpot_id == game_id,
         Ticket.user_id == user_id
     )
-    tickets = await db.execute(stmt)
+    tickets = await db.execute(stmt.offset(offset).limit(limit))
     tickets = tickets.scalars().all()
 
     data = [{
         "id": ticket.id,
+        "number": ticket.number,
         "numbers": ticket.numbers,
     } for ticket in tickets]
 
@@ -201,15 +202,15 @@ async def get_tickets(
 
 @admin.get(
     "/jackpots/{game_id}/winner",
-    # dependencies=[Security(
-    #     get_admin_token,
-    #     scopes=[
-    #         Role.SUPER_ADMIN.value,
-    #         Role.GLOBAL_ADMIN.value,
-    #         Role.ADMIN.value,
-    #         Role.LOCAL_ADMIN.value,
-    #         Role.SUPPORT.value,
-    #     ])],
+    dependencies=[Security(
+        get_admin_token,
+        scopes=[
+            Role.SUPER_ADMIN.value,
+            Role.GLOBAL_ADMIN.value,
+            Role.ADMIN.value,
+            Role.LOCAL_ADMIN.value,
+            Role.SUPPORT.value,
+        ])],
     responses={
         400: {"model": BadResponse},
     },

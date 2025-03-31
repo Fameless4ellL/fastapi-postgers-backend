@@ -1,5 +1,7 @@
 import datetime
 from enum import Enum
+
+from .utils import generate_unique_ticket_number
 from .db import Base
 from sqlalchemy import (
     JSON,
@@ -208,6 +210,12 @@ class Ticket(Base):
     instabingo_id = Column(Integer, ForeignKey('instabingos.id'), nullable=True)
     jackpot_id = Column(Integer, ForeignKey('jackpots.id'), nullable=True)
     currency_id = Column(Integer, ForeignKey('currencies.id'), nullable=True)
+    number = Column(
+        String(15),
+        unique=True,
+        default=generate_unique_ticket_number,
+        doc="The unique ticket number"
+    )
     numbers = Column(ARRAY(Integer), nullable=False)
     won = Column(Boolean, default=False)
     amount = Column(DECIMAL(9, 2), default=0)

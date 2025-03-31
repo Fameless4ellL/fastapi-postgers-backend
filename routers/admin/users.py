@@ -2,7 +2,6 @@ from eth_account import Account
 from fastapi import Depends, Path, Query, status, Security
 from fastapi.responses import JSONResponse
 from typing import Annotated, Optional
-from pydantic_extra_types.country import CountryAlpha3
 
 from sqlalchemy import and_, func, select, or_
 from models.user import Balance, User, Role, Wallet, BalanceChangeHistory
@@ -283,6 +282,7 @@ async def get_user_tickets(
         select(
             Ticket.id,
             Game.name.label("game_name"),
+            Ticket.number,
             Ticket.numbers,
             Ticket.created_at.label("date_and_time"),
             Ticket.won,
@@ -305,6 +305,7 @@ async def get_user_tickets(
         {
             "id": ticket.id,
             "game_name": ticket.game_name,
+            "number": ticket.number,
             "numbers": ticket.numbers,
             "date_and_time": (
                 ticket.date_and_time.strftime("%Y-%m-%d %H:%M:%S")
@@ -417,6 +418,7 @@ async def get_user_tickets_by_jackpots(
         select(
             Ticket.id,
             Jackpot.name.label("game_name"),
+            Ticket.number,
             Ticket.numbers,
             Ticket.created_at.label("date_and_time"),
             Ticket.won,
@@ -439,6 +441,7 @@ async def get_user_tickets_by_jackpots(
         {
             "id": ticket.id,
             "game_name": ticket.game_name,
+            "number": ticket.number,
             "numbers": ticket.numbers,
             "date_and_time": (
                 ticket.date_and_time.strftime("%Y-%m-%d %H:%M:%S")
@@ -644,6 +647,7 @@ async def get_user_winings(
             Ticket.instabingo_id,
             Ticket.jackpot_id,
             Ticket.game_id,
+            Ticket.number,
             Ticket.numbers,
             Ticket.amount,
             Ticket.won
@@ -706,6 +710,7 @@ async def get_user_winings(
 
         data.append({
             "id": ticket.id,
+            "number": ticket.number,
             "numbers": ticket.numbers,
             "game_id": game_id,
             "type": game_name,

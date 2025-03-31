@@ -18,6 +18,8 @@ log = logging.getLogger("LOGS")
 
 console_handler = logging.StreamHandler()
 console_handler.setLevel(logging.INFO)
+if log.level == logging.DEBUG:
+    console_handler.setLevel(logging.DEBUG)
 formatter = logging.Formatter('%(asctime)s - %(name)s - %(levelname)s - %(message)s')
 console_handler.setFormatter(formatter)
 log.addHandler(console_handler)
@@ -107,10 +109,9 @@ async def logger(
         db.add(request_log)
         await db.commit()
 
-        # TODO rm
-        log.info(f"{request.method} {request.url.path} {response.status_code} {time.perf_counter() - start:.2f}s")
-        log.info(f"Request: {json_body}")
-        log.info(f"Response: {body}")
+        log.debug(f"{request.method} {request.url.path} {response.status_code} {time.perf_counter() - start:.2f}s")
+        log.debug(f"Request: {json_body}")
+        log.debug(f"Response: {body}")
 
         actions = set(Action)
 
