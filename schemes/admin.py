@@ -273,12 +273,7 @@ class GameCreate(BaseAdmin):
             tz = pytz.timezone('UTC')
 
         zone = tz.utcoffset(self.scheduled_datetime).total_seconds() // 3600
-        scheduled_datetime = self.scheduled_datetime.astimezone(tz).isoformat()
-
-        if self.scheduled_datetime and self.scheduled_datetime.tzinfo is not None:
-            scheduled_datetime = self.scheduled_datetime.replace(tzinfo=None)
-        else:
-            scheduled_datetime = self.scheduled_datetime
+        scheduled_datetime = self.scheduled_datetime
 
         if self.kind == GameView.MATERIAL:
             self.prize = str(self.prize)
@@ -423,22 +418,10 @@ class JackpotCreate(BaseModel):
             tz = pytz.timezone('UTC')
 
         zone = tz.utcoffset(self.scheduled_datetime).total_seconds() // 3600
-        scheduled_datetime = self.scheduled_datetime.astimezone(tz).isoformat()
-
-        if self.scheduled_datetime and self.scheduled_datetime.tzinfo is not None:
-            scheduled_datetime = self.scheduled_datetime.replace(tzinfo=None)
-        else:
-            scheduled_datetime = self.scheduled_datetime
+        scheduled_datetime = self.scheduled_datetime
 
         fund_start = self.fund_start
-        if fund_start and isinstance(fund_start, datetime):
-            if fund_start.tzinfo is not None:
-                fund_start = fund_start.replace(tzinfo=None)
-
         fund_end = self.fund_end
-        if fund_end and isinstance(fund_end, datetime):
-            if fund_end.tzinfo is not None:
-                fund_end = fund_end.replace(tzinfo=None)
 
         return {
             "name": self.name,
