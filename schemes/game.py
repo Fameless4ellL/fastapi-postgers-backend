@@ -99,7 +99,7 @@ class Tickets(BaseModel):
 
 class MyGame(Game):
     max_limit_grid: Optional[int] = None
-    won: float = 0
+    total_amount: float = 0
 
 
 class MyGames(BaseModel):

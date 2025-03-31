@@ -273,7 +273,7 @@ async def upload_kyc(
 
     user.firstname = item.first_name
     user.lastname = item.last_name
-    user.document = file.filename
+    user.document = f"{filename}_{user.id}{file_extension}"
     db.add(user)
     await db.commit()
 
@@ -454,8 +454,9 @@ async def get_my_games(
             "currency": i.currency.code if i.currency else None,
             "name": i.name,
             "image": url_for("static", path=i.image),
-            "status": str(i.status),
-            "price": float(i.price),
+            "status": i.status.value if i.status else "None",
+            "price": i.ticket.won,
+            "max_limit_grid": i.max_limit_grid if i.max_limit_grid else None,
             "prize": float(i.prize) if i.prize.isnumeric() else i.prize,
             "won": float(total_amount),
             "endtime": i.scheduled_datetime.timestamp(),
