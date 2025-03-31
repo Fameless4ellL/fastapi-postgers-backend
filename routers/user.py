@@ -417,6 +417,7 @@ async def get_my_games(
     """
     Получение игр пользователя в котором он участвовал
     """
+    # TODO refactor
     model = importlib.import_module("models.other")
     model = getattr(model, item.model)
 
@@ -438,7 +439,7 @@ async def get_my_games(
             func.sum(Ticket.amount).label("total_amount")
         ).filter(
             Ticket.user_id == user.id,
-            Ticket.won.is_(True)
+            Ticket.won.is_(True),
         ).group_by(
             Ticket.won
         )
@@ -473,6 +474,20 @@ async def get_my_games(
                 "created": i.created_at.timestamp(),
                 "endtime": i.created_at.timestamp()
             } | ticket)
+        elif item.model == "Jackpot":
+            amount = getattr(i, "amount", '0') or '0'
+            data.append({
+                "id": i.id,
+                "currency": i.currency.code if i.currency else None,
+                "name": i.name,
+                "image": url_for("static", path=i.image),
+                "status": i.status.value if i.status else "None",
+                "price": getattr(i, "price", 0),
+                "max_limit_grid": getattr(i, "max_limit_grid", 0),
+                "prize": float(amount) if amount.isnumeric() else amount,
+                "endtime": i.scheduled_datetime.timestamp(),
+                "created": i.created_at.timestamp(),
+            } | ticket)
         else:
             data.append({
                 "id": i.id,
@@ -480,8 +495,8 @@ async def get_my_games(
                 "name": i.name,
                 "image": url_for("static", path=i.image),
                 "status": i.status.value if i.status else "None",
-                "price": i.price,
-                "max_limit_grid": i.max_limit_grid if i.max_limit_grid else None,
+                "price": getattr(i, "price", 0),
+                "max_limit_grid": getattr(i, "max_limit_grid", 0),
                 "prize": float(i.prize) if i.prize.isnumeric() else i.prize,
                 "endtime": i.scheduled_datetime.timestamp(),
                 "created": i.created_at.timestamp(),
