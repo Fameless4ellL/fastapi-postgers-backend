@@ -395,7 +395,7 @@ class JackpotBase(BaseAdmin):
     created_at: datetime
 
     tickets_pcs: int = 0
-    amount: float = 0.0
+    amount: Optional[float] = 0.0
 
     @computed_field
     def fundraising_period(self) -> str:
