@@ -202,15 +202,15 @@ async def get_tickets(
 
 @admin.get(
     "/jackpots/{game_id}/winner",
-    dependencies=[Security(
-        get_admin_token,
-        scopes=[
-            Role.SUPER_ADMIN.value,
-            Role.GLOBAL_ADMIN.value,
-            Role.ADMIN.value,
-            Role.LOCAL_ADMIN.value,
-            Role.SUPPORT.value,
-        ])],
+    # dependencies=[Security(
+    #     get_admin_token,
+    #     scopes=[
+    #         Role.SUPER_ADMIN.value,
+    #         Role.GLOBAL_ADMIN.value,
+    #         Role.ADMIN.value,
+    #         Role.LOCAL_ADMIN.value,
+    #         Role.SUPPORT.value,
+    #     ])],
     responses={
         400: {"model": BadResponse},
     },
@@ -234,7 +234,7 @@ async def get_winner(
     )
 
     winner = await db.execute(stmt)
-    winner = winner.scalar()
+    winner = winner.first()
 
     data = {
         'id': None,
@@ -243,10 +243,11 @@ async def get_winner(
     }
 
     if winner:
+        ticket_id, username, numbers = winner
         data = {
-            "id": winner.id,
-            "username": winner.username,
-            "numbers": winner.numbers
+            "id": ticket_id,
+            "username": username,
+            "numbers": numbers
         }
 
     tickets_pcs = select(func.count()).filter(
