@@ -23,7 +23,7 @@ from fastapi import Query, UploadFile
 
 from models.other import GameStatus, GameType, GameView, JackpotType, RepeatType
 from models.user import BalanceChangeHistory
-from routers.utils import get_currency_by_id, url_for
+from routers.utils import get_currency_by_id, get_first_currency, url_for
 from schemes.base import Country, Country_by_name
 from settings import settings
 from utils.datastructure import MultiValueStrEnum
@@ -406,7 +406,7 @@ class JackpotCreate(BaseModel):
     name: str
     percentage: float = 10.0
     game_type: JackpotType
-    currency_id: Annotated[int, AfterValidator(get_currency_by_id)]
+    # currency_id: Annotated[int, AfterValidator(get_currency_by_id)]
     country: Optional[CountryAlpha3] = None
     scheduled_datetime: Optional[FutureDatetime]
     repeat: RepeatType = RepeatType.NONE
@@ -443,7 +443,7 @@ class JackpotCreate(BaseModel):
         return {
             "name": self.name,
             "_type": self.game_type,
-            "currency_id": self.currency_id,
+            "currency_id": get_first_currency(),
             "percentage": self.percentage,
             "country": self.country,
             "scheduled_datetime": scheduled_datetime,

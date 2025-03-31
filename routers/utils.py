@@ -196,6 +196,18 @@ def get_currency_by_id(
     return cur.id
 
 
+def get_first_currency() -> Currency:
+    db = next(get_sync_db())
+    cur = db.query(Currency).first()
+
+    if cur is None:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND, detail="Currency not found"
+        )
+
+    return cur.id
+
+
 async def get_w3(
     network: Annotated[Network, Depends(get_network)],
 ) -> Web3:
