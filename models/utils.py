@@ -1,9 +1,9 @@
 import random
-from sqlalchemy.orm import Session
+
+from models.db import get_sync_db
 
 
 def generate_unique_ticket_number(
-    db: Session,
     length: int = 15
 ) -> str:
     """
@@ -14,6 +14,7 @@ def generate_unique_ticket_number(
     :param length: Length of the ticket number (default is 15).
     :return: A unique ticket number.
     """
+    db = next(get_sync_db())
     from models.other import Ticket
 
     while True:
