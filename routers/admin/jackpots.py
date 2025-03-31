@@ -119,6 +119,7 @@ async def get_participants(
         User.id,
         User.username,
         func.count(Ticket.id).label("tickets"),
+        Ticket.id.label("ticket_id"),
         Ticket.game_id,
         func.min(Ticket.created_at).label("created_at")
     ).join(
@@ -127,6 +128,7 @@ async def get_participants(
         Ticket.jackpot_id == game_id
     ).group_by(
         User.id,
+        Ticket.id,
         Ticket.game_id
     ).order_by(
         func.min(Ticket.created_at).desc()
@@ -135,7 +137,8 @@ async def get_participants(
     participants = participants.fetchall()
 
     data = [{
-        "id": user.id,
+        "id": user.ticket_id,
+        "user_id": user.id,
         "username": user.username,
         "tickets": user.tickets,
         "game_id": user.game_id,

@@ -484,7 +484,7 @@ async def get_my_games(
                 "status": i.status.value if i.status else "None",
                 "price": getattr(i, "price", 0),
                 "max_limit_grid": getattr(i, "max_limit_grid", 0),
-                "prize": float(amount) if amount.isnumeric() else amount,
+                "prize": float(amount) if str(amount).isnumeric() else amount,
                 "endtime": i.scheduled_datetime.timestamp(),
                 "created": i.created_at.timestamp(),
             } | ticket)
