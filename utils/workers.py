@@ -9,7 +9,16 @@ from datetime import datetime, timedelta
 
 from models.db import get_sync_db, get_sync_logs_db
 from models.user import Notification, Wallet
-from models.other import Currency, Game, GameStatus, GameView, Ticket, Jackpot, TicketStatus, RepeatType
+from models.other import (
+    Currency,
+    Game,
+    GameStatus,
+    GameView,
+    Ticket,
+    Jackpot,
+    TicketStatus,
+    RepeatType
+)
 from utils.web3 import transfer
 from sqlalchemy.orm import joinedload
 from utils import worker

@@ -1,7 +1,6 @@
 import datetime
 from decimal import Decimal
 import traceback
-from pydantic import BaseModel
 from typing import Annotated
 from fastapi import Depends
 from sqlalchemy import select

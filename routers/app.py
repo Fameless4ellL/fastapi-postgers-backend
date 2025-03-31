@@ -277,16 +277,6 @@ async def buy_tickets(
             ).model_dump()
         )
 
-    if game.min_ticket_count > len(item.numbers):
-        return JSONResponse(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            content=BadResponse(
-                message=(
-                    f"Not enough tickets to participate, "
-                    f"need {game.min_ticket_count}"
-                )
-            ).model_dump()
-        )
     if item.demo and len(item.numbers) > 1:
         return JSONResponse(
             status_code=status.HTTP_400_BAD_REQUEST,
@@ -476,14 +466,6 @@ async def gen_tickets(
                 status_code=status.HTTP_400_BAD_REQUEST,
                 content=BadResponse(
                     message=f"Invalid ticket numbers, need {game.limit_by_ticket} per ticket"
-                ).model_dump()
-            )
-
-        if game.min_ticket_count > len(item.numbers):
-            return JSONResponse(
-                status_code=status.HTTP_400_BAD_REQUEST,
-                content=BadResponse(
-                    message=f"Not enough tickets to participate, need {game.min_ticket_count}"
                 ).model_dump()
             )
 

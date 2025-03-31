@@ -47,7 +47,6 @@ class GameInstance(Game):
     max_limit_grid: int
     price: float
     prize: Union[float, str] = None
-    min_ticket_count: int
 
 
 class Games(BaseModel):
