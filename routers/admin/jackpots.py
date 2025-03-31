@@ -1,16 +1,16 @@
 from fastapi import Depends, Path, Security, status
 from fastapi.responses import JSONResponse
-from typing import Annotated, Literal, Optional, Union
+from typing import Annotated, Literal, Optional
 from apscheduler.jobstores.base import JobLookupError
 from models.log import Action
 
-from sqlalchemy import func, select, or_
+from sqlalchemy import func, select
 from models.user import User, Role
-from models.other import Game, GameStatus, Jackpot, Ticket, RepeatType
+from models.other import GameStatus, Jackpot, Ticket, RepeatType
 from routers import admin
 from routers.admin import get_crud_router
-from routers.utils import get_admin_token, send_mail, url_for
-from globals import scheduler, aredis
+from routers.utils import get_admin_token
+from globals import scheduler
 from sqlalchemy.ext.asyncio import AsyncSession
 from models.db import get_db
 from schemes.admin import (
@@ -19,7 +19,6 @@ from schemes.admin import (
     Jackpots,
     JackpotCreate,
     JackpotUpdate,
-    Empty,
     JackpotFilter,
 )
 from schemes.base import BadResponse, JsonForm

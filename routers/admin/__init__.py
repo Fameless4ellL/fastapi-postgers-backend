@@ -13,6 +13,7 @@ from models.db import get_db
 from models.user import Role
 from routers import admin
 from globals import scheduler
+from apscheduler.jobstores.base import JobLookupError
 from routers.utils import get_admin_token, Token
 from utils.workers import add_to_queue
 from schemes.admin import Empty
@@ -294,22 +295,49 @@ def get_crud_router(
 
         if model.__name__ == "Jackpot":
             if item.scheduled_datetime:
-                scheduler.reschedule_job(
-                    job_id=f"jackpot_{db_item.id}",
-                    run_date=item.scheduled_datetime
-                )
+                try:
+                    scheduler.reschedule_job(
+                        job_id=f"jackpot_{db_item.id}",
+                        run_date=item.scheduled_datetime
+                    )
+                except JobLookupError:
+                    scheduler.add_job(
+                        func=add_to_queue,
+                        id=f"jackpot_{db_item.id}",
+                        trigger="date",
+                        args=["proceed_jackpot", db_item.id],
+                        run_date=item.scheduled_datetime,
+                    )
             if item.fidn_start:
-                scheduler.reschedule_job(
-                    job_id=f"jackpot_status_{db_item.id}",
-                    run_date=item.fund_start
-                )
+                try:
+                    scheduler.reschedule_job(
+                        job_id=f"jackpot_status_{db_item.id}",
+                        run_date=item.fund_start
+                    )
+                except JobLookupError:
+                    scheduler.add_job(
+                        func=add_to_queue,
+                        id=f"jackpot_status_{db_item.id}",
+                        trigger="date",
+                        args=["proceed_jackpot_status", db_item.id, GameStatus.PENDING],
+                        run_date=item.fund_start,
+                    )
 
         if model.__name__ == "Game":
             if item.scheduled_datetime:
-                scheduler.reschedule_job(
-                    job_id=f"game_{db_item.id}",
-                    run_date=item.scheduled_datetime
-                )
+                try:
+                    scheduler.reschedule_job(
+                        job_id=f"game_{db_item.id}",
+                        run_date=item.scheduled_datetime
+                    )
+                except JobLookupError:
+                    scheduler.add_job(
+                        func=add_to_queue,
+                        id=f"game_{db_item.id}",
+                        trigger="date",
+                        args=["proceed_game", db_item.id],
+                        run_date=item.scheduled_datetime,
+                    )
 
             file = files.image
 

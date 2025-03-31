@@ -13,7 +13,14 @@ from sqlalchemy.orm import joinedload
 from tronpy.keys import to_base58check_address
 from models.db import get_db
 from models.log import Action
-from models.user import Balance, Kyc, Notification, User, Wallet, BalanceChangeHistory
+from models.user import (
+    Balance,
+    Kyc,
+    Notification,
+    User,
+    Wallet,
+    BalanceChangeHistory
+)
 from models.other import Currency, Ticket
 from routers import public
 from globals import aredis
@@ -249,12 +256,18 @@ async def upload_kyc(
 
     # Delete old file if it exists
     if user.document:
-        old_file_path = os.path.join(directory, f"{filename}_{user.id}{file_extension}")
+        old_file_path = os.path.join(
+            directory,
+            f"{filename}_{user.id}{file_extension}"
+        )
         if os.path.exists(old_file_path):
             os.remove(old_file_path)
 
     # Save file to disk
-    file_path = os.path.join(directory, f"{filename}_{user.id}{file_extension}")
+    file_path = os.path.join(
+        directory,
+        f"{filename}_{user.id}{file_extension}"
+    )
     with open(file_path, "wb") as f:
         f.write(await file.read())
 
@@ -447,7 +460,7 @@ async def get_my_games(
             "won": float(total_amount),
             "endtime": i.scheduled_datetime.timestamp(),
             "created": i.created_at.timestamp(),
-            "total_amount": float(total_amount)  # Add the total amount to the response
+            "total_amount": float(total_amount)
         })
 
     stmt = select(func.count(model.id)).join(Ticket).filter(
