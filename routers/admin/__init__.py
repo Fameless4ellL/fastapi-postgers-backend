@@ -308,7 +308,7 @@ def get_crud_router(
                         args=["proceed_jackpot", db_item.id],
                         run_date=item.scheduled_datetime,
                     )
-            if item.fudn_start:
+            if item.fund_start:
                 try:
                     scheduler.reschedule_job(
                         job_id=f"jackpot_status_{db_item.id}",
