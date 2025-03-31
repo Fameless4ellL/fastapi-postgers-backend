@@ -248,6 +248,31 @@ def get_crud_router(
             )
 
         if model.__name__ == "Jackpot":
+            file = getattr(file, "image", None)
+            if file:
+
+                if not file.content_type.startswith("image"):
+                    return JSONResponse(
+                        status_code=status.HTTP_400_BAD_REQUEST,
+                        content="Invalid file type"
+                    )
+
+                directory = "static"
+                os.makedirs(directory, exist_ok=True)
+
+                # Save file to disk
+                filename, file_extension = os.path.splitext(file.filename)
+                filename = filename.replace(" ", "_")
+                new_item.image = f"{filename}_{new_item.id}{file_extension}"
+                db.add(new_item)
+
+                file_path = os.path.join(
+                    directory,
+                    f"{filename}_{new_item.id}{file_extension}"
+                )
+                with open(file_path, "wb") as f:
+                    f.write(await file.read())
+            
             scheduler.add_job(
                 func=add_to_queue,
                 id=f"jackpot_{new_item.id}",
@@ -290,6 +315,14 @@ def get_crud_router(
         stmt = select(model).where(model.id == id)
         db_item = await db.execute(stmt)
         db_item = db_item.scalar()
+        if not db_item:
+            return JSONResponse(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                content=BadResponse(
+                    message=f"{model.__name__} not found"
+                ).model_dump(mode='json')
+            )
+
         for key, value in item.model_dump().items():
             setattr(db_item, key, value)
 
@@ -322,6 +355,39 @@ def get_crud_router(
                         args=["proceed_jackpot_status", db_item.id, GameStatus.PENDING],
                         run_date=item.fund_start,
                     )
+
+            file = files.image
+
+            if file:
+                if not file.content_type.startswith("image"):
+                    return JSONResponse(
+                        status_code=status.HTTP_400_BAD_REQUEST,
+                        content="Invalid file type"
+                    )
+
+                directory = "static"
+                os.makedirs(directory, exist_ok=True)
+                filename, file_extension = os.path.splitext(file.filename)
+                filename = filename.replace(" ", "_")
+
+                # Delete old file if it exists
+                if db_item.image:
+                    old_file_path = os.path.join(
+                        directory,
+                        f"{db_item.image}_{db_item.id}"
+                    )
+                    if os.path.exists(old_file_path):
+                        os.remove(old_file_path)
+
+                # Save file to disk
+                db_item.image = f"{filename}_{db_item.id}{file_extension}"
+
+                file_path = os.path.join(
+                    directory,
+                    f"{filename}_{db_item.id}{file_extension}"
+                )
+                with open(file_path, "wb") as f:
+                    f.write(await file.read())
 
         if model.__name__ == "Game":
             if item.scheduled_datetime:
