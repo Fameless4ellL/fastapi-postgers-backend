@@ -147,6 +147,7 @@ class InstaBingo(Base):
     deleted = Column(Boolean, default=False, doc="Indicates if the instance is deleted")
     created_at = Column(DateTime, default=datetime.datetime.now)
 
+    currency = relationship("Currency", uselist=False)
 
 class Number(Base):
     __tablename__ = "numbers"

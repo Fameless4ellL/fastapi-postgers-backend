@@ -21,7 +21,7 @@ from models.user import (
     Wallet,
     BalanceChangeHistory
 )
-from models.other import Currency, Ticket
+from models.other import Currency, GameStatus, Ticket
 from routers import public
 from globals import aredis
 from routers.utils import get_user, get_currency, url_for, get_user_token
@@ -433,9 +433,14 @@ async def get_my_games(
     data = []
     for i in items:
         # Calculate the sum of Ticket.amount for the chosen game
-        sum_stmt = select(func.sum(Ticket.amount)).filter(
+        sum_stmt = select(
+            Ticket.won,
+            func.sum(Ticket.amount).label("total_amount")
+        ).filter(
             Ticket.user_id == user.id,
             Ticket.won.is_(True)
+        ).group_by(
+            Ticket.won
         )
         if item.model == "Game":
             sum_stmt = sum_stmt.filter(Ticket.game_id == i.id)
@@ -447,22 +452,40 @@ async def get_my_games(
             sum_stmt = sum_stmt.filter(Ticket.instabingo_id == i.id)
 
         sum_result = await db.execute(sum_stmt)
-        total_amount = sum_result.scalar() or 0
-
-        data.append({
-            "id": i.id,
-            "currency": i.currency.code if i.currency else None,
-            "name": i.name,
-            "image": url_for("static", path=i.image),
-            "status": i.status.value if i.status else "None",
-            "price": i.ticket.won,
-            "max_limit_grid": i.max_limit_grid if i.max_limit_grid else None,
-            "prize": float(i.prize) if i.prize.isnumeric() else i.prize,
-            "won": float(total_amount),
-            "endtime": i.scheduled_datetime.timestamp(),
-            "created": i.created_at.timestamp(),
-            "total_amount": float(total_amount)
-        })
+        ticket = sum_result.first()
+        if not ticket:
+            ticket = {
+                "won": False,
+                "total_amount": 0
+            }
+        else:
+            ticket = {
+                "won": ticket.won,
+                "total_amount": float(ticket.total_amount)
+            }
+        if item.model == "InstaBingo":
+            data.append({
+                "id": i.id,
+                "currency": i.currency.code if i.currency else None,
+                "status": GameStatus.COMPLETED.value,
+                "name": "InstaBingo",
+                "price": i.price,
+                "created": i.created_at.timestamp(),
+                "endtime": i.created_at.timestamp()
+            } | ticket)
+        else:
+            data.append({
+                "id": i.id,
+                "currency": i.currency.code if i.currency else None,
+                "name": i.name,
+                "image": url_for("static", path=i.image),
+                "status": i.status.value if i.status else "None",
+                "price": i.price,
+                "max_limit_grid": i.max_limit_grid if i.max_limit_grid else None,
+                "prize": float(i.prize) if i.prize.isnumeric() else i.prize,
+                "endtime": i.scheduled_datetime.timestamp(),
+                "created": i.created_at.timestamp(),
+            } | ticket)
 
     stmt = select(func.count(model.id)).join(Ticket).filter(
         Ticket.user_id == user.id
