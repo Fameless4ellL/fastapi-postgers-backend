@@ -3,7 +3,6 @@ from functools import wraps
 import json
 import requests
 import marshal
-import random
 from typing import Optional
 from datetime import datetime, timedelta
 
@@ -14,12 +13,14 @@ from models.other import (
     Game,
     GameStatus,
     GameView,
+    JackpotType,
     Ticket,
     Jackpot,
     TicketStatus,
     RepeatType
 )
 from utils.web3 import transfer
+from .rng import get_random
 from sqlalchemy.orm import joinedload
 from utils import worker
 from sqlalchemy import func
@@ -90,6 +91,45 @@ def generate_game(
     return True
 
 
+def get_winners(
+    game: Game,
+    tickets: list[Ticket],
+    drawn_numbers: list[int],
+) -> set[Ticket]:
+    """
+    Generate winning numbers for the game instance
+    """
+    number = get_random(1, game.max_limit_grid)
+
+    if number in drawn_numbers:
+        return set()
+
+    drawn_numbers.append(number)
+
+    _winners = {
+        ticket
+        for ticket in tickets
+        if set(drawn_numbers).issubset(set(ticket.numbers))
+    }
+
+    if not _winners:
+        drawn_numbers.pop()
+        return set()
+
+    if game.kind == GameView.MONETARY:
+        max_win_per_combination = float(game.max_win_amount or 100)
+        prize_per_winner = max_win_per_combination / len(_winners)
+
+    for ticket in _winners:
+        if game.kind == GameView.MONETARY:
+            ticket.amount = prize_per_winner
+        ticket.status = TicketStatus.COMPLETED
+        ticket.won = True
+        ticket.numbers = drawn_numbers
+
+    return _winners
+
+
 @worker.register
 def proceed_game(game_id: Optional[int] = None):
     """
@@ -118,88 +158,113 @@ def proceed_game(game_id: Optional[int] = None):
         start_date = datetime.now()
         game.event_start = start_date
 
+        # Получаем билеты
         tickets = db.query(Ticket).filter(
             Ticket.game_id == game.id
         ).all()
 
+        if not tickets or len(tickets) < game.min_ticket_count:
+            game.status = GameStatus.CANCELLED
+            db.add(game)
+            db.commit()
+
+            # TODO вернуть деньги пользователям
+            continue
+
         if game.kind == GameView.MONETARY:
-            prize = float(game.prize or 1000)
-            prize_per_winner = prize // float(game.max_win_amount or 8)
+            # Рассчитываем призовой фонд
+            ticket_price = float(game.price or 1)
+            total_tickets = float(game.prize)
+
+            jackpot = db.query(Jackpot).filter(
+                Jackpot._type == JackpotType[game.game_type.name],
+                Jackpot.status == GameStatus.PENDING
+            ).first()
+            if not jackpot:
+                percentage = float(jackpot.percentage) or 10
+                percentage = percentage / 100
+            else:
+                percentage = 0
+
+            # 10% на джекпот и 10% на расходы
+            total_prize = total_tickets * ticket_price * (1 - percentage - 0.1)
+
+            max_win_per_combination = float(game.max_win_amount or 100)
+            num_winning_combinations = int(total_prize // max_win_per_combination)
+            actual_prize_fund = num_winning_combinations * max_win_per_combination
+            jackpot_remainder = total_prize - actual_prize_fund
+            # Сохраняем остаток в джекпот
+            if jackpot:
+                jackpot.amount += Decimal(jackpot_remainder)
+                db.add(jackpot)
+
+        winners = set()
+        drawn_numbers = []
+
+        if game.kind == GameView.MONETARY:
+            cond = len(drawn_numbers) < num_winning_combinations
         else:
-            prize_per_winner = 1
+            cond = len(drawn_numbers) < game.limit_by_ticket
 
-        winners = []
-        _tickets = [ticket.numbers for ticket in tickets]
+        # Генерация  выигрышной комбинации до game.limit_by_ticket
+        while cond:
+            winners = winners | get_winners(
+                game,
+                tickets,
+                drawn_numbers,
+            )
 
-        while len(winners) != prize_per_winner:
-            if not _tickets:
-                break
-            # генератор случ. числел # TODO: добавить в RNG и использовать его
-            winning_numbers = random.sample(
-                _tickets,
-                1
-            )[0]
-            # проверка на наличие победителей
-            sub_winners = [
-                ticket
-                for ticket in tickets
-                if set(ticket.numbers).issubset(set(winning_numbers))
-            ]
-            if sub_winners:
-                winners.append(sub_winners)
+        tickets = [
+            ticket
+            for ticket in tickets
+            if ticket not in winners
+        ]
 
-        game.numbers = winners
+        if game.kind == GameView.MONETARY:
+            # Генерация остальных выигрышных комбинаций
+            while len(drawn_numbers) < num_winning_combinations:
+                _winners = get_winners(
+                    game,
+                    tickets,
+                    drawn_numbers,
+                )
+                if _winners:
+                    winners = winners | _winners
+                    tickets = [
+                        ticket
+                        for ticket in tickets
+                        if ticket not in _winners
+                    ]
 
-        for _tickets in winners:
-            # Если комбинация совпала на нескольких билетах,
-            # то все билеты исключаются, а приз делится пропорционально.
-            prize_per_ticket = prize_per_winner / len(_tickets)
-            for ticket in _tickets:
-                ticket = db.query(Ticket).with_for_update().filter(
-                    Ticket.id == ticket.id
-                ).first()
-                ticket.won = True
+        game.numbers = drawn_numbers
 
-                if game.kind == GameView.MONETARY:
-                    ticket.amount = prize_per_ticket
-                    ticket.status = TicketStatus.COMPLETED
-
+        for _ticket in winners:
+            if game.kind == GameView.MONETARY:
+                if not _ticket.demo:
                     user_balance = db.query(Balance).with_for_update().filter(
-                        Balance.user_id == ticket.user_id
+                        Balance.user_id == _ticket.user_id
                     ).first()
 
                     if not user_balance:
                         user_balance = Balance(
-                            user_id=ticket.user_id,
+                            user_id=_ticket.user_id,
                             currency_id=game.currency_id
                         )
                         db.add(user_balance)
                         db.commit()
 
                     previous_balance = user_balance.balance
-                    balance = user_balance.balance + Decimal(prize)
+                    balance = user_balance.balance + Decimal(_ticket.amount)
 
                     balance_change = BalanceChangeHistory(
-                        user_id=ticket.user_id,
+                        user_id=_ticket.user_id,
                         balance_id=user_balance.id,
                         currency_id=game.currency_id,
-                        change_amount=prize_per_ticket,
+                        change_amount=_ticket.amount,
                         change_type="win",
                         previous_balance=previous_balance,
                         new_balance=balance
                     )
-
-                    notification = Notification(
-                        user_id=ticket.user_id,
-                        head="You won!",
-                        body=f"You won! {prize_per_ticket} {game.currency.code}",
-                        args=json.dumps({
-                            "game": game.name,
-                            "amount": prize_per_ticket,
-                            "currency": game.currency.code
-                        })
-                    )
-                    db.add(notification)
                     db.add(balance_change)
                     db.commit()
                     db.refresh(balance_change)
@@ -209,7 +274,35 @@ def proceed_game(game_id: Optional[int] = None):
                         change_type=balance_change.change_type
                     )
 
-                db.add(ticket)
+                notification = Notification(
+                    user_id=_ticket.user_id,
+                    head="You won!",
+                    body=f"You won! {_ticket.amount} {game.currency.code}",
+                    args=json.dumps({
+                        "game": game.name,
+                        "amount": _ticket.amount,
+                        "currency": game.currency.code
+                    })
+                )
+                db.add(notification)
+                db.commit()
+
+            else:
+                notification = Notification(
+                    user_id=_ticket.user_id,
+                    head="You won!",
+                    body=f"You won! {game.prize}",
+                    args=json.dumps({
+                        "game": game.name,
+                        "amount": _ticket.amount,
+                        "prize": game.prize,
+                        "currency": game.currency.code
+                    })
+                )
+                db.add(notification)
+                db.commit()
+
+        db.add_all(winners)
 
         end_date = datetime.now()
         game.event_end = end_date
@@ -275,9 +368,6 @@ def generate_jackpot(
 
     if not jackpot:
         return False
-
-    # tz = timedelta(hours=jackpot.tzone)
-    # now = datetime.now() + tz
 
     next_day = jackpot.next_scheduled_date()
     if not next_day:
@@ -348,6 +438,13 @@ def proceed_jackpot(jackpot_id: Optional[int] = None):
         tickets = db.query(Ticket).filter(
             Ticket.jackpot_id == jackpot.id
         ).all()
+
+        if not tickets:
+            jackpot.status = GameStatus.CANCELLED
+            db.add(jackpot)
+            db.commit()
+            continue
+
         total_prize = db.query(func.sum(Ticket.amount)).filter(
             Ticket.game_id == jackpot.id
         ).scalar() or 0
@@ -357,76 +454,78 @@ def proceed_jackpot(jackpot_id: Optional[int] = None):
             raise ValueError("Percentage cannot be zero")
         prize = total_prize * (percentage / 100)
 
-        winners = []
-        _tickets = [ticket.numbers for ticket in tickets]
+        remaining_tickets = tickets
+        winning_number = ""
 
-        while len(winners) != 1:
-            if not _tickets:
-                break
-            # генератор случ. числел # TODO: добавить в RNG и использовать его
-            winning_numbers = random.sample(
-                _tickets,
-                1
-            )[0]
-            # проверка на наличие победителей
-            sub_winners = [
-                ticket
-                for ticket in tickets
-                if set(ticket.numbers).issubset(set(winning_numbers))
+        while len(remaining_tickets) > 1:
+            digit = get_random(0, 9)  # Выпавшее число может быть от 0 до 9
+            new_winning_number = winning_number + str(digit)
+
+            # Filter tickets based on the current sequence of digits
+            filtered_tickets = [
+                ticket for ticket in remaining_tickets
+                if ticket.numbers.startswith(new_winning_number)
             ]
-            if sub_winners:
-                winners.append(sub_winners)
 
-        jackpot.numbers = winners
+            if filtered_tickets:
+                # Update the winning number and remaining tickets
+                winning_number = new_winning_number
+                remaining_tickets = filtered_tickets
+            else:
+                # Retry with a new digit if no tickets match
+                continue
 
-        for _tickets in winners:
-            for ticket in _tickets:
-                user_balance = db.query(Balance).with_for_update().filter(
-                    Balance.user_id == ticket.user_id
-                ).first()
+        jackpot.numbers = [int(digit) for digit in winning_number]
 
-                if not user_balance:
-                    user_balance = Balance(
-                        user_id=ticket.user_id,
-                        currency_id=jackpot.currency_id
-                    )
-                    db.add(user_balance)
-                    db.commit()
-                    db.refresh(user_balance)
+        if remaining_tickets:
+            ticket = remaining_tickets[0]
 
-                previous_balance = user_balance.balance
-                balance = user_balance.balance + Decimal(prize)
+            user_balance = db.query(Balance).with_for_update().filter(
+                Balance.user_id == ticket.user_id
+            ).first()
 
-                balance_change = BalanceChangeHistory(
+            if not user_balance:
+                user_balance = Balance(
                     user_id=ticket.user_id,
-                    balance_id=user_balance.id,
-                    currency_id=jackpot.currency_id,
-                    change_amount=prize,
-                    change_type="jackpot",
-                    previous_balance=previous_balance,
-                    new_balance=balance
+                    currency_id=jackpot.currency_id
                 )
-
-                notification = Notification(
-                    user_id=ticket.user_id,
-                    head="You won!",
-                    body=f"You won! {prize} {jackpot.currency.code}",
-                    args=json.dumps({
-                        "game": jackpot.name,
-                        "amount": prize,
-                        "currency": jackpot.currency.code
-                    })
-                )
-
-                db.add(notification)
-                db.add(balance_change)
+                db.add(user_balance)
                 db.commit()
-                db.refresh(balance_change)
+                db.refresh(user_balance)
 
-                deposit(
-                    history_id=balance_change.id,
-                    change_type=balance_change.change_type
-                )
+            previous_balance = user_balance.balance
+            balance = user_balance.balance + Decimal(prize)
+
+            balance_change = BalanceChangeHistory(
+                user_id=ticket.user_id,
+                balance_id=user_balance.id,
+                currency_id=jackpot.currency_id,
+                change_amount=prize,
+                change_type="jackpot",
+                previous_balance=previous_balance,
+                new_balance=balance
+            )
+
+            notification = Notification(
+                user_id=ticket.user_id,
+                head="You won!",
+                body=f"You won! {prize} {jackpot.currency.code}",
+                args=json.dumps({
+                    "game": jackpot.name,
+                    "amount": prize,
+                    "currency": jackpot.currency.code
+                })
+            )
+
+            db.add(notification)
+            db.add(balance_change)
+            db.commit()
+            db.refresh(balance_change)
+
+            deposit(
+                history_id=balance_change.id,
+                change_type=balance_change.change_type
+            )
 
         end_date = datetime.now()
         jackpot.event_end = end_date

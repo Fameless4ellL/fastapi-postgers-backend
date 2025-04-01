@@ -23,6 +23,7 @@ from schemes.game import BuyInstaTicket
 from schemes.instabingo import InstaBingoInfo
 from settings import settings
 from utils.workers import deposit, withdraw
+from utils.rng import get_random
 
 
 @public.get(
@@ -175,7 +176,7 @@ async def buy_tickets(
     win_numbers = []
     while len(win_numbers) < 15:
         start_date = datetime.datetime.now()
-        number = random.randint(0, 90)
+        number = get_random(0, 90)
         end_date = datetime.datetime.now()
 
         if number in win_numbers:
