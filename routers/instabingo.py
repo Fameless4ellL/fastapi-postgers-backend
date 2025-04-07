@@ -47,7 +47,7 @@ async def get_instabingo(
         InstaBingo.country == user.country
     )
     data = await db.execute(stmt)
-    data = data.scalar()
+    data = data.fetchall()
 
     if not data:
         return JSONResponse(
