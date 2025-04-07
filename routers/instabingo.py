@@ -150,6 +150,7 @@ async def buy_tickets(
         win_numbers.append((number, start_date, end_date))
 
     won = False
+    prize = 0
     if all(any(num == win_num[0] for win_num in win_numbers) for num in item.numbers):
         last_number = item.numbers[-1]
         prize = next(
@@ -215,6 +216,7 @@ async def buy_tickets(
         instabingo_id=game.id,
         numbers=item.numbers,
         won=won,
+        amount=prize,
         jackpot_id=jackpot_id,
         status=TicketStatus.COMPLETED
     )
@@ -235,5 +237,10 @@ async def buy_tickets(
 
     return JSONResponse(
         status_code=status.HTTP_201_CREATED,
-        content={"won": won}
+        content={
+            "won": won,
+            "gen": [number for number, _, _, in win_numbers],
+            "won_amount": str(ticket.amount),
+            "numbers": item.numbers
+        }
     )
