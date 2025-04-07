@@ -1,15 +1,16 @@
-from fastapi import Depends, Path, status, Security
-from fastapi.responses import JSONResponse
 from typing import Annotated
 
+from fastapi import Depends, Path, status, Security
+from fastapi.responses import JSONResponse
 from sqlalchemy import select, func
-from models.user import Role, User
+from sqlalchemy.ext.asyncio import AsyncSession
+
+from models.db import get_db
 from models.other import InstaBingo, Ticket, Currency, Number
+from models.user import Role, User
 from routers import admin
 from routers.admin import get_crud_router
 from routers.utils import get_admin_token
-from sqlalchemy.ext.asyncio import AsyncSession
-from models.db import get_db
 from schemes.admin import (
     InstaBingoFilter,
     InstaBingoSchema,
@@ -20,7 +21,6 @@ from schemes.admin import (
     Empty
 )
 from schemes.base import BadResponse
-
 
 get_crud_router(
     model=InstaBingo,
