@@ -139,7 +139,7 @@ class InstaBingo(Base):
     __tablename__ = "instabingos"
 
     id = Column(Integer, primary_key=True, index=True)
-    country = Column(String(32))
+    country = Column(String(32), nullable=True)
     price = Column(DECIMAL(10, 2), nullable=False, default=1)
     winnings = Column(JSON, nullable=True)
     currency_id = Column(Integer, ForeignKey('currencies.id'), nullable=True)

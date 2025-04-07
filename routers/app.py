@@ -43,7 +43,6 @@ async def tg_login(item: WidgetLogin):
     """
         Для логина в telegram mini app через seamless auth
     """
-    print(settings.bot_token)
     if not TgAuth(item, settings.bot_token.encode("utf-8")).check_hash():
         return JSONResponse(
             status_code=status.HTTP_400_BAD_REQUEST,

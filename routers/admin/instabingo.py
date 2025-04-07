@@ -118,6 +118,9 @@ async def get_instabingo_list(
         content=InstaBingoList(**{"count": count, "data": data}).model_dump()
     )
 
+
+
+
 @admin.get(
     "/instabingo/{game_id}",
     dependencies=[Security(

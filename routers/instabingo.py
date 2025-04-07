@@ -56,6 +56,80 @@ async def get_instabingo(
     )
 
 
+@public.put(
+    "/instabingo/{game_id}/check", tags=["game"],
+    responses={
+        400: {"model": BadResponse},
+    }
+)
+async def instabingo_check(
+    item: BuyInstaTicket,
+    user: Annotated[User, Depends(get_user)],
+    db: Annotated[Session, Depends(get_sync_db)],
+):
+    """
+    generate tickets
+    """
+    if len(set(item.numbers)) != 15:
+        return JSONResponse(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            content=BadResponse(message="Invalid numbers, should be 15").model_dump()
+        )
+
+    stmt = db.query(InstaBingo).filter(
+        InstaBingo.country == user.country,
+        InstaBingo.deleted.is_(False)
+    )
+
+    game = stmt.first()
+
+    if game is None:
+        game = db.query(InstaBingo).filter(
+            InstaBingo.country.is_(None),
+        ).first()
+
+        if game is None:
+            currency = db.query(Currency).first()
+            if not currency:
+                return JSONResponse(
+                    status_code=status.HTTP_400_BAD_REQUEST,
+                    content=BadResponse(message="Currency not found").model_dump()
+                )
+
+            game = InstaBingo(
+                currency_id=currency.id,
+                country=None
+            )
+            db.add(game)
+            db.commit()
+
+            game = db.query(InstaBingo).filter(
+                InstaBingo.country.is_(None),
+            ).first()
+
+    if not game:
+        return JSONResponse(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            content=BadResponse(message="Game not found").model_dump()
+        )
+
+    tickets = [
+        dict(
+            id=i,
+            user_id=user.id,
+            instabingo_id=game.id,
+            numbers=numbers,
+            won=False,
+            created=datetime.datetime.utcnow().timestamp()
+        ) for i, numbers in enumerate(item.numbers)
+    ]
+
+    return JSONResponse(
+        status_code=status.HTTP_200_OK,
+        content=dict(tickets=tickets, count=item.quantity)
+    )
+
+
 @public.post(
     "/instabingo/tickets",
     tags=["InstaBingo", Action.TRANSACTION],
@@ -82,21 +156,28 @@ async def buy_tickets(
     game = stmt.first()
 
     if game is None:
-        currency = db.query(Currency).first()
-        if not currency:
-            return JSONResponse(
-                status_code=status.HTTP_400_BAD_REQUEST,
-                content=BadResponse(message="Currency not found").model_dump()
+        game = db.query(InstaBingo).filter(
+            InstaBingo.country.is_(None),
+        ).first()
+
+        if game is None:
+            currency = db.query(Currency).first()
+            if not currency:
+                return JSONResponse(
+                    status_code=status.HTTP_400_BAD_REQUEST,
+                    content=BadResponse(message="Currency not found").model_dump()
+                )
+
+            game = InstaBingo(
+                currency_id=currency.id,
+                country=None
             )
+            db.add(game)
+            db.commit()
 
-        game = InstaBingo(
-            currency_id=currency.id,
-            country=user.country
-        )
-        db.add(game)
-        db.commit()
-
-        game = stmt.first()
+            game = db.query(InstaBingo).filter(
+                InstaBingo.country.is_(None),
+            ).first()
 
     if not game:
         return JSONResponse(
