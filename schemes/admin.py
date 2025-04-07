@@ -713,3 +713,19 @@ class UserTicketWinner(BaseModel):
 class Winners(BaseModel):
     items: list[UserTickets] = []
     count: int = 0
+
+
+class InstaBingoItem(BaseModel):
+    id: int
+    ticket_id: int
+    user_id: int
+    username: str
+    country: str
+    created_at: str
+    won: Optional[bool] = False
+    amount: Optional[float] = None
+
+
+class InstaBingoList(BaseModel):
+    data: list[InstaBingoItem] = []
+    count: int = 0

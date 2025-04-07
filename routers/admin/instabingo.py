@@ -4,7 +4,7 @@ from typing import Annotated
 
 from sqlalchemy import select, func
 from models.user import Role, User
-from models.other import Currency, InstaBingo, Ticket, Currency, Number
+from models.other import InstaBingo, Ticket, Currency, Number
 from routers import admin
 from routers.admin import get_crud_router
 from routers.utils import get_admin_token
@@ -16,6 +16,7 @@ from schemes.admin import (
     InstaBingos,
     InstaBingoCreate,
     InstaBingoUpdate,
+    InstaBingoList,
     Empty
 )
 from schemes.base import BadResponse
@@ -55,6 +56,7 @@ get_crud_router(
         ])],
     responses={
         400: {"model": BadResponse},
+        200: {"model": InstaBingoList}
     },
 )
 async def get_instabingo_list(
@@ -110,11 +112,11 @@ async def get_instabingo_list(
         "won": i.won,
         "amount": float(i.amount)
     } for i in game]
+
     return JSONResponse(
         status_code=status.HTTP_200_OK,
-        content={"count": count, "data": data}
+        content=InstaBingoList(**{"count": count, "data": data}).model_dump()
     )
-
 
 @admin.get(
     "/instabingo/{game_id}",
