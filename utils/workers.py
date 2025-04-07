@@ -850,8 +850,7 @@ def set_pending_jackpot(
     return True
 
 # def buy_tickets():
-#     db = next(get_sync_db())
-    
+#     db = next(get_sync_db())    
 #     wallet = db.query(Wallet).filter(
 #         User.id == user.id
 #     )

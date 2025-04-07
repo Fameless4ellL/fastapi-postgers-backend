@@ -24,7 +24,7 @@ from schemes.base import BadResponse
 
 get_crud_router(
     model=InstaBingo,
-    prefix="/bingo",
+    prefix="/instabingo/bingo",
     schema=InstaBingos,
     get_schema=InstaBingoSchema,
     create_schema=InstaBingoCreate,
