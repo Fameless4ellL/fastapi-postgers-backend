@@ -720,7 +720,7 @@ class InstaBingoItem(BaseModel):
     ticket_id: int
     user_id: int
     username: str
-    country: str
+    country: Country
     created_at: str
     won: Optional[bool] = False
     amount: Optional[float] = None
