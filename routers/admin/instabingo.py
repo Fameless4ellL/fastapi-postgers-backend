@@ -104,7 +104,7 @@ async def get_instabingo_list(
     count = count_result.scalar()
 
     data = [{
-        "id": i.id,
+        "ticket_id": i.id,
         "user_id": i.user_id,
         "username": i.username,
         "country": i.country,

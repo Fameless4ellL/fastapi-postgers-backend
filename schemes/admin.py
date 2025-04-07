@@ -716,7 +716,6 @@ class Winners(BaseModel):
 
 
 class InstaBingoItem(BaseModel):
-    id: int
     ticket_id: int
     user_id: int
     username: str
