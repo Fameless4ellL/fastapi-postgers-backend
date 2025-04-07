@@ -59,7 +59,7 @@ get_crud_router(
         200: {"model": InstaBingoList}
     },
 )
-async def get_instabingo_list(
+async def get_instabingo_tickets_list(
     db: Annotated[AsyncSession, Depends(get_db)],
     item: Annotated[InstaBingoFilter, Depends(InstaBingoFilter)],
     offset: int = 0,
@@ -137,7 +137,7 @@ async def get_instabingo_list(
         400: {"model": BadResponse},
     },
 )
-async def get_instabingo(
+async def get_instabingo_ticket(
     db: Annotated[AsyncSession, Depends(get_db)],
     game_id: Annotated[int, Path()],
 ):
