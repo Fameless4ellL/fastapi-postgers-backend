@@ -527,7 +527,7 @@ class InstaBingoBase(BaseAdmin):
 
 
 class InstaBingoCreate(BaseAdmin):
-    currency_id: Annotated[int, AfterValidator(get_currency_by_id)]
+    # currency_id: Annotated[int, AfterValidator(get_currency_by_id)]
     price: float = 1.0
     x15: int = 1
     x16_20: int = 1
@@ -561,8 +561,10 @@ class InstaBingoCreate(BaseAdmin):
 
             winnings[i] = getattr(self, f"x{start}{key}")
 
+        currency_id = get_first_currency()
+
         return {
-            "currency_id": self.currency_id,
+            "currency_id": currency_id,
             "price": self.price,
             "country": self.country,
             "winnings": winnings
@@ -623,6 +625,10 @@ class KycBase(BaseAdmin):
 class KycCreate(BaseAdmin):
     countries: list[CountryAlpha3] = []
 
+
+@dataclass
+class KycDelete:
+    countries: list[CountryAlpha3] = Query(None)
 
 class Profile(BaseAdmin):
     id: int

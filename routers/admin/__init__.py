@@ -127,6 +127,13 @@ def get_crud_router(
             has_tickets = exists().where(Ticket.jackpot_id == model.id).label("has_tickets")
             stmt = stmt.add_columns(has_tickets)
 
+        if model.__name__ == "InstaBingo":
+
+            # avoid None
+            stmt = stmt.filter(
+                model.country.isnot(None),
+            )
+
         items = await db.execute(stmt.order_by(model.id.desc()).offset(offset).limit(limit))
         items = items.scalars().all()
 
@@ -455,3 +462,4 @@ from .instabingo import *
 from .kyc import *
 from .profile import *
 from .jackpots import *
+from .lobby import *
