@@ -630,6 +630,7 @@ class KycCreate(BaseAdmin):
 class KycDelete:
     countries: list[CountryAlpha3] = Query(None)
 
+
 class Profile(BaseAdmin):
     id: int
     fullname: str

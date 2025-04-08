@@ -11,7 +11,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from models.db import get_db
 from schemes.admin import (
     KycBase,
-    KycCreate,
+    KycCreate, KycDelete,
 )
 from schemes.base import BadResponse
 
@@ -114,7 +114,7 @@ async def create_kyc_list(
 )
 async def detele_kyc_list(
     db: Annotated[AsyncSession, Depends(get_db)],
-    item: KycCreate
+    item: Annotated[KycDelete, Depends(KycDelete)],
 ):
     """
     delete KYC country bulk_delete

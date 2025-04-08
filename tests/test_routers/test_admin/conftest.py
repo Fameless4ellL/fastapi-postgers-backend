@@ -1,10 +1,8 @@
 from fastapi.testclient import TestClient
 import pytest
 from sqlalchemy.orm.session import Session
-from models.other import Game, GameType
-from models.user import Role, User, Balance
+from models.user import Role, User, Kyc
 from globals import redis
-from utils.signature import get_password_hash
 
 
 PASSWORD = "test_password"
@@ -47,3 +45,20 @@ def admin_token(
     assert response.status_code == 200
     assert "access_token" in response.json()
     yield response.json()["access_token"]
+
+
+@pytest.fixture
+def kyc(
+    db: Session,
+):
+    """
+    Создание KYC.
+    """
+    kyc = Kyc(
+        country="USA",
+    )
+    db.add(kyc)
+    db.commit()
+    db.refresh(kyc)
+    yield kyc
+    db.query(Kyc).delete()
