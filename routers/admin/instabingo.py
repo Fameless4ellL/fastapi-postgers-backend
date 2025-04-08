@@ -4,8 +4,9 @@ from fastapi import Depends, Path, status, Security
 from fastapi.responses import JSONResponse
 from sqlalchemy import select, func
 from sqlalchemy.ext.asyncio import AsyncSession
+from sqlalchemy.orm import Session
 
-from models.db import get_db
+from models.db import get_db, get_sync_db
 from models.other import InstaBingo, Ticket, Currency, Number
 from models.user import Role, User
 from routers import admin
@@ -231,7 +232,7 @@ async def get_generated_numbers(
 
 
 @admin.delete(
-    "/bingo/{instabingo_id}",
+    "instabingo/bingo/{instabingo_id}",
     dependencies=[Security(
         get_admin_token,
         scopes=[
@@ -270,4 +271,65 @@ async def set_instabingo_as_deleted(
     return JSONResponse(
         status_code=status.HTTP_200_OK,
         content="Instabingo deleted"
+    )
+
+
+@admin.get(
+    "instabingo/bingo/default",
+    dependencies=[Security(
+        get_admin_token,
+        scopes=[
+            Role.SUPER_ADMIN.value,
+            Role.ADMIN.value,
+            Role.GLOBAL_ADMIN.value,
+            Role.LOCAL_ADMIN.value,
+            Role.FINANCIER.value,
+            Role.SUPPORT.value
+        ])],
+    responses={
+        400: {"model": BadResponse},
+    },
+)
+async def get_instabingo_defafult(
+    db: Annotated[Session, Depends(get_sync_db)],
+):
+    """
+    get instabingo default
+    """
+    default = db.query(
+        InstaBingo
+    ).filter(
+        InstaBingo.country.is_(None)
+    ).first()
+
+    if not default:
+        currency = db.query(Currency).first()
+        if not currency:
+            return JSONResponse(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                content=BadResponse(message="Currency not found").model_dump()
+            )
+
+        game = InstaBingo(
+            currency_id=currency.id,
+            country=None
+        )
+        db.add(game)
+        db.commit()
+
+        default = db.query(InstaBingo).filter(
+            InstaBingo.country.is_(None),
+        ).first()
+
+    data = {
+        "id": default.id,
+        "country": default.country,
+        "price": float(default.price),
+        "currency_id": default.currency_id,
+        "created_at": default.created_at.strftime("%Y-%m-%d %H:%M:%S"),
+    }
+
+    return JSONResponse(
+        status_code=status.HTTP_200_OK,
+        content=data
     )

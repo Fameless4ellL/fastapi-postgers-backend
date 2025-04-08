@@ -109,8 +109,6 @@ class Jackpot(Base):
     repeat_type = Column(SqlEnum(RepeatType), default=RepeatType.NONE, doc="The type of repetition (weekly, monthly, yearly)")
 
     amount = Column(DECIMAL(9, 2), nullable=True, default=0)
-
-    image = Column(String(255), nullable=True, default="default_image.png", doc="The image of the game instance")
     status = Column(SqlEnum(GameStatus), default=GameStatus.NEW)
 
     numbers = Column(ARRAY(Integer), nullable=True)

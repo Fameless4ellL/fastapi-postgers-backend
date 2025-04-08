@@ -684,7 +684,6 @@ class AdminCreate(BaseAdmin):
     def ser_model(self):
         # get country from phone_number
         country_code = parse(self.phone_number)
-        # country = geocoder.region_code_for_number(country_code)
         phone_number = f"{country_code.country_code}{country_code.national_number}"
 
         country = geocoder.region_code_for_number(country_code)
