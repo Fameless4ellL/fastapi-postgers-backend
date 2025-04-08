@@ -1,7 +1,9 @@
+from typing import Optional
+
 import requests
 
 
-def get_random(min: int = 1, max: int = 90) -> dict:
+def get_random(min: int = 1, max: int = 90) -> Optional[int]:
     """
     Получение случайного числа
     """

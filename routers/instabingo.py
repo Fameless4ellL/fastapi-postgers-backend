@@ -220,14 +220,16 @@ async def buy_tickets(
         )
 
     win_numbers = []
-    while len(win_numbers) < 15:
+    generated_numbers = set()
+    while len(generated_numbers) < 40:
         start_date = datetime.datetime.now()
         number = get_random(1, 90)
         end_date = datetime.datetime.now()
 
-        if number in win_numbers:
-            continue
+        if len(win_numbers) >= 15 and set(item.numbers).issubset(generated_numbers):
+            break
 
+        generated_numbers.add(number)
         win_numbers.append((number, start_date, end_date))
 
     won = False
