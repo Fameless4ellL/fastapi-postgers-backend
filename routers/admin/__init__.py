@@ -128,10 +128,11 @@ def get_crud_router(
             stmt = stmt.add_columns(has_tickets)
 
         if model.__name__ == "InstaBingo":
-
+            model: InstaBingo = model
             # avoid None
             stmt = stmt.filter(
                 model.country.isnot(None),
+                model.deleted.isnot(True)
             )
 
         items = await db.execute(stmt.order_by(model.id.desc()).offset(offset).limit(limit))

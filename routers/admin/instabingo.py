@@ -120,8 +120,6 @@ async def get_instabingo_tickets_list(
     )
 
 
-
-
 @admin.get(
     "/instabingo/{game_id}",
     dependencies=[Security(
@@ -232,7 +230,7 @@ async def get_generated_numbers(
 
 
 @admin.delete(
-    "instabingo/bingo/{instabingo_id}",
+    "/instabingo/bingo/{instabingo_id}",
     dependencies=[Security(
         get_admin_token,
         scopes=[
@@ -275,7 +273,7 @@ async def set_instabingo_as_deleted(
 
 
 @admin.get(
-    "instabingo/bingo/default",
+    "/instabingo/bingo/default",
     dependencies=[Security(
         get_admin_token,
         scopes=[
