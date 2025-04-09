@@ -314,17 +314,17 @@ async def set_instabingo_as_deleted(
     set instabingo as deleted
     """
     stmt = select(InstaBingo).filter(InstaBingo.id == instabingo_id)
-    numbers = await db.execute(stmt)
-    numbers = numbers.scalars().all()
+    number = await db.execute(stmt)
+    number = number.scalar_one_or_none()
 
-    if not numbers:
+    if not number:
         return JSONResponse(
             status_code=status.HTTP_400_BAD_REQUEST,
             content="Instabingo not found"
         )
 
-    numbers.deleted = True
-    db.add(numbers)
+    number.deleted = True
+    db.add(number)
     await db.commit()
 
     return JSONResponse(
