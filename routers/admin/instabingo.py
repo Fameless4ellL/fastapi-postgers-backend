@@ -291,7 +291,7 @@ async def get_generated_numbers(
 
 
 @admin.delete(
-    "/instabingo/bingo/{instabingo_id}",
+    "/bingo/{instabingo_id}",
     dependencies=[Security(
         get_admin_token,
         scopes=[
