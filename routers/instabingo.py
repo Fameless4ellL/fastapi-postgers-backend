@@ -58,7 +58,7 @@ async def get_instabingo(
 
     return JSONResponse(
         status_code=status.HTTP_200_OK,
-        content=InstaBingoInfo(**data).model_dump()
+        content=InstaBingoInfo(**data).model_dump(mode="json")
     )
 
 
@@ -234,6 +234,9 @@ async def buy_tickets(
 
         if len(win_numbers) >= 15 and set(item.numbers).issubset(generated_numbers):
             break
+
+        if number in generated_numbers:
+            continue
 
         generated_numbers.add(number)
         win_numbers.append((number, start_date, end_date))
