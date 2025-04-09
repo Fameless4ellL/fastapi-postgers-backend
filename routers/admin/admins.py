@@ -164,7 +164,7 @@ async def get_admin(
     user = await db.execute(stmt)
     user = user.scalar()
 
-    if not admin:
+    if not user:
         return JSONResponse(
             status_code=status.HTTP_400_BAD_REQUEST,
             content={"message": "Admin not found"},

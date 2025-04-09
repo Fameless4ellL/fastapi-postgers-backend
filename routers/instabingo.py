@@ -40,19 +40,25 @@ async def get_instabingo(
     """
     Получение нужной информации для игры в инстабинго
     """
-    data = db.query(InstaBingo).filter(
+    game = db.query(InstaBingo).filter(
         InstaBingo.country == user.country
     ).first()
 
-    if not data:
+    if not game:
         return JSONResponse(
             status_code=status.HTTP_200_OK,
             content=InstaBingoInfo().model_dump()
         )
 
+    data = {
+        "id": game.id,
+        "price": game.price,
+        "currency": game.currency.code if game.currency else ""
+    }
+
     return JSONResponse(
         status_code=status.HTTP_200_OK,
-        content=InstaBingoInfo(data).model_dump()
+        content=InstaBingoInfo(**data).model_dump()
     )
 
 
