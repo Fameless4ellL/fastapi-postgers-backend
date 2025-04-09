@@ -225,6 +225,22 @@ async def create_admin(
             content={"message": "You can't create this admin"},
         )
 
+    stmt = select(User)
+
+    if item.phone_number:
+        stmt = stmt.filter(User.phone_number == item.phone_number)
+    if item.username:
+        stmt = stmt.filter(User.username != item.username)
+
+    exists = await db.execute(stmt)
+    exists = exists.scalars().all()
+
+    if exists:
+        return JSONResponse(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            content={"message": "Unique field error"}
+        )
+
     new_admin = User(**item.model_dump(exclude={"id"}))
     db.add(new_admin)
     await db.commit()
@@ -297,6 +313,24 @@ async def update_admin(
         return JSONResponse(
             status_code=status.HTTP_400_BAD_REQUEST,
             content={"message": "Admin not found"},
+        )
+
+    stmt = select(User)
+
+    if item.phone_number:
+        stmt = stmt.filter(User.phone_number == item.phone_number)
+    if item.telegram_id:
+        stmt = stmt.filter(User.telegram_id != item.telegram_id)
+    if item.username:
+        stmt = stmt.filter(User.username != item.username)
+
+    exists = await db.execute(stmt)
+    exists = exists.scalars().all()
+
+    if exists:
+        return JSONResponse(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            content={"message": "Unique field error"}
         )
 
     for key, value in item.model_dump().items():

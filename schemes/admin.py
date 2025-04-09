@@ -681,6 +681,7 @@ class AdminFilter(Search, Countries):
 class AdminCreate(BaseAdmin):
     firstname: str
     lastname: str
+    username: str
     email: str
     phone_number: PhoneNumber
     role: AdminRoles
