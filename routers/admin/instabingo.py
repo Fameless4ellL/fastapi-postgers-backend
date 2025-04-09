@@ -44,6 +44,67 @@ get_crud_router(
 
 
 @admin.get(
+    "/instabingo/bingo/default",
+    dependencies=[Security(
+        get_admin_token,
+        scopes=[
+            Role.SUPER_ADMIN.value,
+            Role.ADMIN.value,
+            Role.GLOBAL_ADMIN.value,
+            Role.LOCAL_ADMIN.value,
+            Role.FINANCIER.value,
+            Role.SUPPORT.value
+        ])],
+    responses={
+        400: {"model": BadResponse},
+    },
+)
+async def get_instabingo_defafult(
+    db: Annotated[Session, Depends(get_sync_db)],
+):
+    """
+    get instabingo default
+    """
+    default = db.query(
+        InstaBingo
+    ).filter(
+        InstaBingo.country.is_(None)
+    ).first()
+
+    if not default:
+        currency = db.query(Currency).first()
+        if not currency:
+            return JSONResponse(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                content=BadResponse(message="Currency not found").model_dump()
+            )
+
+        game = InstaBingo(
+            currency_id=currency.id,
+            country=None
+        )
+        db.add(game)
+        db.commit()
+
+        default = db.query(InstaBingo).filter(
+            InstaBingo.country.is_(None),
+        ).first()
+
+    data = {
+        "id": default.id,
+        "country": default.country,
+        "price": float(default.price),
+        "currency_id": default.currency_id,
+        "created_at": default.created_at.strftime("%Y-%m-%d %H:%M:%S"),
+    }
+
+    return JSONResponse(
+        status_code=status.HTTP_200_OK,
+        content=data
+    )
+
+
+@admin.get(
     "/instabingos",
     dependencies=[Security(
         get_admin_token,
@@ -269,65 +330,4 @@ async def set_instabingo_as_deleted(
     return JSONResponse(
         status_code=status.HTTP_200_OK,
         content="Instabingo deleted"
-    )
-
-
-@admin.get(
-    "/instabingo/bingo/default",
-    dependencies=[Security(
-        get_admin_token,
-        scopes=[
-            Role.SUPER_ADMIN.value,
-            Role.ADMIN.value,
-            Role.GLOBAL_ADMIN.value,
-            Role.LOCAL_ADMIN.value,
-            Role.FINANCIER.value,
-            Role.SUPPORT.value
-        ])],
-    responses={
-        400: {"model": BadResponse},
-    },
-)
-async def get_instabingo_defafult(
-    db: Annotated[Session, Depends(get_sync_db)],
-):
-    """
-    get instabingo default
-    """
-    default = db.query(
-        InstaBingo
-    ).filter(
-        InstaBingo.country.is_(None)
-    ).first()
-
-    if not default:
-        currency = db.query(Currency).first()
-        if not currency:
-            return JSONResponse(
-                status_code=status.HTTP_400_BAD_REQUEST,
-                content=BadResponse(message="Currency not found").model_dump()
-            )
-
-        game = InstaBingo(
-            currency_id=currency.id,
-            country=None
-        )
-        db.add(game)
-        db.commit()
-
-        default = db.query(InstaBingo).filter(
-            InstaBingo.country.is_(None),
-        ).first()
-
-    data = {
-        "id": default.id,
-        "country": default.country,
-        "price": float(default.price),
-        "currency_id": default.currency_id,
-        "created_at": default.created_at.strftime("%Y-%m-%d %H:%M:%S"),
-    }
-
-    return JSONResponse(
-        status_code=status.HTTP_200_OK,
-        content=data
     )
