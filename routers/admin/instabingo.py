@@ -44,7 +44,7 @@ get_crud_router(
 
 
 @admin.get(
-    "/instabingo/bingo/default",
+    "/instabingo/default",
     dependencies=[Security(
         get_admin_token,
         scopes=[
