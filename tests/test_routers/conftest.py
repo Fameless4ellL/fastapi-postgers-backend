@@ -21,26 +21,27 @@ def tear_down(db: Session):
 
 @pytest.fixture
 def user(db: Session):
-    db.query(User).filter(
+    user = db.query(User).filter(
         User.username == "test_user1"
-    ).delete()
-    db.commit()
+    ).first()
 
-    hashed_password = get_password_hash("test_password")
-    user = User(
-        phone_number="77079898911",
-        username="test_user1",
-        password=hashed_password,
-        country="KAZ",
-    )
-    db.add(user)
-    db.commit()
+    if not user:
+        hashed_password = get_password_hash("test_password")
+        user = User(
+            phone_number="77079898911",
+            username="test_user1",
+            password=hashed_password,
+            country="KAZ",
+        )
+        db.add(user)
+        db.commit()
+        db.refresh(user)
 
     yield user
 
     try:
         db.query(User).filter(
-            User.username == "test_user1"
+            User.id == user.id
         ).delete()
         db.commit()
     except Exception as e:
@@ -70,53 +71,62 @@ def token(
 
 @pytest.fixture
 def network(db: Session):
-    db.query(Currency).filter(
-        Currency.network_id == db.query(Network.id).filter(Network.name == "Test Network").scalar()
-    ).delete()
-    db.commit()
+    network = db.query(Network).filter(
+        Network.symbol == "TST"
+    ).first()
 
-    db.query(Network).filter(
-        Network.name == "Test Network"
-    ).delete()
-    db.commit()
-
-    network = Network(
-        name="Test Network",
-        symbol="TST",
-        chain_id=1,
-        rpc_url="http://localhost:8545",
-        explorer_url="http://localhost:8080",
-    )
-    db.add(network)
-    db.commit()
+    if not network:
+        network = Network(
+            name="Test Network",
+            symbol="TST",
+            chain_id=1,
+            rpc_url="http://localhost:8545",
+            explorer_url="http://localhost:8080",
+        )
+        db.add(network)
+        db.commit()
+        db.refresh(network)
 
     yield network
-
-    db.query(Currency).filter(
-        Currency.network_id == db.query(Network.id).filter(Network.name == "Test Network").scalar()
-    ).delete()
-    db.commit()
-
-    db.query(Network).filter(
-        Network.name == "Test Network"
-    ).delete()
-    db.commit()
+    try:
+        db.query(Network).filter(
+            Network.id == network.id
+        ).delete()
+        db.commit()
+    except Exception as e:
+        db.rollback()
+        print(e)
 
 
 @pytest.fixture
 def currency(db: Session, network: Network):
-    currency = Currency(
-        code="TST",
-        name="Test Currency",
-        network_id=network.id,
-        address="0x",
-        decimals=18,
-        conversion_rate=1
-    )
-    db.add(currency)
-    db.commit()
+    currency = db.query(Currency).filter(
+        Currency.code == "TST"
+    ).first()
+
+    if not currency:
+        currency = Currency(
+            code="TST",
+            name="Test Currency",
+            network_id=network.id,
+            address="0x",
+            decimals=18,
+            conversion_rate=1
+        )
+        db.add(currency)
+        db.commit()
+        db.refresh(currency)
 
     yield currency
+
+    try:
+        db.query(Currency).filter(
+            Currency.id == currency.id
+        ).delete()
+        db.commit()
+    except Exception as e:
+        db.rollback()
+        print(e)
 
 
 @pytest.fixture(params=GameView)

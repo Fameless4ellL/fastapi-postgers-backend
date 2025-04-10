@@ -1,7 +1,9 @@
 from fastapi.testclient import TestClient
 import pytest
 from sqlalchemy.orm.session import Session
-from models.user import Role, User, Kyc
+
+from models import InstaBingo, Currency
+from models.user import Role, User, Kyc, ReferralLink
 from globals import redis
 
 
@@ -62,3 +64,73 @@ def kyc(
     db.refresh(kyc)
     yield kyc
     db.query(Kyc).delete()
+
+
+@pytest.fixture
+def instabingo(
+    db: Session,
+    currency: Currency,
+):
+    """
+    Создание InstaBingo.
+    """
+    instabingo = InstaBingo(
+        country="KAZ",
+        currency_id=currency.id
+    )
+    db.add(instabingo)
+    db.commit()
+    db.refresh(instabingo)
+    yield instabingo
+
+    try:
+        db.query(InstaBingo).filter(
+            InstaBingo.id == instabingo.id
+        ).delete()
+        db.commit()
+    except Exception as e:
+        db.rollback()
+        print(e)
+
+
+@pytest.fixture
+def referral(
+    db: Session,
+    admin: User,
+):
+    """
+    Создание реферальной ссылки.
+    """
+    referral = ReferralLink(
+        name="test_referral",
+        comment="test_comment",
+        link="test_link",
+        generated_by=admin.id,
+    )
+    db.add(referral)
+    db.commit()
+    db.refresh(referral)
+    yield referral
+
+    try:
+        db.query(ReferralLink).filter(
+            ReferralLink.id == referral.id
+        ).delete()
+        db.commit()
+    except Exception as e:
+        db.rollback()
+        print(e)
+
+
+@pytest.fixture
+def referral_user(
+    db: Session,
+    referral: ReferralLink,
+    user: User,
+):
+    """
+    Создание пользователя с реферальной ссылкой.
+    """
+    user.referral_id = referral.id
+    db.commit()
+    yield user
