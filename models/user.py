@@ -27,7 +27,7 @@ class User(Base):
     id = Column(Integer, primary_key=True, index=True)
     telegram = Column(String(64))
     telegram_id = Column(Integer, unique=True, nullable=True)
-    username = Column(String(64), unique=True)
+    username = Column(String(64), unique=True, nullable=True)
     firstname = Column(String(64), nullable=True)
     patronomic = Column(String(64), nullable=True)
     lastname = Column(String(64), nullable=True)

@@ -31,7 +31,7 @@ from schemes.base import BadResponse, Country, JsonForm
 from schemes.game import (
     MyGames, MyGamesType, Tickets, Withdraw
 )
-from schemes.user import KYC, Notifications, Profile, UserBalance, Usersettings
+from schemes.user import KYC, Notifications, Profile, UserBalance, Usersettings, Transactions
 from utils.workers import add_to_queue
 
 
@@ -364,7 +364,10 @@ async def get_countries(
 
 @public.get(
     "/history", tags=["user"],
-    responses={400: {"model": BadResponse}}
+    responses={
+        400: {"model": BadResponse},
+        200: {"model": Transactions}
+    }
 )
 async def get_history(
     db: Annotated[AsyncSession, Depends(get_db)],
@@ -385,9 +388,9 @@ async def get_history(
 
     data = [{
         "id": h.id,
-        "amount": float(h.change_amount),
+        "amount": h.change_amount,
         "type": h.change_type,
-        "status": str(h.status),
+        "status": h.status,
         "created": h.created_at.timestamp()
     } for h in history]
 
@@ -399,7 +402,10 @@ async def get_history(
 
     return JSONResponse(
         status_code=status.HTTP_200_OK,
-        content=dict(tickets=data, count=count)
+        content=Transactions(
+            items=data,
+            count=count
+        ).model_dump()
     )
 
 

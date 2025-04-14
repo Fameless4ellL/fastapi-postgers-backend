@@ -1,8 +1,12 @@
+from decimal import Decimal
+
 import pycountry
 from typing import Annotated, Optional
 from pydantic import BaseModel, computed_field, AfterValidator, Field
 from pydantic_extra_types.country import CountryAlpha3
 from pydantic_extra_types.language_code import LanguageAlpha2
+
+from models import BalanceChangeHistory
 
 
 class UserBalance(BaseModel):
@@ -66,4 +70,17 @@ class NotificationItem(BaseModel):
 
 class Notifications(BaseModel):
     items: list[NotificationItem] = []
+    count: int = 0
+
+
+class Transaction(BaseModel):
+    id: int
+    amount: Decimal
+    type: str
+    status: BalanceChangeHistory.Status
+    created: float
+
+
+class Transactions(BaseModel):
+    items: list[Transaction] = []
     count: int = 0
