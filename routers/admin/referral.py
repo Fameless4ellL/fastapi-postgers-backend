@@ -112,7 +112,6 @@ async def get_referral_users(
         )
         .join(BalanceChangeHistory, BalanceChangeHistory.user_id == User.id)
         .filter(User.referral_id == referral_id)
-        .filter(BalanceChangeHistory.change_type == "deposit")
         .order_by(User.id, BalanceChangeHistory.created_at)
         .distinct(User.id)
     )

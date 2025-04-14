@@ -649,7 +649,7 @@ class ReferralUsers(BaseAdmin):
     id: int
     username: str
     country: Country
-    first_deposit: float
+    first_deposit: Optional[float] = None
 
 
 class ReferralUsersList(BaseModel):
