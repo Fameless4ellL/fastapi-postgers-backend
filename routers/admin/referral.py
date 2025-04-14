@@ -109,6 +109,7 @@ async def get_referral_users(
             User.username,
             User.country,
             BalanceChangeHistory.change_amount.label("first_deposit"),
+            BalanceChangeHistory.created_at,
         )
         .join(BalanceChangeHistory, BalanceChangeHistory.user_id == User.id, isouter=True)
         .filter(User.referral_id == referral_id)
@@ -123,6 +124,7 @@ async def get_referral_users(
         "username": user.username,
         "country": user.country,
         "first_deposit": user.first_deposit,
+        "created_at": user.created_at.strftime("%Y-%m-%d %H:%M:%S")
     } for user in referral_users]
 
     count_stmt = select(func.count()).select_from(

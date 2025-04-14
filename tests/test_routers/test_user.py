@@ -11,33 +11,6 @@ from settings import settings
     reason="This test is only for debug mode",
 )
 class TestApp:
-    # def test_balance(
-    #     self,
-    #     api: TestClient,
-    #     token: str,
-    #     balance: Balance,
-    # ):
-    #     response = api.get(
-    #         "/v1/profile",
-    #         headers={"Authorization": f"Bearer {token}"}
-    #     )
-    #     assert response.status_code == status.HTTP_200_OK
-    #     assert response.json()["balance"] == 0
-    #     assert response.json()["locale"] == "EN"
-
-    # def test_withdraw(
-    #     self,
-    #     api: TestClient,
-    #     token: str,
-    #     balance: Balance,
-    # ):
-    #     response = api.post(
-    #         "/v1/withdraw",
-    #         json={"amount": 100},
-    #         headers={"Authorization": f"Bearer {token}"}
-    #     )
-    #     assert response.status_code == status.HTTP_200_OK
-
     def test_tickets(
         self,
         api: TestClient,
