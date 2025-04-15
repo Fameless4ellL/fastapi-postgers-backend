@@ -1,8 +1,11 @@
 import datetime
 from enum import Enum
+
+from .custom_types import FileType
 from .db import Base
 from sqlalchemy import DECIMAL, Boolean, Column, DateTime, ForeignKey, Integer, String, Enum as SQLEnum
 from sqlalchemy.orm import relationship
+from fastapi_storages import FileSystemStorage
 
 
 class Role(Enum):
@@ -45,6 +48,16 @@ class User(Base):
 
     referral_id = Column(Integer, ForeignKey('referral_links.id'), nullable=True)
 
+    created_at = Column(DateTime, default=datetime.datetime.now)
+    updated_at = Column(DateTime, default=datetime.datetime.now, onupdate=datetime.datetime.now)
+
+
+class Document(Base):
+    __tablename__ = "documents"
+
+    id = Column(Integer, primary_key=True, index=True)
+    user_id = Column(Integer, ForeignKey('users.id', ondelete='CASCADE'), nullable=True)
+    file = Column(FileType(storage=FileSystemStorage(path="/app/static/kyc")))
     created_at = Column(DateTime, default=datetime.datetime.now)
     updated_at = Column(DateTime, default=datetime.datetime.now, onupdate=datetime.datetime.now)
 

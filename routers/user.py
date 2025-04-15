@@ -1,5 +1,7 @@
 import os
 import importlib
+import shutil
+
 from eth_account import Account
 import pycountry
 import json
@@ -19,7 +21,7 @@ from models.user import (
     Notification,
     User,
     Wallet,
-    BalanceChangeHistory
+    BalanceChangeHistory, Document
 )
 from models.other import Currency, GameStatus, Ticket
 from routers import public
@@ -32,6 +34,7 @@ from schemes.game import (
     MyGames, MyGamesType, Tickets, Withdraw
 )
 from schemes.user import KYC, Notifications, Profile, UserBalance, Usersettings, Transactions
+from settings import settings
 from utils.workers import add_to_queue
 
 
@@ -77,12 +80,19 @@ async def profile(
         await aredis.sadd("BLOCKER:WALLETS", wallet.address)
 
     data = None
-    if user.document:
+    document = await db.execute(
+        select(Document)
+        .filter(Document.user_id == user.id)
+        .order_by(Document.created_at.desc())
+    )
+    document = document.scalar()
+
+    if document:
         data = {
             "first_name": user.firstname,
             "patronomic": user.patronomic,
             "last_name": user.lastname,
-            "document": url_for("static/kyc", path=user.document),
+            "document": url_for("static/kyc", path=document.file.name),
         }
 
     return JSONResponse(
@@ -237,44 +247,29 @@ async def upload_kyc(
     user: Annotated[User, Depends(get_user)],
     db: Annotated[AsyncSession, Depends(get_db)],
     item: Annotated[KYC, JsonForm()],
-    file: UploadFile
+    files: List[UploadFile]
 ):
     """
     Загрузка документа
     """
-    if not file.content_type.startswith("image"):
-        return JSONResponse(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            content="Invalid file type"
-        )
-
-    directory = "static/kyc"
-    os.makedirs(directory, exist_ok=True)
-
-    filename, file_extension = os.path.splitext(file.filename)
-    filename = filename.replace(" ", "_")
-
-    # Delete old file if it exists
-    if user.document:
-        old_file_path = os.path.join(
-            directory,
-            f"{filename}_{user.id}{file_extension}"
-        )
-        if os.path.exists(old_file_path):
-            os.remove(old_file_path)
-
-    # Save file to disk
-    file_path = os.path.join(
-        directory,
-        f"{filename}_{user.id}{file_extension}"
-    )
-    with open(file_path, "wb") as f:
-        f.write(await file.read())
-
     user.firstname = item.first_name
     user.lastname = item.last_name
-    user.document = f"{filename}_{user.id}{file_extension}"
     db.add(user)
+
+    for file in files:
+        if not file.content_type.startswith("image"):
+            return JSONResponse(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                content="Invalid file type"
+            )
+
+        file.filename = f"{user.id}_{file.filename}"
+        doc = Document(
+            user_id=user.id,
+            file=file
+        )
+        db.add(doc)
+
     await db.commit()
 
     return JSONResponse(status_code=status.HTTP_200_OK, content="OK")

@@ -1,5 +1,6 @@
 pydantic==2.10.6
 fastapi[all]
+fastapi-storages==0.3.0
 aiogram==3.17.0
 alembic==1.14.1
 sqlalchemy==2.0.37

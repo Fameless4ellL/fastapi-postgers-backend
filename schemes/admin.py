@@ -641,8 +641,9 @@ class Profile(BaseAdmin):
     role: str
     phone_number: Optional[str] = None
     kyc: Optional[bool] = None
+    active: bool
     avatar: Optional[str] = None
-    document: Optional[str] = None
+    document: Optional[list[str]] = []
 
 
 class ReferralUsers(BaseAdmin):
