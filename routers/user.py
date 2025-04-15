@@ -254,6 +254,7 @@ async def upload_kyc(
     """
     user.firstname = item.first_name
     user.lastname = item.last_name
+    user.patronomic = item.patronomic
     db.add(user)
 
     for file in files:
