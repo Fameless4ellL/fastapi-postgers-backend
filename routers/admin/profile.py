@@ -1,8 +1,12 @@
-from fastapi import status, Security
+from fastapi import status, Security, Depends
 from fastapi.responses import JSONResponse
 from typing import Annotated
 
-from models.user import Role, User
+from sqlalchemy import select
+from sqlalchemy.ext.asyncio import AsyncSession
+
+from models import get_db
+from models.user import Role, User, Document
 from routers import admin
 from routers.utils import get_admin, url_for
 from schemes.admin import (
@@ -19,6 +23,7 @@ from schemes.base import BadResponse
     },
 )
 async def get_profile(
+    db: Annotated[AsyncSession, Depends(get_db)],
     user: Annotated[User, Security(get_admin, scopes=[
         Role.SUPER_ADMIN.value,
         Role.ADMIN.value,
@@ -27,10 +32,23 @@ async def get_profile(
         Role.FINANCIER.value,
         Role.SUPPORT.value
     ])],
+
 ):
     """
     Получение профиля пользователя
     """
+    docs = await db.execute(
+        select(Document)
+        .where(Document.user_id == user.id)
+        .order_by(Document.created_at.desc())
+        .limit(4)
+    )
+    documents = docs.scalars().all()
+    documents = [
+        url_for("static/kyc", path=doc.file.name)
+        for doc in documents
+    ]
+
     data = {
         "id": user.id,
         "telegram": user.telegram,
@@ -43,7 +61,7 @@ async def get_profile(
         "active": user.active,
         "kyc": user.kyc,
         "avatar": url_for('static/avatars', filename=user.avatar) if user.avatar else None,
-        "document": url_for('static/kyc', filename=user.document) if user.document else None,
+        "document": documents,
     }
 
     return JSONResponse(
