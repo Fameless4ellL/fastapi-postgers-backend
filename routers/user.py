@@ -381,6 +381,7 @@ async def get_history(
     history = await db.execute(
         select(BalanceChangeHistory)
         .filter(BalanceChangeHistory.user_id == user.id)
+        .join(BalanceChangeHistory, BalanceChangeHistory.currency_id == Currency.id, isouter=True)
         .order_by(BalanceChangeHistory.created_at.desc())
         .offset(skip).limit(limit)
     )
@@ -389,6 +390,7 @@ async def get_history(
     data = [{
         "id": h.id,
         "amount": h.change_amount,
+        "currency": h.currency.code if h.currency else None,
         "type": h.change_type,
         "status": h.status,
         "created": h.created_at.timestamp()
