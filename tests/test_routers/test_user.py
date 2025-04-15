@@ -10,7 +10,7 @@ from settings import settings
     not settings.debug,
     reason="This test is only for debug mode",
 )
-class TestApp:
+class TestUser:
     def test_tickets(
         self,
         api: TestClient,

@@ -405,7 +405,7 @@ async def get_history(
         content=Transactions(
             items=data,
             count=count
-        ).model_dump()
+        ).model_dump(mode='json')
     )
 
 

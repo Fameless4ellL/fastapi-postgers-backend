@@ -261,7 +261,7 @@ def proceed_game(game_id: Optional[int] = None):
                         balance_id=user_balance.id,
                         currency_id=game.currency_id,
                         change_amount=_ticket.amount,
-                        change_type="win",
+                        change_type="won",
                         previous_balance=previous_balance,
                         new_balance=balance
                     )
