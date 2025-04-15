@@ -650,6 +650,7 @@ class ReferralUsers(BaseAdmin):
     username: str
     country: Country
     first_deposit: Optional[float] = None
+    created_at: str
 
 
 class ReferralUsersList(BaseModel):
