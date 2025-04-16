@@ -704,7 +704,7 @@ class AdminCreate(BaseAdmin):
             "lastname": self.lastname,
             "email": self.email,
             "phone_number": phone_number,
-            "role": self.role,
+            "role": self.role.label,
             "telegram": self.telegram,
             "country": alpha3,
         }

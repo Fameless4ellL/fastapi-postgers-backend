@@ -7,7 +7,7 @@ from models.log import Action
 from pydantic_extra_types.country import CountryAlpha3
 
 from sqlalchemy import func, select, or_
-from models.user import User, Role
+from models.user import User, Role, Document
 from models.other import Network, Currency
 from routers import admin
 from routers.admin import get_crud_router
@@ -29,7 +29,7 @@ from schemes.admin import (
     CurrencyUpdate,
     NetworkUpdate,
     Empty,
-    Profile
+    Profile, AdminRoles
 )
 from schemes.base import BadResponse, JsonForm
 
@@ -127,14 +127,14 @@ async def get_admin_list(
 
     data = [
         {
-            "id": admin.id,
-            "username": f"{admin.firstname} {admin.lastname}",
-            "phone_number": admin.phone_number if scope == Role.GLOBAL_ADMIN.value else None,
-            "email": admin.email if scope == Role.GLOBAL_ADMIN.value else None,
-            "role": admin.role,
-            "country": admin.country,
+            "id": a.id,
+            "username": f"{a.firstname} {a.lastname}",
+            "phone_number": a.phone_number if scope == Role.GLOBAL_ADMIN.value else None,
+            "email": a.email if scope == Role.GLOBAL_ADMIN.value else None,
+            "role": a.role,
+            "country": a.country,
         }
-        for admin in admins
+        for a in admins
     ]
     return JSONResponse(
         status_code=status.HTTP_200_OK,
@@ -210,7 +210,7 @@ async def create_admin(
     item: Annotated[AdminCreate, JsonForm],
     bg: background.BackgroundTasks,
     avatar: UploadFile,
-    document: list[UploadFile],
+    documents: list[UploadFile],
 ):
     """
     Create new admin
@@ -218,7 +218,7 @@ async def create_admin(
     scope = next(iter(token.scopes), None)
     if (
         scope == Role.GLOBAL_ADMIN.value
-        and item.role in {Role.SUPER_ADMIN.value, Role.ADMIN.value}
+        and item.role in {AdminRoles.SUPER_ADMIN, AdminRoles.ADMIN}
     ):
         return JSONResponse(
             status_code=status.HTTP_400_BAD_REQUEST,
@@ -247,25 +247,23 @@ async def create_admin(
     await db.commit()
     await db.refresh(new_admin)
 
-    if not avatar.content_type.startswith("image"):
-        return JSONResponse(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            content="Invalid file type"
-        )
-
-    if not document.content_type.startswith("image"):
-        return JSONResponse(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            content="Invalid file type"
-        )
-
     if avatar:
-        avatar = await save_file(new_admin, avatar, "static/avatars", "avatar")
-    if document:
-        document = await save_file(new_admin, document, "static/kyc", "document")
+        avatar.filename = f"{new_admin.id}_{avatar.filename}"
+        new_admin.avatar_v1 = avatar
 
-    new_admin.avatar = avatar
-    new_admin.document = document
+    for file in documents:
+        if not file.content_type.startswith("image"):
+            return JSONResponse(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                content="Invalid file type"
+            )
+
+        file.filename = f"{new_admin.id}_{file.filename}"
+        doc = Document(
+            user_id=new_admin.id,
+            file=file
+        )
+        db.add(doc)
 
     db.add(new_admin)
     await db.commit()
@@ -302,7 +300,7 @@ async def update_admin(
     item: Annotated[AdminCreate, JsonForm()],
     admin_id: Annotated[int, Path()],
     avatar: Union[UploadFile, None] = None,
-    document: Union[UploadFile, None] = None
+    documents: Union[list[UploadFile], None] = None
 ):
     """
     Update admin
@@ -338,34 +336,22 @@ async def update_admin(
         setattr(admin, key, value)
 
     if avatar:
-        if not avatar.content_type.startswith("image"):
+        avatar.filename = f"{admin.id}_{avatar.filename}"
+        admin.avatar_v1 = avatar
+
+    for file in documents:
+        if not file.content_type.startswith("image"):
             return JSONResponse(
                 status_code=status.HTTP_400_BAD_REQUEST,
                 content="Invalid file type"
             )
-        if admin.avatar:
-            try:
-                os.remove(f"static/avatars/{admin.avatar}")
-            except FileNotFoundError:
-                pass
 
-        avatar = await save_file(admin, avatar, "static/avatars", "avatar")
-    if document:
-        if not document.content_type.startswith("image"):
-            return JSONResponse(
-                status_code=status.HTTP_400_BAD_REQUEST,
-                content="Invalid file type"
-            )
-        if admin.document:
-            try:
-                os.remove(f"static/kyc/{admin.document}")
-            except FileNotFoundError:
-                pass
-
-        document = await save_file(admin, document, "static/kyc", "document")
-
-    admin.avatar = avatar
-    admin.document = document
+        file.filename = f"{admin.id}_{file.filename}"
+        doc = Document(
+            user_id=admin.id,
+            file=file
+        )
+        db.add(doc)
 
     db.add(admin)
     await db.commit()
@@ -373,23 +359,6 @@ async def update_admin(
     return JSONResponse(
         status_code=status.HTTP_201_CREATED, content="OK"
     )
-
-
-async def save_file(model: object, file: UploadFile, directory: str, field: str):
-    os.makedirs(directory, exist_ok=True)
-
-    # Save file to disk
-    filename, file_extension = os.path.splitext(file.filename)
-    filename = filename.replace(" ", "_")
-    setattr(model, field, f"{filename}_{model.id}{file_extension}")
-
-    file_path = os.path.join(
-        directory,
-        f"{filename}_{model.id}{file_extension}"
-    )
-    with open(file_path, "wb") as f:
-        f.write(await file.read())
-    return f"{filename}_{model.id}{file_extension}"
 
 
 @admin.delete(
