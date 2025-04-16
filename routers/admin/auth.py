@@ -115,8 +115,8 @@ async def reset_password(
             content={"message": "Code expired"},
         )
 
-    code = await aredis.get(f"EMAIL:{user.email}").decode('utf-8')
-    if code != item.code:
+    code = await aredis.get(f"EMAIL:{user.email}")
+    if code.decode('utf-8') != item.code:
         return JSONResponse(
             status_code=status.HTTP_400_BAD_REQUEST,
             content={"message": "Invalid code"},
