@@ -1,20 +1,22 @@
-import os
 import importlib
-import shutil
-
-from eth_account import Account
-import pycountry
 import json
 from decimal import Decimal
 from typing import Annotated, List
-from fastapi import Depends, Query, status, UploadFile
+
+import pycountry
+from eth_account import Account
+from eth_account.signers.local import LocalAccount
+from fastapi import Depends, Query, status, UploadFile, File
 from fastapi.responses import JSONResponse
 from sqlalchemy import func, select
-from eth_account.signers.local import LocalAccount
+from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import joinedload
 from tronpy.keys import to_base58check_address
+
+from globals import aredis
 from models.db import get_db
 from models.log import Action
+from models.other import Currency, GameStatus, Ticket
 from models.user import (
     Balance,
     Kyc,
@@ -23,18 +25,13 @@ from models.user import (
     Wallet,
     BalanceChangeHistory, Document
 )
-from models.other import Currency, GameStatus, Ticket
 from routers import public
-from globals import aredis
 from routers.utils import get_user, get_currency, url_for, get_user_token
-
-from sqlalchemy.ext.asyncio import AsyncSession
 from schemes.base import BadResponse, Country, JsonForm
 from schemes.game import (
     MyGames, MyGamesType, Tickets, Withdraw
 )
 from schemes.user import KYC, Notifications, Profile, UserBalance, Usersettings, Transactions
-from settings import settings
 from utils.workers import add_to_queue
 
 
@@ -247,7 +244,8 @@ async def upload_kyc(
     user: Annotated[User, Depends(get_user)],
     db: Annotated[AsyncSession, Depends(get_db)],
     item: Annotated[KYC, JsonForm()],
-    files: List[UploadFile]
+    files: List[UploadFile],
+    avatar: Annotated[UploadFile, File(include_in_schema=False)] = None
 ):
     """
     Загрузка документа
@@ -255,6 +253,11 @@ async def upload_kyc(
     user.firstname = item.first_name
     user.lastname = item.last_name
     user.patronomic = item.patronomic
+
+    if avatar:
+        avatar.filename = f"{user.id}_{avatar.filename}"
+        user.avatar_v1 = avatar
+
     db.add(user)
 
     for file in files:

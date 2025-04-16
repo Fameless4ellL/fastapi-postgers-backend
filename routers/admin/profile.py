@@ -60,7 +60,7 @@ async def get_profile(
         "role": user.role,
         "active": user.active,
         "kyc": user.kyc,
-        "avatar": url_for('static/avatars', filename=user.avatar) if user.avatar else None,
+        "avatar": url_for('static/avatars', filename=user.avatar_v1.name) if user.avatar_v1 else None,
         "document": documents,
     }
 

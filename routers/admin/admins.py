@@ -210,7 +210,7 @@ async def create_admin(
     item: Annotated[AdminCreate, JsonForm],
     bg: background.BackgroundTasks,
     avatar: UploadFile,
-    document: UploadFile
+    document: list[UploadFile],
 ):
     """
     Create new admin
@@ -229,6 +229,7 @@ async def create_admin(
 
     if item.phone_number:
         stmt = stmt.filter(User.phone_number == item.phone_number)
+
     if item.username:
         stmt = stmt.filter(User.username != item.username)
 

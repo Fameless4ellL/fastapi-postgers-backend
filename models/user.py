@@ -44,7 +44,9 @@ class User(Base):
 
     kyc = Column(Boolean, default=False)
     document = Column(String(256), nullable=True)
+
     avatar = Column(String(256), nullable=True)
+    avatar_v1 = Column(FileType(storage=FileSystemStorage(path="/app/static/avatars")))
 
     referral_id = Column(Integer, ForeignKey('referral_links.id'), nullable=True)
 
