@@ -126,7 +126,7 @@ async def instabingo_check(
             instabingo_id=game.id,
             numbers=numbers,
             won=False,
-            created=datetime.datetime.utcnow().timestamp()
+            created=datetime.datetime.now().timestamp()
         ) for i, numbers in enumerate(item.numbers)
     ]
 
