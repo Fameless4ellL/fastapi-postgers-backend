@@ -20,7 +20,7 @@ from models.other import (
     RepeatType
 )
 from utils.web3 import transfer
-from .rng import get_random
+from .rng import get_random_sync as get_random
 from sqlalchemy.orm import joinedload
 from utils import worker
 from sqlalchemy import func

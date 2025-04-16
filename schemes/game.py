@@ -60,7 +60,7 @@ class BuyTicket(BaseModel):
 
 
 class BuyInstaTicket(BaseModel):
-    numbers: Annotated[list[int], Len(15, 15)]
+    numbers: Annotated[list[int], Len[15, 15]]
 
 
 class EditTicket(BaseModel):

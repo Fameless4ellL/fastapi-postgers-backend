@@ -170,6 +170,18 @@ async def get_admin(
             content={"message": "Admin not found"},
         )
 
+    docs = await db.execute(
+        select(Document)
+        .where(Document.user_id == user.id)
+        .order_by(Document.created_at.desc())
+        .limit(4)
+    )
+    documents = docs.scalars().all()
+    documents = [
+        url_for("static/kyc", path=doc.file.name)
+        for doc in documents
+    ]
+
     data = {
         "id": user.id,
         "telegram": user.telegram,
@@ -181,8 +193,8 @@ async def get_admin(
         "role": user.role,
         "active": user.active,
         "kyc": user.kyc,
-        "avatar": url_for('static/avatars', filename=user.avatar) if user.avatar else None,
-        "document": url_for('static/kyc', filename=user.document) if user.document else None,
+        "avatar": url_for('static/avatars', filename=user.avatar_v1.name) if user.avatar else None,
+        "document": documents
     }
     return JSONResponse(
         status_code=status.HTTP_200_OK, content=Profile(**data).model_dump()

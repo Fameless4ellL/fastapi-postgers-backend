@@ -229,7 +229,7 @@ async def buy_tickets(
     generated_numbers = set()
     while len(generated_numbers) < 40:
         start_date = datetime.datetime.now()
-        number = get_random(1, 90)
+        number = await get_random(1, 90)
 
         if number is None:
             continue
@@ -320,7 +320,6 @@ async def buy_tickets(
     db.commit()
     db.refresh(ticket)
 
-    print(win_numbers)
     for number, start_date, end_date in win_numbers:
         number = Number(
             number=number,

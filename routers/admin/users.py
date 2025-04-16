@@ -4,7 +4,7 @@ from fastapi.responses import JSONResponse
 from typing import Annotated, Optional
 
 from sqlalchemy import and_, func, select, or_
-from models.user import Balance, User, Role, Wallet, BalanceChangeHistory
+from models.user import Balance, User, Role, Wallet, BalanceChangeHistory, Document
 from models.other import Currency, Game, GameView, Network, Ticket, Jackpot, InstaBingo
 from routers import admin
 from eth_account.signers.local import LocalAccount
@@ -144,6 +144,18 @@ async def get_user(
     material_winnings = await db.execute(material_winnings)
     material_winnings = material_winnings.scalars().all()
 
+    docs = await db.execute(
+        select(Document)
+        .where(Document.user_id == user.id)
+        .order_by(Document.created_at.desc())
+        .limit(4)
+    )
+    documents = docs.scalars().all()
+    documents = [
+        url_for("static/kyc", path=doc.file.name)
+        for doc in documents
+    ]
+
     data = {
         "id": user.id,
         "firstname": user.firstname,
@@ -158,7 +170,7 @@ async def get_user(
         "email": user.email,
         "role": user.role,
         "kyc_status": user.kyc,
-        "document": [url_for('static/kyc', filename=user.document) if user.document else None],
+        "document": documents,
         "created_at": user.created_at.strftime("%Y-%m-%d %H:%M:%S"),
         "updated_at": user.updated_at.strftime("%Y-%m-%d %H:%M:%S"),
         "tickets": {"purchased": tickets or 0},

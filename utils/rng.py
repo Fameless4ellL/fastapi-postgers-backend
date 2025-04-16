@@ -1,9 +1,28 @@
 from typing import Optional
-
+from httpx import AsyncClient
 import requests
 
 
-def get_random(min: int = 1, max: int = 90) -> Optional[int]:
+client = AsyncClient()
+
+async def get_random(x: int = 1, y: int = 90) -> Optional[int]:
+    """
+    Получение случайного числа
+    """
+    try:
+        response = await client.get(
+            "http://rng:8001/random",
+            params={"x": min, "y": max},
+            timeout=5
+        )
+    except Exception as e:
+        print(f"Error: {e}")
+        return None
+
+    return response.json()
+
+
+def get_random_sync(x: int = 1, y: int = 90) -> Optional[int]:
     """
     Получение случайного числа
     """
