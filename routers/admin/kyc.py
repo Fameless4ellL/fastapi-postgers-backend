@@ -11,7 +11,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from models.db import get_db
 from schemes.admin import (
     KycBase,
-    KycCreate, KycDelete,
+    KycCreate, KycDelete, KycList,
 )
 from schemes.base import BadResponse
 
@@ -48,7 +48,10 @@ async def get_kyc_list(
         "country": item.country
     } for item in data]
 
-    return JSONResponse(content=data, status_code=status.HTTP_200_OK)
+    return JSONResponse(
+        content=KycList(items=data).model_dump(),
+        status_code=status.HTTP_200_OK
+    )
 
 
 @admin.post(

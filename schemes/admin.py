@@ -619,7 +619,11 @@ class InstaBingoFilter(DatePicker, Search, Countries):
 
 class KycBase(BaseAdmin):
     id: int
-    countries: list[CountryAlpha3] = []
+    country: Country
+
+
+class KycList(BaseModel):
+    items: list[KycBase] = []
 
 
 class KycCreate(BaseAdmin):
