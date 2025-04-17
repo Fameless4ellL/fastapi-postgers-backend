@@ -77,6 +77,7 @@ class Transaction(BaseModel):
     id: int
     amount: Decimal
     type: str
+    currency: str
     status: BalanceChangeHistory.Status
     created: float
 

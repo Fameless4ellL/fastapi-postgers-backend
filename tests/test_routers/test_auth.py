@@ -1,6 +1,8 @@
 from fastapi.testclient import TestClient
 import pytest
 from fastapi import status
+from httpx import AsyncClient
+
 from globals import redis
 from models.user import User
 from settings import settings
@@ -12,13 +14,14 @@ from settings import settings
 )
 class TestAuth:
     @pytest.mark.usefixtures("tear_down")
-    def test_register(
+    @pytest.mark.asyncio
+    async def test_register(
         self,
-        api: TestClient,
+        async_api: AsyncClient,
         user: User,
         tear_down: None
     ):
-        response = api.post(
+        response = await async_api.post(
             "/v1/check_code",
             json={
                 "phone_number": user.phone_number,
@@ -27,7 +30,7 @@ class TestAuth:
         )
         assert response.status_code == status.HTTP_200_OK
 
-        response = api.post(
+        response = await async_api.post(
             "/v1/register",
             json={
                 "username": "testuser",

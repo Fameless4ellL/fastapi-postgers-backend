@@ -149,11 +149,6 @@ async def buy_tickets(
     """
     Для покупки билетов frame:20
     """
-    if len(set(item.numbers)) != 15:
-        return JSONResponse(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            content=BadResponse(message="Invalid numbers, should be 15").model_dump()
-        )
     stmt = db.query(InstaBingo).filter(
         InstaBingo.country == user.country,
         InstaBingo.deleted.is_(False)

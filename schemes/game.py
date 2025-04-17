@@ -1,5 +1,5 @@
 from typing import Annotated, Optional, Union
-from pydantic import BaseModel, Field, AfterValidator
+from pydantic import BaseModel, Field, AfterValidator, field_validator
 from annotated_types import Len
 from enum import Enum
 
@@ -60,7 +60,13 @@ class BuyTicket(BaseModel):
 
 
 class BuyInstaTicket(BaseModel):
-    numbers: Annotated[list[int], Len[15, 15]]
+    numbers: Annotated[list[int], Len(15, 15)]
+
+    @field_validator("numbers", mode="after")
+    def check_numbers(cls, v: list[int]) -> list[int]:
+        if len(set(v)) != 15:
+            raise ValueError("Invalid numbers, should be 15")
+        return v
 
 
 class EditTicket(BaseModel):

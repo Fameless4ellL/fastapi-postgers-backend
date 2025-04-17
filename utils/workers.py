@@ -289,14 +289,14 @@ def proceed_game(game_id: Optional[int] = None):
 
             else:
                 notification = Notification(
-                    user_id=_ticket.user_id,
+                    user_id=u.id,
                     head="You won!",
-                    body=f"You won! {game.prize}",
+                    body=f"You won!",
                     args=json.dumps({
-                        "game": game.name,
-                        "amount": _ticket.amount,
-                        "prize": game.prize,
-                        "currency": game.currency.code
+                        "game": "test",
+                        "amount": "test",
+                        "prize": "test",
+                        "currency": "test"
                     })
                 )
                 db.add(notification)

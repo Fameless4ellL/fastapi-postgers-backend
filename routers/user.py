@@ -378,18 +378,25 @@ async def get_history(
     Получение истории изменения баланса
     """
     history = await db.execute(
-        select(BalanceChangeHistory)
+        select(
+            BalanceChangeHistory.id,
+            BalanceChangeHistory.change_amount,
+            BalanceChangeHistory.change_type,
+            BalanceChangeHistory.status,
+            Currency.code.label("currency"),
+            BalanceChangeHistory.created_at,
+        )
+        .join(Currency, BalanceChangeHistory.currency_id == Currency.id)
         .filter(BalanceChangeHistory.user_id == user.id)
-        .join(BalanceChangeHistory, BalanceChangeHistory.currency_id == Currency.id, isouter=True)
         .order_by(BalanceChangeHistory.created_at.desc())
         .offset(skip).limit(limit)
     )
-    history = history.scalars().all()
+    history = history.fetchall()
 
     data = [{
         "id": h.id,
         "amount": h.change_amount,
-        "currency": h.currency.code if h.currency else None,
+        "currency": h.currency,
         "type": h.change_type,
         "status": h.status,
         "created": h.created_at.timestamp()
