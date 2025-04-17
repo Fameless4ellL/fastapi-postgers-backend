@@ -19,6 +19,7 @@ from models.other import (
     TicketStatus,
     RepeatType
 )
+from routers import url_for
 from utils.web3 import transfer
 from .rng import get_random_sync as get_random
 from sqlalchemy.orm import joinedload
@@ -280,7 +281,9 @@ def proceed_game(game_id: Optional[int] = None):
                     body=f"You won! {_ticket.amount} {game.currency.code}",
                     args=json.dumps({
                         "game": game.name,
-                        "amount": _ticket.amount,
+                        "type": type(game).__name__,
+                        "image": url_for("static", path=game.image),
+                        "amount": str(_ticket.amount),
                         "currency": game.currency.code
                     })
                 )
@@ -289,14 +292,15 @@ def proceed_game(game_id: Optional[int] = None):
 
             else:
                 notification = Notification(
-                    user_id=u.id,
+                    user_id=_ticket.user_id,
                     head="You won!",
-                    body=f"You won!",
+                    body=f"You won! {game.prize}",
                     args=json.dumps({
-                        "game": "test",
-                        "amount": "test",
-                        "prize": "test",
-                        "currency": "test"
+                        "game": game.name,
+                        "type": type(game).__name__,
+                        "image": url_for("static", path=game.image),
+                        "amount": str(_ticket.amount),
+                        "currency": game.currency.code
                     })
                 )
                 db.add(notification)
@@ -512,7 +516,9 @@ def proceed_jackpot(jackpot_id: Optional[int] = None):
                 body=f"You won! {prize} {jackpot.currency.code}",
                 args=json.dumps({
                     "game": jackpot.name,
-                    "amount": prize,
+                    "type": type(jackpot).__name__,
+                    "image": url_for("static", path=jackpot.image),
+                    "amount": str(prize),
                     "currency": jackpot.currency.code
                 })
             )
