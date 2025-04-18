@@ -627,12 +627,12 @@ class KycList(BaseModel):
 
 
 class KycCreate(BaseAdmin):
-    countries: list[CountryAlpha3] = []
+    countries: list[Country_by_name] = []
 
 
 @dataclass
 class KycDelete:
-    countries: list[CountryAlpha3] = Query(None)
+    countries: list[Country_by_name] = []
 
 
 class Profile(BaseAdmin):
