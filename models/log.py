@@ -1,5 +1,9 @@
 import datetime
+import decimal
 from enum import Enum
+
+from sqlalchemy.orm import Mapped
+
 from .db import LogsBase
 from sqlalchemy import (
     DECIMAL,
@@ -31,15 +35,15 @@ class Action(Enum):
 class RequestLog(LogsBase):
     __tablename__ = 'request_logs'
 
-    id = Column(Integer, primary_key=True, index=True)
-    method = Column(String, index=True)
-    headers = Column(JSON)
-    body = Column(JSON)
-    response = Column(JSON)
-    url = Column(String, index=True)
-    status_code = Column(Integer)
-    timestamp = Column(DateTime, default=datetime.datetime.now)
-    response_time = Column(DECIMAL(10, 2))
+    id: Mapped[int] = Column(Integer, primary_key=True, index=True)
+    method: Mapped[str] = Column(String, index=True)
+    headers: Mapped[dict[str, str]] = Column(JSON)
+    body: Mapped[dict[str, str]] = Column(JSON)
+    response: Mapped[dict[str, str]] = Column(JSON)
+    url: Mapped[str] = Column(String, index=True)
+    status_code: Mapped[int] = Column(Integer)
+    timestamp: Mapped[datetime.datetime] = Column(DateTime, default=datetime.datetime.now)
+    response_time: Mapped[decimal.Decimal] = Column(DECIMAL(10, 2))
 
 
 class TransactionLog(LogsBase):
@@ -55,20 +59,20 @@ class TransactionLog(LogsBase):
         WITHDRAW = 'withdraw'
         TRANSFER = 'transfer'
 
-    id = Column(Integer, primary_key=True, index=True)
-    transaction_id = Column(String, index=True)
-    user_id = Column(Integer, index=True)
-    action = Column(EnumColumn(TransactionAction), index=True)
-    status = Column(EnumColumn(Status), index=True)
-    arguments = Column(JSON)
-    timestamp = Column(DateTime, default=datetime.datetime.now)
+    id: Mapped[int] = Column(Integer, primary_key=True, index=True)
+    transaction_id: Mapped[str] = Column(String, index=True)
+    user_id: Mapped[int] = Column(Integer, index=True)
+    action: Mapped[TransactionAction] = Column(EnumColumn(TransactionAction), index=True)
+    status: Mapped[Status] = Column(EnumColumn(Status), index=True)
+    arguments: Mapped[dict[str, str]] = Column(JSON)
+    timestamp: Mapped[datetime.datetime] = Column(DateTime, default=datetime.datetime.now)
 
 
 class UserActionLog(LogsBase):
     __tablename__ = 'user_action_logs'
 
-    id = Column(Integer, primary_key=True, index=True)
-    user_id = Column(Integer, index=True)
-    action = Column(EnumColumn(Action), index=True)
-    request_id = Column(Integer, ForeignKey('request_logs.id', ondelete="CASCADE"))
-    timestamp = Column(DateTime, default=datetime.datetime.now)
+    id: Mapped[int] = Column(Integer, primary_key=True, index=True)
+    user_id: Mapped[int] = Column(Integer, index=True)
+    action: Mapped[Action] = Column(EnumColumn(Action), index=True)
+    request_id: Mapped[int] = Column(Integer, ForeignKey('request_logs.id', ondelete="CASCADE"))
+    timestamp: Mapped[datetime.datetime] = Column(DateTime, default=datetime.datetime.now)

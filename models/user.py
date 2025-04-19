@@ -1,10 +1,12 @@
 import datetime
+import decimal
 from enum import Enum
+from typing import Union
 
 from .custom_types import FileType
 from .db import Base
 from sqlalchemy import DECIMAL, Boolean, Column, DateTime, ForeignKey, Integer, String, Enum as SQLEnum
-from sqlalchemy.orm import relationship
+from sqlalchemy.orm import relationship, Mapped
 from fastapi_storages import FileSystemStorage
 
 
@@ -27,70 +29,70 @@ class History(Enum):
 class User(Base):
     __tablename__ = "users"
 
-    id = Column(Integer, primary_key=True, index=True)
-    telegram = Column(String(64))
-    telegram_id = Column(Integer, unique=True, nullable=True)
-    username = Column(String(64), unique=True, nullable=True)
-    firstname = Column(String(64), nullable=True)
-    patronomic = Column(String(64), nullable=True)
-    lastname = Column(String(64), nullable=True)
-    language_code = Column(String(8), nullable=True)
-    phone_number = Column(String(32), unique=True)
-    country = Column(String(32), nullable=True)
-    email = Column(String(64), nullable=True)
-    password = Column(String(128), nullable=True)
-    role = Column(String(64), default=Role.USER.value)
-    active = Column(Boolean, default=True)
+    id: Mapped[int] = Column(Integer, primary_key=True, index=True)
+    telegram: Mapped[str] = Column(String(64))
+    telegram_id: Mapped[Union[int, None]] = Column(Integer, unique=True, nullable=True)
+    username: Mapped[Union[str, None]] = Column(String(64), unique=True, nullable=True)
+    firstname: Mapped[Union[str, None]] = Column(String(64), nullable=True)
+    patronomic: Mapped[Union[str, None]] = Column(String(64), nullable=True)
+    lastname: Mapped[Union[str, None]] = Column(String(64), nullable=True)
+    language_code: Mapped[Union[str, None]] = Column(String(8), nullable=True)
+    phone_number: Mapped[str] = Column(String(32), unique=True)
+    country: Mapped[Union[str, None]] = Column(String(32), nullable=True)
+    email: Mapped[Union[str, None]] = Column(String(64), nullable=True)
+    password: Mapped[Union[str, None]] = Column(String(128), nullable=True)
+    role: Mapped[str] = Column(String(64), default=Role.USER.value)
+    active: Mapped[bool] = Column(Boolean, default=True)
 
-    kyc = Column(Boolean, default=False)
-    document = Column(String(256), nullable=True)
+    kyc: Mapped[bool] = Column(Boolean, default=False)
+    document: Mapped[Union[str, None]] = Column(String(256), nullable=True)
 
-    avatar = Column(String(256), nullable=True)
-    avatar_v1 = Column(FileType(storage=FileSystemStorage(path="/app/static/avatars")))
+    avatar: Mapped[Union[str, None]] = Column(String(256), nullable=True)
+    avatar_v1: Mapped[FileType] = Column(FileType(storage=FileSystemStorage(path="/app/static/avatars")))
 
-    referral_id = Column(Integer, ForeignKey('referral_links.id'), nullable=True)
+    referral_id: Mapped[Union[str, None]] = Column(Integer, ForeignKey('referral_links.id'), nullable=True)
 
-    created_at = Column(DateTime, default=datetime.datetime.now)
-    updated_at = Column(DateTime, default=datetime.datetime.now, onupdate=datetime.datetime.now)
+    created_at: Mapped[datetime.datetime] = Column(DateTime, default=datetime.datetime.now)
+    updated_at: Mapped[datetime.datetime] = Column(DateTime, default=datetime.datetime.now, onupdate=datetime.datetime.now)
 
 
 class Document(Base):
     __tablename__ = "documents"
 
-    id = Column(Integer, primary_key=True, index=True)
-    user_id = Column(Integer, ForeignKey('users.id', ondelete='CASCADE'), nullable=True)
-    file = Column(FileType(storage=FileSystemStorage(path="/app/static/kyc")))
-    created_at = Column(DateTime, default=datetime.datetime.now)
-    updated_at = Column(DateTime, default=datetime.datetime.now, onupdate=datetime.datetime.now)
+    id: Mapped[int] = Column(Integer, primary_key=True, index=True)
+    user_id: Mapped[int] = Column(Integer, ForeignKey('users.id', ondelete='CASCADE'), nullable=True)
+    file: Mapped[FileType] = Column(FileType(storage=FileSystemStorage(path="/app/static/kyc")))
+    created_at: Mapped[datetime.datetime] = Column(DateTime, default=datetime.datetime.now)
+    updated_at: Mapped[datetime.datetime] = Column(DateTime, default=datetime.datetime.now, onupdate=datetime.datetime.now)
 
 
 class Kyc(Base):
     __tablename__ = "kyc"
 
-    id = Column(Integer, primary_key=True, index=True)
-    country = Column(String(32))
+    id: Mapped[int] = Column(Integer, primary_key=True, index=True)
+    country: Mapped[str] = Column(String(32))
 
 
 class Wallet(Base):
     __tablename__ = "wallet"
 
-    id = Column(Integer, primary_key=True, index=True)
-    user_id = Column(Integer, ForeignKey('users.id', ondelete="CASCADE"), nullable=True)
-    address = Column(String(256), unique=True)
-    private_key = Column(String(256), unique=True)
-    created_at = Column(DateTime, default=datetime.datetime.now)
-    updated_at = Column(DateTime, default=datetime.datetime.now, onupdate=datetime.datetime.now)
+    id: Mapped[int] = Column(Integer, primary_key=True, index=True)
+    user_id: Mapped[int] = Column(Integer, ForeignKey('users.id', ondelete="CASCADE"), nullable=True)
+    address: Mapped[str] = Column(String(256), unique=True)
+    private_key: Mapped[str] = Column(String(256), unique=True)
+    created_at: Mapped[datetime.datetime] = Column(DateTime, default=datetime.datetime.now)
+    updated_at: Mapped[datetime.datetime] = Column(DateTime, default=datetime.datetime.now, onupdate=datetime.datetime.now)
 
 
 class Balance(Base):
     __tablename__ = "balance"
 
-    id = Column(Integer, primary_key=True, index=True)
-    user_id = Column(Integer, ForeignKey('users.id', ondelete="CASCADE"), nullable=True)
-    currency_id = Column(Integer, ForeignKey('currencies.id', ondelete="CASCADE"), nullable=True)
-    balance = Column(DECIMAL(20, 8), default=0)
-    created_at = Column(DateTime, default=datetime.datetime.now)
-    updated_at = Column(DateTime, default=datetime.datetime.now, onupdate=datetime.datetime.now)
+    id: Mapped[int] = Column(Integer, primary_key=True, index=True)
+    user_id: Mapped[int] = Column(Integer, ForeignKey('users.id', ondelete="CASCADE"), nullable=True)
+    currency_id: Mapped[int] = Column(Integer, ForeignKey('currencies.id', ondelete="CASCADE"), nullable=True)
+    balance: Mapped[decimal.Decimal] = Column(DECIMAL(20, 8), default=0)
+    created_at: Mapped[datetime.datetime] = Column(DateTime, default=datetime.datetime.now)
+    updated_at: Mapped[datetime.datetime] = Column(DateTime, default=datetime.datetime.now, onupdate=datetime.datetime.now)
 
     currency = relationship("Currency", uselist=False)
 
@@ -105,40 +107,40 @@ class BalanceChangeHistory(Base):
 
     __tablename__ = "balance_change_history"
 
-    id = Column(Integer, primary_key=True, index=True)
-    user_id = Column(Integer, ForeignKey('users.id', ondelete='CASCADE'), nullable=True)
-    balance_id = Column(Integer, ForeignKey('balance.id', ondelete='CASCADE'), nullable=True)
-    currency_id = Column(Integer, ForeignKey('currencies.id', ondelete='CASCADE'), nullable=True)
-    change_amount = Column(DECIMAL(20, 8), default=0)
-    change_type = Column(String(64), nullable=False)
-    previous_balance = Column(Integer, nullable=True)    
-    status = Column(SQLEnum(Status), default=Status.PENDING)
-    proof = Column(String(256), nullable=True)
-    new_balance = Column(DECIMAL(20, 8), default=0)
-    args = Column(String, nullable=True, default="{}")
-    created_at = Column(DateTime, default=datetime.datetime.now)
+    id: Mapped[int] = Column(Integer, primary_key=True, index=True)
+    user_id: Mapped[int] = Column(Integer, ForeignKey('users.id', ondelete='CASCADE'), nullable=True)
+    balance_id: Mapped[int] = Column(Integer, ForeignKey('balance.id', ondelete='CASCADE'), nullable=True)
+    currency_id: Mapped[int] = Column(Integer, ForeignKey('currencies.id', ondelete='CASCADE'), nullable=True)
+    change_amount: Mapped[decimal.Decimal] = Column(DECIMAL(20, 8), default=0)
+    change_type: Mapped[str] = Column(String(64), nullable=False)
+    previous_balance: Mapped[int] = Column(Integer, nullable=True)
+    status: Mapped[Status] = Column(SQLEnum(Status), default=Status.PENDING)
+    proof: Mapped[str] = Column(String(256), nullable=True)
+    new_balance: Mapped[decimal.Decimal] = Column(DECIMAL(20, 8), default=0)
+    args: Mapped[str] = Column(String, nullable=True, default="{}")
+    created_at: Mapped[datetime.datetime] = Column(DateTime, default=datetime.datetime.now)
 
 
 class ReferralLink(Base):
     __tablename__ = "referral_links"
 
-    id = Column(Integer, primary_key=True, index=True)
-    name = Column(String(256), nullable=False)
-    comment = Column(String(256), nullable=True)
-    link = Column(String(256), nullable=False, index=True)
-    generated_by = Column(Integer, ForeignKey('users.id'), nullable=False)
-    user_count = Column(Integer, default=0)
+    id: Mapped[int] = Column(Integer, primary_key=True, index=True)
+    name: Mapped[str] = Column(String(256), nullable=False)
+    comment: Mapped[str] = Column(String(256), nullable=True)
+    link: Mapped[str] = Column(String(256), nullable=False, index=True)
+    generated_by: Mapped[int] = Column(Integer, ForeignKey('users.id'), nullable=False)
+    user_count: Mapped[int] = Column(Integer, default=0)
 
-    deleted = Column(Boolean, default=False)
-    created_at = Column(DateTime, default=datetime.datetime.now)
+    deleted: Mapped[bool] = Column(Boolean, default=False)
+    created_at: Mapped[datetime.datetime] = Column(DateTime, default=datetime.datetime.now)
 
 
 class Notification(Base):
     __tablename__ = "notifications"
 
-    id = Column(Integer, primary_key=True, index=True)
-    user_id = Column(Integer, ForeignKey('users.id', ondelete='CASCADE'), nullable=True)
-    head = Column(String(256), nullable=False)
-    body = Column(String(256), nullable=False)
-    args = Column(String, nullable=True, default="{}")
-    created_at = Column(DateTime, default=datetime.datetime.now)
+    id: Mapped[int] = Column(Integer, primary_key=True, index=True)
+    user_id: Mapped[int] = Column(Integer, ForeignKey('users.id', ondelete='CASCADE'), nullable=True)
+    head: Mapped[str] = Column(String(256), nullable=False)
+    body: Mapped[str] = Column(String(256), nullable=False)
+    args: Mapped[dict[str, str]] = Column(String, nullable=True, default="{}")
+    created_at: Mapped[datetime.datetime] = Column(DateTime, default=datetime.datetime.now)
