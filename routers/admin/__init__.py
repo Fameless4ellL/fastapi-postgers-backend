@@ -1,22 +1,22 @@
+"""Admin CRUD API Router"""
 import os
-from fastapi import APIRouter, Depends, Path, Request, status, Security, Query
+from typing import Type, List, Annotated
+from fastapi import APIRouter, Depends, Path, status, Security, Query
 from fastapi.responses import JSONResponse
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select, func, or_, exists
 from models.log import Action
 from models.other import Game, Ticket
-from typing import Type, List, Annotated
-from schemes.admin import ReferralFilter, GameFilter, JackpotFilter
+
 from schemes.base import BadResponse
 from pydantic import BaseModel
 from models.db import get_db
 from models.user import Role
 from routers import admin
-from globals import scheduler
-from apscheduler.jobstores.base import JobLookupError
+from globals import q
 from routers.utils import get_admin_token, Token
-from utils.workers import add_to_queue
 from schemes.admin import Empty
+from ..utils import worker
 
 
 def get_crud_router(
@@ -35,7 +35,6 @@ def get_crud_router(
         Role.LOCAL_ADMIN.value,
         Role.SUPPORT.value,
     ],
-    order_by: str = "id"
 ) -> APIRouter:
     router = admin
 
@@ -60,8 +59,6 @@ def get_crud_router(
         stmt = select(model)
 
         if model.__name__ == "Game":
-            filters: GameFilter = filters
-            model: Game = model
 
             if filters.game_type:
                 stmt = stmt.filter(model.game_type.in_(filters.game_type))
@@ -92,7 +89,6 @@ def get_crud_router(
             stmt = stmt.add_columns(has_tickets)
 
         if model.__name__ == "ReferralLink":
-            filters: ReferralFilter = filters
 
             if filters.status:
                 deleted = [status.label for status in filters.status]
@@ -107,7 +103,6 @@ def get_crud_router(
                 )
 
         if model.__name__ == "Jackpot":
-            filters: JackpotFilter = filters
 
             if filters.filter:
                 stmt = stmt.filter(model.name.ilike(f"%{filters.filter}%"))
@@ -128,7 +123,6 @@ def get_crud_router(
             stmt = stmt.add_columns(has_tickets)
 
         if model.__name__ == "InstaBingo":
-            model: InstaBingo = model
             # avoid None
             stmt = stmt.filter(
                 model.country.isnot(None),
@@ -193,7 +187,6 @@ def get_crud_router(
         name=f"create_{model.__name__}",
     )
     async def create_item(
-        requests: Request,
         db: Annotated[AsyncSession, Depends(get_db)],
         token: Annotated[Token, Security(get_admin_token, scopes=security_scopes)],
         item: create_schema,
@@ -247,12 +240,11 @@ def get_crud_router(
                 with open(file_path, "wb") as f:
                     f.write(await file.read())
 
-            scheduler.add_job(
-                func=add_to_queue,
-                trigger="date",
-                id=f"game_{new_item.id}",
-                args=["proceed_game", new_item.id],
-                run_date=new_item.scheduled_datetime,
+            q.enqueue_at(
+                new_item.scheduled_datetime,
+                getattr(worker, "proceed_game"),
+                new_item.id,
+                job_id=f"proceed_game_{new_item.id}",
             )
 
         if model.__name__ == "Jackpot":
@@ -280,21 +272,19 @@ def get_crud_router(
                 )
                 with open(file_path, "wb") as f:
                     f.write(await file.read())
-            
-            scheduler.add_job(
-                func=add_to_queue,
-                id=f"jackpot_{new_item.id}",
-                trigger="date",
-                args=["proceed_jackpot", new_item.id],
-                run_date=new_item.scheduled_datetime,
-            )
 
-            scheduler.add_job(
-                func=add_to_queue,
-                id=f"jackpot_status_{new_item.id}",
-                trigger="date",
-                args=["proceed_jackpot_status", new_item.id, GameStatus.PENDING],
-                run_date=new_item.fund_start,
+            q.enqueue_at(
+                new_item.scheduled_datetime,
+                getattr(worker, "proceed_jackpot"),
+                new_item.id,
+                job_id=f"proceed_jackpot_{new_item.id}",
+            )
+            q.enqueue_at(
+                new_item.fund_start,
+                getattr(worker, "proceed_jackpot_status"),
+                new_item.id,
+                GameStatus.PENDING,
+                job_id=f"proceed_jackpot_status_{new_item.id}",
             )
 
         await db.commit()
@@ -336,33 +326,29 @@ def get_crud_router(
 
         if model.__name__ == "Jackpot":
             if item.scheduled_datetime:
-                try:
-                    scheduler.reschedule_job(
-                        job_id=f"jackpot_{db_item.id}",
-                        run_date=item.scheduled_datetime
-                    )
-                except JobLookupError:
-                    scheduler.add_job(
-                        func=add_to_queue,
-                        id=f"jackpot_{db_item.id}",
-                        trigger="date",
-                        args=["proceed_jackpot", db_item.id],
-                        run_date=item.scheduled_datetime,
-                    )
+                job = q.fetch_job(f"jackpot_{db_item.id}")
+                if job:
+                    job.delete()
+
+                q.enqueue_at(
+                    item.scheduled_datetime,
+                    getattr(worker, "proceed_jackpot"),
+                    db_item.id,
+                    job_id=f"jackpot_{db_item.id}",
+                )
+
             if item.fund_start:
-                try:
-                    scheduler.reschedule_job(
-                        job_id=f"jackpot_status_{db_item.id}",
-                        run_date=item.fund_start
-                    )
-                except JobLookupError:
-                    scheduler.add_job(
-                        func=add_to_queue,
-                        id=f"jackpot_status_{db_item.id}",
-                        trigger="date",
-                        args=["proceed_jackpot_status", db_item.id, GameStatus.PENDING],
-                        run_date=item.fund_start,
-                    )
+                job = q.fetch_job(f"jackpot_status_{db_item.id}")
+                if job:
+                    job.delete()
+
+                q.enqueue_at(
+                    item.fund_start,
+                    getattr(worker, "proceed_jackpot_status"),
+                    db_item.id,
+                    GameStatus.PENDING,
+                    job_id=f"jackpot_status_{db_item.id}",
+                )
 
             file = files.image
 
@@ -399,19 +385,16 @@ def get_crud_router(
 
         if model.__name__ == "Game":
             if item.scheduled_datetime:
-                try:
-                    scheduler.reschedule_job(
-                        job_id=f"game_{db_item.id}",
-                        run_date=item.scheduled_datetime
-                    )
-                except JobLookupError:
-                    scheduler.add_job(
-                        func=add_to_queue,
-                        id=f"game_{db_item.id}",
-                        trigger="date",
-                        args=["proceed_game", db_item.id],
-                        run_date=item.scheduled_datetime,
-                    )
+                job = q.fetch_job(f"game_{db_item.id}")
+                if job:
+                    job.delete()
+
+                q.enqueue_at(
+                    item.scheduled_datetime,
+                    getattr(worker, "proceed_game"),
+                    db_item.id,
+                    job_id=f"game_{db_item.id}",
+                )
 
             file = files.image
 

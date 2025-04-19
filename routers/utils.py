@@ -19,9 +19,9 @@ from models.other import Game, GameStatus, GameType, Network, Currency
 import settings
 from utils.signature import decode_access_token
 from settings import email, settings
-from globals import scheduler, aredis
+from globals import aredis, q
 from utils.web3 import AWSHTTPProvider
-from utils.workers import add_to_queue
+from utils.workers import worker
 
 
 oauth2_scheme = security.OAuth2PasswordBearer(tokenUrl="/v1/token")
@@ -278,11 +278,11 @@ async def generate_game(
     game = await db.execute(stmt)
     game = game.scalar()
 
-    scheduler.add_job(
-        func=add_to_queue,
-        trigger="date",
-        args=["proceed_game", game.id],
-        run_date=game.scheduled_datetime,
+    q.enqueue_at(
+        game.scheduled_datetime,
+        getattr(worker, f"proceed_game"),
+        game.id,
+        job_id=f"proceed_game_{game.id}",
     )
 
     return game

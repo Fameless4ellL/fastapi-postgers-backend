@@ -2,7 +2,7 @@ from fastapi import Depends, status, Security
 from fastapi.responses import JSONResponse
 from typing import Annotated
 
-from sqlalchemy import select
+from sqlalchemy import select, insert, delete
 from models.log import Action
 from models.user import Role, Kyc
 from routers import admin
@@ -137,5 +137,43 @@ async def detele_kyc_list(
     await db.commit()
     return JSONResponse(
         content={"message": "Countries deleted successfully"},
+        status_code=status.HTTP_200_OK
+    )
+
+
+@admin.put(
+    "/kyc",
+    tags=[Action.ADMIN_UPDATE],
+    dependencies=[Security(
+        get_admin_token,
+        scopes=[
+            Role.SUPER_ADMIN.value,
+            Role.ADMIN.value,
+            Role.GLOBAL_ADMIN.value,
+            Role.LOCAL_ADMIN.value,
+            Role.FINANCIER.value,
+            Role.SUPPORT.value
+        ])],
+    responses={
+        400: {"model": BadResponse},
+    },
+)
+async def update_kyc_list(
+        db: Annotated[AsyncSession, Depends(get_db)],
+        item: KycCreate
+):
+    """
+    Обновление списка стран для KYC
+    """
+    # Удаление всех существующих записей
+    await db.execute(delete(Kyc))
+
+    # Создание новых записей
+    stmt = insert(Kyc).values([{"country": country} for country in item.countries])
+    await db.execute(stmt)
+    await db.commit()
+
+    return JSONResponse(
+        content={"message": "KYC list updated successfully"},
         status_code=status.HTTP_200_OK
     )
