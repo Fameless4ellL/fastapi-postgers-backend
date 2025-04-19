@@ -1,43 +1,30 @@
-from fastapi.testclient import TestClient
 import pytest
-from sqlalchemy.orm.session import Session
+from httpx import AsyncClient
+from sqlalchemy import delete
+from sqlalchemy.ext.asyncio import AsyncSession
 
 from models import InstaBingo, Currency
 from models.user import Role, User, Kyc, ReferralLink
-from globals import redis
-
 
 PASSWORD = "test_password"
 
 
 @pytest.fixture
-def tear_down(db: Session):
-    redis.set("SMS:testclient", 123456)
-    yield
-    redis.delete("SMS:testclient")
-
-    db.query(User).filter(
-        User.username == "testuser"
-    ).delete()
-    db.commit()
-
-
-@pytest.fixture
-def admin(
-    db: Session,
+async def admin(
+    db: AsyncSession,
     user: User,
 ):
     user.role = Role.SUPER_ADMIN.value
-    db.commit()
+    await db.commit()
     yield user
 
 
 @pytest.fixture
-def admin_token(
-    api: TestClient,
+async def admin_token(
+    async_api: AsyncClient,
     admin: User,
 ):
-    response = api.post(
+    response =await async_api.post(
         "/v1/admin/login",
         json={
             "login": admin.username,
@@ -50,8 +37,8 @@ def admin_token(
 
 
 @pytest.fixture
-def kyc(
-    db: Session,
+async def kyc(
+    db: AsyncSession,
 ):
     """
     Создание KYC.
@@ -60,46 +47,53 @@ def kyc(
         country="USA",
     )
     db.add(kyc)
-    db.commit()
-    db.refresh(kyc)
+    await db.commit()
+    await db.refresh(kyc)
     yield kyc
-    db.query(Kyc).delete()
+
+    try:
+        await db.execute(
+            delete(Kyc).where(Kyc.id == kyc.id)
+        )
+        await db.commit()
+    except Exception as e:
+        print(e)
 
 
 @pytest.fixture
-def instabingo(
-    db: Session,
+async def instabingo(
+    db: AsyncSession,
     currency: Currency,
 ):
     """
-    Создание InstaBingo.
+    Create InstaBingo.
     """
     instabingo = InstaBingo(
         country="KAZ",
         currency_id=currency.id
     )
     db.add(instabingo)
-    db.commit()
-    db.refresh(instabingo)
+    await db.commit()
+    await db.refresh(instabingo)
     yield instabingo
 
     try:
-        db.query(InstaBingo).filter(
-            InstaBingo.id == instabingo.id
-        ).delete()
-        db.commit()
+        await db.execute(
+            delete(InstaBingo).where(InstaBingo.id == instabingo.id)
+        )
+        await db.commit()
     except Exception as e:
-        db.rollback()
+        await db.rollback()
         print(e)
 
 
 @pytest.fixture
-def referral(
-    db: Session,
+async def referral(
+    db: AsyncSession,
     admin: User,
 ):
     """
-    Создание реферальной ссылки.
+    Create a referral link.
     """
     referral = ReferralLink(
         name="test_referral",
@@ -108,29 +102,29 @@ def referral(
         generated_by=admin.id,
     )
     db.add(referral)
-    db.commit()
-    db.refresh(referral)
+    await db.commit()
+    await db.refresh(referral)
     yield referral
 
     try:
-        db.query(ReferralLink).filter(
-            ReferralLink.id == referral.id
-        ).delete()
-        db.commit()
+        await db.execute(
+            delete(ReferralLink).where(ReferralLink.id == referral.id)
+        )
+        await db.commit()
     except Exception as e:
-        db.rollback()
+        await db.rollback()
         print(e)
 
 
 @pytest.fixture
-def referral_user(
-    db: Session,
+async def referral_user(
+    db: AsyncSession,
     referral: ReferralLink,
     user: User,
 ):
     """
-    Создание пользователя с реферальной ссылкой.
+    Create a user with a referral link.
     """
     user.referral_id = referral.id
-    db.commit()
+    await db.commit()
     yield user

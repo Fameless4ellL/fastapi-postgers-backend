@@ -1,18 +1,12 @@
-from fastapi.testclient import TestClient
-import pycountry
-import pytest
+from httpx import AsyncClient
+
 from models.user import User
-from settings import settings
 
 
-@pytest.mark.skipif(
-    not settings.debug,
-    reason="This test is only for debug mode",
-)
 class TestProfile:
-    def test_profile(
+    async def test_profile(
         self,
-        api: TestClient,
+        async_api: AsyncClient,
         admin_token: str,
         admin: User,
     ):
@@ -35,7 +29,7 @@ class TestProfile:
             "document": "string"
         }
         """
-        response = api.get(
+        response = await async_api.get(
             "/v1/admin/profile",
             headers={
                 "Authorization": f"Bearer {admin_token}",
@@ -54,4 +48,4 @@ class TestProfile:
         assert response["phone_number"] == admin.phone_number
         assert response["kyc"] == admin.kyc
         assert response["avatar"] is None
-        assert response["document"] is None
+        assert response["document"] == []

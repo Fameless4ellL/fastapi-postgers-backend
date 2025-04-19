@@ -5,7 +5,7 @@ from utils import proceed_game
 
 
 @pytest.mark.skipif(
-    not settings.debug,
+    False is True,
     reason="This test is only for debug mode",
 )
 class TestWorker:

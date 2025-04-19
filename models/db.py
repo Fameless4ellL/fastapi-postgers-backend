@@ -7,27 +7,37 @@ from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker, declarative_base
 from settings import settings
 
+engine_kwargs = {
+    "pool_pre_ping": True,
+    "pool_recycle": 3600,
+    "pool_size": 10,
+    "max_overflow": 20,
+    "pool_timeout": 30,
+    "future": True,
+}
 
 engine = create_async_engine(
     settings.database_url.format(mode="asyncpg", database="db"),
     # echo=settings.debug,
-    future=True
+    **engine_kwargs,
 )
 
 sync_engine = create_engine(
     settings.database_url.format(mode="psycopg2", database="db"),
     # echo=settings.debug,
-    future=True
+    **engine_kwargs,
 )
 
 # Logs database engine and session
 logs_engine = create_async_engine(
     settings.database_url.format(mode="asyncpg", database="logs"),
-    future=True
+    # echo=settings.debug,
+    **engine_kwargs,
 )
 logs_sync_engine = create_engine(
     settings.database_url.format(mode="psycopg2", database="logs"),
-    future=True
+    # echo=settings.debug,
+    **engine_kwargs,
 )
 
 

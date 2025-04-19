@@ -1,20 +1,13 @@
-from fastapi.testclient import TestClient
 import pytest
 from fastapi import status
 from httpx import AsyncClient
+from redis.asyncio import Redis
 
-from globals import redis
 from models.user import User
-from settings import settings
 
 
-@pytest.mark.skipif(
-    not settings.debug,
-    reason="This test is only for debug mode",
-)
 class TestAuth:
     @pytest.mark.usefixtures("tear_down")
-    @pytest.mark.asyncio
     async def test_register(
         self,
         async_api: AsyncClient,
@@ -28,43 +21,45 @@ class TestAuth:
                 "code": "123456",
             }
         )
+        print(response.json())
         assert response.status_code == status.HTTP_200_OK
 
         response = await async_api.post(
             "/v1/register",
             json={
-                "username": "testuser",
+                "username": "test_user3",
                 "country": "KAZ",
-                "phone_number": "+77073993001",
+                "phone_number": "+77079898923",
             }
         )
         print(response.json())
         assert response.status_code == status.HTTP_200_OK
         assert "access_token" in response.json()
 
-    def test_login(
+    async def test_login(
         self,
-        api: TestClient,
+        async_api: AsyncClient,
         user: User,
         tear_down: None
     ):
-        response = api.post(
+        response = await async_api.post(
             "/v1/login",
             json={
                 "username": user.username,
-                "phone_number": user.phone_number,
+                "phone_number": f"+{user.phone_number}",
                 "code": "123456",
             }
         )
+        print(response.json())
         assert response.status_code == status.HTTP_200_OK
         assert "access_token" in response.json()
 
-    def test_token(
+    async def test_token(
         self,
-        api: TestClient,
+        async_api: AsyncClient,
         user: User
     ):
-        response = api.post(
+        response = await async_api.post(
             "/v1/token",
             # send form data
             data={
@@ -87,26 +82,27 @@ class TestAuth:
             ),
         ],
     )
-    def test_send_code(
+    async def test_send_code(
         self,
-        api: TestClient,
+        async_api: AsyncClient,
+        aredis: Redis,
         code_data,
         expected_status,
         expected_response,
     ):
-        response = api.post("/v1/send_code", json=code_data)
+        response = await async_api.post("/v1/send_code", json=code_data)
         assert response.status_code == expected_status
-        assert redis.get("SMS:testclient").decode("utf-8") == str(
+        assert (await aredis.get("SMS:127.0.0.1")).decode("utf-8") == str(
             response.json()["code"]
         )
 
-    def test_check_code(
+    async def test_check_code(
         self,
-        api: TestClient,
+        async_api: AsyncClient,
         user: User,
         tear_down: None
     ):
-        response = api.post(
+        response = await async_api.post(
             "/v1/check_code",
             json={
                 "phone_number": user.phone_number,

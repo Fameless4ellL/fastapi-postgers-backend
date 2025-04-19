@@ -93,6 +93,7 @@ async def sidebar(
     """
     Получение информации о боковой панели администратора
     """
-    data = sidebars.get(token.role.value, sidebars['default'])
+    role = next(iter(token.scopes))
+    data = sidebars.get(role, sidebars['default'])
 
     return JSONResponse(content=data, status_code=status.HTTP_200_OK)

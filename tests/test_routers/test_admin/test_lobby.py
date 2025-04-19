@@ -1,18 +1,16 @@
-from fastapi.testclient import TestClient
-import pytest
-from settings import settings
+from httpx import AsyncClient
 
 
-@pytest.mark.skipif(
-    not settings.debug,
-    reason="This test is only for debug mode",
-)
 class TestSidebar:
-    def test_sidebar_global_admin(self, api: TestClient, admin_token: str):
+    async def test_sidebar_global_admin(
+        self,
+        async_api: AsyncClient,
+        admin_token: str
+    ):
         """
         Test sidebar for GLOBAL_ADMIN role
         """
-        response = api.get(
+        response = await async_api.get(
             "/v1/admin/sidebar",
             headers={"Authorization": f"Bearer {admin_token}"},
         )

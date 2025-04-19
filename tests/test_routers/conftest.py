@@ -1,66 +1,77 @@
-from fastapi.testclient import TestClient
+from datetime import datetime
+
 import pytest
-from sqlalchemy.orm.session import Session
+from httpx import AsyncClient
+from redis.asyncio import Redis
+from sqlalchemy.ext.asyncio import AsyncSession
+
 from models.other import Currency, Game, GameType, Network, Ticket, GameView
 from models.user import User, Balance
-from globals import redis
 from utils.signature import get_password_hash
 
 
 @pytest.fixture
-def tear_down(db: Session):
-    redis.set("SMS:testclient", 123456)
+async def tear_down(
+    db: AsyncSession,
+    aredis: Redis,
+):
+    # SMS:127.0.0.1 or SMS:testclient
+    await aredis.set("SMS:127.0.0.1", 123456)
     yield
-    redis.delete("SMS:testclient")
+    await aredis.delete("SMS:127.0.0.1")
 
-    db.query(User).filter(
-        User.username == "testuser"
-    ).delete()
-    db.commit()
+    try:
+        await db.execute(
+            delete(User).where(User.username == "test_user3")
+        )
+        await db.commit()
+    except Exception as e:
+        print(e)
 
 
-@pytest.fixture
-def user(db: Session):
-    user = db.query(User).filter(
-        User.username == "test_user1"
-    ).first()
+@pytest.fixture(scope="function")
+async def user(db: AsyncSession):
+    stmt = select(User).filter(User.username == "test_user2")
+
+    result = await db.execute(stmt)
+    user = result.scalars().first()
 
     if not user:
         hashed_password = get_password_hash("test_password")
         user = User(
-            phone_number="77079898911",
-            username="test_user1",
+            phone_number="77079898912",
+            username="test_user2",
             password=hashed_password,
             country="KAZ",
         )
         db.add(user)
-        db.commit()
-        db.refresh(user)
+        await db.commit()
+        result = await db.execute(stmt)
+        user = result.scalars().first()
 
     yield user
 
     try:
-        db.query(User).filter(
-            User.id == user.id
-        ).delete()
-        db.commit()
+        await db.execute(
+            delete(User).where(User.id == user.id)
+        )
+        await db.commit()
     except Exception as e:
-        db.rollback()
         print(e)
 
 
 @pytest.fixture
-def token(
-    db: Session,
-    api: TestClient,
+async def token(
+    db: AsyncSession,
+    async_api: AsyncClient,
     user: User,
     tear_down: None
 ):
-    response = api.post(
+    response = await async_api.post(
         "/v1/login",
         json={
             "username": user.username,
-            "phone_number": user.phone_number,
+            "phone_number": f"+{user.phone_number}",
             "code": "123456",
         }
     )
@@ -69,11 +80,17 @@ def token(
     yield response.json()["access_token"]
 
 
+import pytest
+from sqlalchemy import select, delete
+from sqlalchemy.ext.asyncio import AsyncSession
+
+
 @pytest.fixture
-def network(db: Session):
-    network = db.query(Network).filter(
-        Network.symbol == "TST"
-    ).first()
+async def network(db: AsyncSession):
+    result = await db.execute(
+        select(Network).filter(Network.symbol == "TST")
+    )
+    network = result.scalars().first()
 
     if not network:
         network = Network(
@@ -84,25 +101,27 @@ def network(db: Session):
             explorer_url="http://localhost:8080",
         )
         db.add(network)
-        db.commit()
-        db.refresh(network)
+        await db.commit()
+        await db.refresh(network)
 
     yield network
+
     try:
-        db.query(Network).filter(
-            Network.id == network.id
-        ).delete()
-        db.commit()
+        await db.execute(
+            delete(Network).where(Network.id == network.id)
+        )
+        await db.commit()
     except Exception as e:
-        db.rollback()
+        await db.rollback()
         print(e)
 
 
 @pytest.fixture
-def currency(db: Session, network: Network):
-    currency = db.query(Currency).filter(
-        Currency.code == "TST"
-    ).first()
+async def currency(db: AsyncSession, network: Network):
+    result = await db.execute(
+        select(Currency).filter(Currency.code == "TST")
+    )
+    currency = result.scalars().first()
 
     if not currency:
         currency = Currency(
@@ -114,41 +133,39 @@ def currency(db: Session, network: Network):
             conversion_rate=1
         )
         db.add(currency)
-        db.commit()
-        db.refresh(currency)
+        await db.commit()
+        await db.refresh(currency)
 
     yield currency
 
     try:
-        db.query(Currency).filter(
-            Currency.id == currency.id
-        ).delete()
-        db.commit()
+        await db.execute(
+            delete(Currency).where(Currency.id == currency.id)
+        )
+        await db.commit()
     except Exception as e:
-        db.rollback()
+        await db.rollback()
         print(e)
 
 
 @pytest.fixture(params=GameView)
-def game_view(
-    request: pytest.FixtureRequest
-):
+async def game_view(request: pytest.FixtureRequest):
     yield request.param, "YourMom"
 
 
 @pytest.fixture(params=GameType)
-def game(
-    db: Session,
+async def game(
+    db: AsyncSession,
     currency: Currency,
     request: pytest.FixtureRequest,
     game_view: GameView
 ):
     view, prize = game_view
 
-    db.query(Game).filter(
-        Game.name == "Test Game"
-    ).delete()
-    db.commit()
+    await db.execute(
+        delete(Game).where(Game.name == "Test Game")
+    )
+    await db.commit()
 
     game = Game(
         name="Test Game",
@@ -156,33 +173,33 @@ def game(
         game_type=request.param,
         kind=view,
         prize=prize,
-        scheduled_datetime="2025-01-30T12:57:40",
+        scheduled_datetime=datetime.now(),
     )
     db.add(game)
-    db.commit()
+    await db.commit()
 
     yield game
 
     try:
-        db.query(Game).filter(
-            Game.name == "Test Game"
-        ).delete()
-        db.commit()
+        await db.execute(
+            delete(Game).where(Game.name == "Test Game")
+        )
+        await db.commit()
     except Exception as e:
-        db.rollback()
+        await db.rollback()
         print(e)
 
 
 @pytest.fixture
-def ticket(
-    db: Session,
+async def ticket(
+    db: AsyncSession,
     user: User,
     game: Game
 ):
-    db.query(Ticket).filter(
-        Ticket.user_id == user.id
-    ).delete()
-    db.commit()
+    await db.execute(
+        delete(Ticket).where(Ticket.user_id == user.id)
+    )
+    await db.commit()
 
     _ticket = Ticket(
         user_id=user.id,
@@ -191,34 +208,37 @@ def ticket(
         amount=1
     )
     db.add(_ticket)
-    db.commit()
+    await db.commit()
 
     yield _ticket
 
     try:
-        db.query(Ticket).filter(
-            Ticket.user_id == user.id
-        ).delete()
-        db.commit()
+        await db.execute(
+            delete(Ticket).where(Ticket.user_id == user.id)
+        )
+        await db.commit()
     except Exception as e:
-        db.rollback()
+        await db.rollback()
         print(e)
 
 
 @pytest.fixture
-def balance(db: Session, user: User):
-
+async def balance(db: AsyncSession, user: User):
     balance = Balance(
         user_id=user.id,
         currency_id=1,
         balance=0
     )
     db.add(balance)
-    db.commit()
+    await db.commit()
 
     yield balance
 
-    db.query(Balance).filter(
-        Balance.user_id == user.id
-    ).delete()
-    db.commit()
+    try:
+        await db.execute(
+            delete(Balance).where(Balance.user_id == user.id)
+        )
+        await db.commit()
+    except Exception as e:
+        await db.rollback()
+        print(e)

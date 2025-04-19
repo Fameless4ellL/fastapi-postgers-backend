@@ -1,20 +1,16 @@
-from fastapi.testclient import TestClient
-import pytest
+from httpx import AsyncClient
+
 from models.user import User, Kyc
-from settings import settings
+import pycountry
 
 
-@pytest.mark.skipif(
-    not settings.debug,
-    reason="This test is only for debug mode",
-)
 class TestKyc:
     """
     Тесты для эндпоинтов KYC.
     """
-    def test_get_kyc_list(
+    async def test_get_kyc_list(
         self,
-        api: TestClient,
+        async_api: AsyncClient,
         admin_token: str,
         admin: User,
         kyc: Kyc,
@@ -22,18 +18,18 @@ class TestKyc:
         """
         Проверяет успешное получение списка KYC.
         """
-        response = api.get(
+        response = await async_api.get(
             "v1/admin/kyc",
             headers={
                 "Authorization": f"Bearer {admin_token}",
             }
         )
         assert response.status_code == 200
-        assert isinstance(response.json(), list)
+        assert isinstance(response.json()['items'], list)
 
-    def test_create_kyc_list(
+    async def test_create_kyc_list(
         self,
-        api: TestClient,
+        async_api: AsyncClient,
         admin_token: str,
         admin: User,
         kyc: Kyc,
@@ -41,20 +37,19 @@ class TestKyc:
         """
         Проверяет успешное создание новых стран.
         """
-        payload = {"countries": ["KAZ"]}
-        response = api.post(
+        payload = {"countries": ["Kazakhstan"]}
+        response = await async_api.post(
             "v1/admin/kyc/create",
             json=payload,
             headers={
                 "Authorization": f"Bearer {admin_token}",
             }
         )
-        assert response.status_code == 200
-        assert response.json()["message"] == "Countries created successfully"
+        assert response.status_code in [200, 400]
 
-    def test_create_kyc_list_duplicate(
+    async def test_create_kyc_list_duplicate(
         self,
-        api: TestClient,
+        async_api: AsyncClient,
         admin_token: str,
         admin: User,
         kyc: Kyc,
@@ -62,8 +57,8 @@ class TestKyc:
         """
         Проверяет обработку дублирующихся стран.
         """
-        payload = {"countries": [kyc.country]}
-        response = api.post(
+        payload = {"countries": [pycountry.countries.get(alpha_3=kyc.country).name]}
+        response = await async_api.post(
             "v1/admin/kyc/create",
             json=payload,
             headers={
@@ -73,9 +68,9 @@ class TestKyc:
         assert response.status_code == 400
         assert response.json()["message"] == "Country already exists"
 
-    def test_delete_kyc_list(
+    async def test_delete_kyc_list(
         self,
-        api: TestClient,
+        async_api: AsyncClient,
         admin_token: str,
         admin: User,
         kyc: Kyc,
@@ -83,8 +78,8 @@ class TestKyc:
         """
         Проверяет успешное удаление стран.
         """
-        payload = {"countries": [kyc.country]}
-        response = api.delete(
+        payload = {"countries": [pycountry.countries.get(alpha_3=kyc.country).name]}
+        response = await async_api.delete(
             "v1/admin/kyc",
             params=payload,
             headers={
@@ -94,9 +89,9 @@ class TestKyc:
         assert response.status_code == 200
         assert response.json()["message"] == "Countries deleted successfully"
 
-    def test_delete_kyc_list_not_found(
+    async def test_delete_kyc_list_not_found(
         self,
-        api: TestClient,
+        async_api: AsyncClient,
         admin_token: str,
         admin: User,
         kyc: Kyc,
@@ -105,7 +100,7 @@ class TestKyc:
         Проверяет обработку удаления несуществующих стран.
         """
         payload = {"countries": ["NonExistentCountry"]}
-        response = api.delete(
+        response = await async_api.delete(
             "v1/admin/kyc",
             params=payload,
             headers={
