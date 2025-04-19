@@ -1,20 +1,20 @@
-import os
 import random
-from fastapi import Depends, Path, Query, background, status, Security, UploadFile
-from fastapi.responses import JSONResponse
 from typing import Annotated, Union
-from models.log import Action
-from pydantic_extra_types.country import CountryAlpha3
 
+from fastapi import Depends, Path, background, status, Security, UploadFile
+from fastapi.responses import JSONResponse
+from rq.job import Job
 from sqlalchemy import func, select, or_
-from models.user import User, Role, Document
+from sqlalchemy.ext.asyncio import AsyncSession
+
+from globals import aredis, q
+from models.db import get_db
+from models.log import Action
 from models.other import Network, Currency
+from models.user import User, Role, Document
 from routers import admin
 from routers.admin import get_crud_router
 from routers.utils import Token, get_admin_token, send_mail, url_for
-from globals import scheduler, aredis
-from sqlalchemy.ext.asyncio import AsyncSession
-from models.db import get_db
 from schemes.admin import (
     Admin,
     AdminCreate,
@@ -40,14 +40,14 @@ from schemes.base import BadResponse, JsonForm
 )
 async def get_jobs():
     """
-    Get active scheduler jobs after game creation(GameInstance)
+    Get active jobs after creation
     """
-    jobs = scheduler.get_jobs()
+    jobs: list[Job] = q.get_jobs()
     data = [
         {
             "id": job.id,
-            "name": job.name,
-            "next_run_time": job.next_run_time.strftime("%Y-%m-%d %H:%M:%S"),
+            "name": job.func_name,
+            "next_run_time": job.func.next_run_time.strftime("%Y-%m-%d %H:%M:%S"),
             "args": job.args,
         }
         for job in jobs

@@ -632,7 +632,7 @@ class KycCreate(BaseAdmin):
 
 @dataclass
 class KycDelete:
-    countries: list[Country_by_name] = []
+    countries: list[Country_by_name] = Query(None)
 
 
 class Profile(BaseAdmin):

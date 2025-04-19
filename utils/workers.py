@@ -1,13 +1,15 @@
+import json
+from datetime import datetime, timedelta
 from decimal import Decimal
 from functools import wraps
-import json
-import requests
-import marshal
 from typing import Optional
-from datetime import datetime, timedelta
 
+from sqlalchemy import func
+from sqlalchemy.orm import joinedload
+
+from globals import q
 from models.db import get_sync_db, get_sync_logs_db
-from models.user import Notification, Wallet
+from models.log import TransactionLog
 from models.other import (
     Currency,
     Game,
@@ -19,16 +21,12 @@ from models.other import (
     TicketStatus,
     RepeatType
 )
-from routers import url_for
+from models.user import Balance, BalanceChangeHistory
+from models.user import Notification, Wallet
+from settings import settings
+from utils import worker
 from utils.web3 import transfer
 from .rng import get_random_sync as get_random
-from sqlalchemy.orm import joinedload
-from utils import worker
-from sqlalchemy import func
-from models.user import Balance, BalanceChangeHistory
-from globals import redis
-from settings import settings
-from models.log import TransactionLog
 
 
 @worker.register
@@ -83,10 +81,11 @@ def generate_game(
     db.commit()
     db.refresh(game_inst)
 
-    add_job_to_scheduler(
-        "add_to_queue",
-        ["proceed_game", game_inst.id],
-        scheduled_datetime
+    q.enqueue_at(
+        scheduled_datetime,
+        proceed_game,
+        game_inst.id,
+        job_id=f"proceed_game_{game_inst.id}",
     )
 
     return True
@@ -136,6 +135,7 @@ def proceed_game(game_id: Optional[int] = None):
     """
     Proceed the game instance and distribute the prize money
     """
+    from routers.utils import url_for
     db = next(get_sync_db())
 
     if game_id:
@@ -323,41 +323,6 @@ def proceed_game(game_id: Optional[int] = None):
 
 
 @worker.register
-def add_to_queue(func_name: str, *args, **kwargs):
-    try:
-        func_params = {
-            "args": args,
-            "kwargs": kwargs
-        }
-        json_params = json.dumps(func_params)
-
-        value = marshal.dumps({
-            "func": func_name,
-            **json.loads(json_params)
-        })
-
-        return redis.lpush(worker.WORKER_TASK_KEY, value)
-
-    except Exception as error:
-        print('add_to_queue ERROR:', error)
-
-
-def add_job_to_scheduler(func_name, args, run_date):
-    payload = {
-        "func_name": func_name,
-        "args": args,
-        "run_date": run_date.strftime("%Y-%m-%d %H:%M:%S")
-    }
-    response = requests.post(
-        f"http://api:8000/v1/cron/add_job/?key={settings.cron_key}",
-        json=payload
-    )
-    print(response.text)
-    if response.status_code != 200:
-        raise Exception(f"Failed to add job: {response.text}")
-
-
-@worker.register
 def generate_jackpot(
     jackpot_id: int,
 ) -> bool:
@@ -405,10 +370,11 @@ def generate_jackpot(
     db.commit()
     db.refresh(jackpot_inst)
 
-    add_job_to_scheduler(
-        "add_to_queue",
-        ["proceed_jackpot", jackpot_inst.id],
-        scheduled_datetime
+    q.enqueue_at(
+        scheduled_datetime,
+        proceed_jackpot,
+        jackpot_inst.id,
+        job_id=f"proceed_jackpot_{jackpot_inst.id}",
     )
 
     return True
@@ -419,6 +385,7 @@ def proceed_jackpot(jackpot_id: Optional[int] = None):
     """
     Proceed the jackpot instance and distribute the prize money
     """
+    from routers.utils import url_for
     db = next(get_sync_db())
 
     if jackpot_id:
@@ -680,10 +647,12 @@ def deposit(
         db.add(balance_change_history)
         db.commit()
 
-        add_job_to_scheduler(
-            "add_to_queue",
-            ["deposit", history_id, counter + 1],
-            datetime.now() + timedelta(minutes=1)
+        q.enqueue_at(
+            datetime.now() + timedelta(minutes=1),
+            deposit,
+            history_id,
+            change_type,
+            counter + 1
         )
         raise TransactionLogError(str(err))
 
@@ -801,10 +770,11 @@ def withdraw(
         db.add(balance_change_history)
         db.commit()
 
-        add_job_to_scheduler(
-            "add_to_queue",
-            ["withdraw", history_id, counter + 1],
-            datetime.now() + timedelta(minutes=1)
+        q.enqueue_at(
+            datetime.now() + timedelta(minutes=1),
+            withdraw,
+            history_id,
+            counter + 1
         )
         return False
 
@@ -854,46 +824,3 @@ def set_pending_jackpot(
     db.commit()
 
     return True
-
-# def buy_tickets():
-#     db = next(get_sync_db())    
-#     wallet = db.query(Wallet).filter(
-#         User.id == user.id
-#     )
-#     wallet = wallet.scalar()
-
-#     if wallet is None:
-#         return JSONResponse(
-#             status_code=status.HTTP_400_BAD_REQUEST,
-#             content=BadResponse(message="Wallet not found").model_dump()
-#         )
-
-#     balance_result = await db.execute(
-#         select(Balance)
-#         .with_for_update()
-#         .filter(Balance.user_id == user.id)
-#     )
-#     user_balance = balance_result.scalar() or Balance(balance=0)
-#     total_price = game.price * len(item.numbers)
-
-#     try:
-#         contract = w3.eth.contract(
-#             address=currency.address,
-#             abi=json.loads(await aredis.get("abi"))
-#         )
-#         amount = int(total_price * 10 ** currency.decimals)
-
-#         w3.eth.default_account = wallet.address
-#         _hash = await contract.functions.transfer(settings.address, amount).transact()
-#         tx = await w3.eth.wait_for_transaction_receipt(_hash, timeout=60)
-
-#         if tx is None or tx.status != 1:
-#             return JSONResponse(
-#                 status_code=status.HTTP_400_BAD_REQUEST,
-#                 content=BadResponse(message="Transaction failed").model_dump()
-#             )
-#     except Exception as e:
-#         return JSONResponse(
-#             status_code=status.HTTP_400_BAD_REQUEST,
-#             content=BadResponse(message=str(e)).model_dump()
-#         )

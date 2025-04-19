@@ -13,7 +13,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import joinedload
 from tronpy.keys import to_base58check_address
 
-from globals import aredis
+from globals import aredis, q
 from models.db import get_db
 from models.log import Action
 from models.other import Currency, GameStatus, Ticket
@@ -26,13 +26,12 @@ from models.user import (
     BalanceChangeHistory, Document
 )
 from routers import public
-from routers.utils import get_user, get_currency, url_for, get_user_token
+from routers.utils import get_user, get_currency, url_for, get_user_token, worker
 from schemes.base import BadResponse, Country, JsonForm
 from schemes.game import (
     MyGames, MyGamesType, Tickets, Withdraw
 )
 from schemes.user import KYC, Notifications, Profile, UserBalance, Usersettings, Transactions
-from utils.workers import add_to_queue
 
 
 @public.get(
@@ -227,9 +226,11 @@ async def withdraw(
 
     await db.commit()
 
-    add_to_queue(
-        "withdraw",
-        history_id=history.id,
+    q.enqueue_at(
+        item.datetime,
+        getattr(worker, "withdraw"),
+        history.id,
+        job_id=f"withdraw_{history.id}",
     )
 
     return JSONResponse(status_code=status.HTTP_200_OK, content="OK")

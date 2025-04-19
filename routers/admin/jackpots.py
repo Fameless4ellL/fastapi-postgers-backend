@@ -1,18 +1,18 @@
+from typing import Annotated, Literal, Optional
+
 from fastapi import Depends, Path, Security, status
 from fastapi.responses import JSONResponse
-from typing import Annotated, Literal, Optional
-from apscheduler.jobstores.base import JobLookupError
-from models.log import Action
-
 from sqlalchemy import func, select
-from models.user import User, Role
+from sqlalchemy.ext.asyncio import AsyncSession
+
+from globals import q
+from models.db import get_db
+from models.log import Action
 from models.other import GameStatus, Jackpot, Ticket, RepeatType
+from models.user import User, Role
 from routers import admin
 from routers.admin import get_crud_router
 from routers.utils import get_admin_token
-from globals import scheduler
-from sqlalchemy.ext.asyncio import AsyncSession
-from models.db import get_db
 from schemes.admin import (
     GameUpload,
     JackpotBase,
@@ -22,7 +22,6 @@ from schemes.admin import (
     JackpotFilter,
 )
 from schemes.base import BadResponse, JsonForm
-
 
 get_crud_router(
     model=Jackpot,
@@ -78,10 +77,9 @@ async def delete_jackpot(
         game.repeat_type = RepeatType.NONE
         game.status = GameStatus.CANCELLED
 
-    try:
-        scheduler.remove_job(f"jackpot_{game.id}")
-    except JobLookupError:
-        pass
+    job = q.fetch_job(f"jackpot_{game.id}")
+    if job:
+        job.remove()
 
     db.add(game)
     await db.commit()

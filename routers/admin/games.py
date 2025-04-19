@@ -21,7 +21,7 @@ from schemes.admin import (
     GameUpdate,
     Winners,
 )
-from globals import scheduler
+from globals import q
 from schemes.base import BadResponse, JsonForm
 
 
@@ -89,10 +89,9 @@ async def delete_game(
         game.repeat = False
         game.status = GameStatus.CANCELLED
 
-    try:
-        scheduler.remove_job(f"game_{game.id}")
-    except JobLookupError:
-        pass
+    job = q.fetch_job(f"game_{game.id}")
+    if job:
+        job.delete()
 
     db.add(game)
     await db.commit()

@@ -10,7 +10,7 @@ from models.db import get_db
 from models.user import BalanceChangeHistory, Wallet, Balance
 from models.other import Currency
 from routers import _cron
-from globals import scheduler
+from globals import q
 from worker.worker import worker
 
 
@@ -37,11 +37,10 @@ async def add_job(request: JobRequest):
         if not func:
             raise ValueError(f"Function {request.func_name} not found")
 
-        scheduler.add_job(
-            func=func,
-            trigger="date",
-            args=request.args,
-            run_date=request.run_date.strftime("%Y-%m-%d %H:%M:%S")
+        q.enqueue_at(
+            request.run_date,
+            func,
+            *request.args,
         )
     except Exception:
         traceback.print_exc()

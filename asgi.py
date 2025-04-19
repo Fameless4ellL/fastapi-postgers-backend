@@ -8,7 +8,6 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
 from models.log import Action, RequestLog, UserActionLog
 from routers import public, admin, _cron
-from globals import scheduler
 from models.db import get_logs_db
 from utils.signature import decode_access_token
 
@@ -28,10 +27,9 @@ log.addHandler(console_handler)
 @asynccontextmanager
 async def lifespan(*args, **kwargs):
     try:
-        scheduler.start()
         yield
     finally:
-        scheduler.shutdown()
+        log.info("Shutting down FastAPI app...")
 
 
 fastapp = FastAPI(lifespan=lifespan)
