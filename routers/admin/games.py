@@ -1,6 +1,5 @@
 from fastapi import Depends, Path, status, Security
 from fastapi.responses import JSONResponse
-from apscheduler.jobstores.base import JobLookupError
 from typing import Annotated, Literal
 
 from sqlalchemy import select, func, orm, exists
