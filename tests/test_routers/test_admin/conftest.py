@@ -1,10 +1,15 @@
+import io
+import os
+from uuid import uuid4
+
 import pytest
+from PIL import Image
+from fastapi import UploadFile
 from httpx import AsyncClient
 from sqlalchemy import delete
 from sqlalchemy.ext.asyncio import AsyncSession
-
 from models import InstaBingo, Currency
-from models.user import Role, User, Kyc, ReferralLink
+from models.user import Role, User, Kyc, ReferralLink, Document
 
 PASSWORD = "test_password"
 
@@ -128,3 +133,49 @@ async def referral_user(
     user.referral_id = referral.id
     await db.commit()
     yield user
+
+
+@pytest.fixture
+async def file() -> UploadFile:
+    """
+    Create a file.
+    """
+    img = Image.new('RGB', (800, 600), color='blue')
+    img_bytes = io.BytesIO()
+    img.save(img_bytes, format='PNG')
+    img_bytes.seek(0)
+
+    upload_file = UploadFile(
+        filename="test_image.png",
+        file=img_bytes,
+    )
+
+    yield upload_file
+
+
+@pytest.fixture(scope="function")
+async def doc(
+    db: AsyncSession,
+    user: User,
+    file: UploadFile,
+):
+    """
+    Create a document.
+    """
+    doc = Document(
+        user_id=user.id,
+        file=file,
+    )
+    db.add(doc)
+    await db.commit()
+    await db.refresh(doc)
+
+    yield doc
+
+    try:
+        await db.execute(
+            delete(Document).where(Document.id == doc.id)
+        )
+        await db.commit()
+    except Exception as e:
+        print(e)

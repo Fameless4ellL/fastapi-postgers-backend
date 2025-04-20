@@ -1,6 +1,6 @@
 from httpx import AsyncClient
 
-from models.user import User
+from models.user import User, Document
 
 
 class TestProfile:
@@ -9,26 +9,8 @@ class TestProfile:
         async_api: AsyncClient,
         admin_token: str,
         admin: User,
+        doc: Document,
     ):
-        """
-        {
-            "id": 0,
-            "fullname": "string",
-            "telegram": "string",
-            "language_code": "string",
-            "country": {
-                "alpha_3": "string",
-                "name": "string",
-                "flag": "string"
-            },
-            "email": "string",
-            "role": "string",
-            "phone_number": "string",
-            "kyc": true,
-            "avatar": "string",
-            "document": "string"
-        }
-        """
         response = await async_api.get(
             "/v1/admin/profile",
             headers={
@@ -38,14 +20,15 @@ class TestProfile:
 
         assert response.status_code == 200
 
-        response = response.json()
-        assert response["id"] == admin.id
-        assert response["fullname"] == f"{admin.firstname} {admin.lastname}"
-        assert response["telegram"] == admin.telegram
-        assert response["language_code"] == admin.language_code
-        assert response["email"] == admin.email
-        assert response["role"] == admin.role
-        assert response["phone_number"] == admin.phone_number
-        assert response["kyc"] == admin.kyc
-        assert response["avatar"] is None
-        assert response["document"] == []
+        data = response.json()
+        assert data["id"] == admin.id
+        assert data["fullname"] == f"{admin.firstname} {admin.lastname}"
+        assert data["telegram"] == admin.telegram
+        assert data["language_code"] == admin.language_code
+        assert data["email"] == admin.email
+        assert data["role"] == admin.role
+        assert data["phone_number"] == admin.phone_number
+        assert data["kyc"] == admin.kyc
+        assert data["avatar"] is None
+        assert len(data["document"]) == 1
+        assert "http://localhost:8100/static/kyc/test_image.png" in data["document"][0]

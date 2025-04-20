@@ -37,7 +37,7 @@ async def get_kyc_list(
     db: Annotated[AsyncSession, Depends(get_db)],
 ):
     """
-    Получение cписка стран для KYC
+    Получение список стран для KYC
     """
     stmt = select(Kyc)
     data = await db.execute(stmt)

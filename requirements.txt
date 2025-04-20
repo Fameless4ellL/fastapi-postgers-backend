@@ -20,10 +20,11 @@ pytz
 alembic-postgresql-enum==1.7.0 
 boto3==1.37.0
 pycryptodome==3.21.0
-python-jose==3.3.0
+python-jose==3.4.0
 bcrypt==4.0.1
 passlib[bcrypt]
 pycountry
+pillow==11.2.1
 phonenumbers==8.13.53
 
 # aws
@@ -32,4 +33,5 @@ requests-auth-aws-sigv4
 # test
 pytest==8.3.4
 pytest-asyncio==0.26.0
+pytest-cov==6.1.1
 httpx==0.28.1

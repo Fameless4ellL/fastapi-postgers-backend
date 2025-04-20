@@ -60,6 +60,7 @@ def event_loop():
     not settings.debug,
     reason="This test is only for debug mode",
 )
+@pytest.mark.no_cover
 async def is_debug():
     """
     This fixture is used to skip tests if the debug mode is not enabled.
