@@ -4,7 +4,7 @@ from typing import Annotated
 
 from sqlalchemy import select, or_
 from models.log import Action
-from models.user import User
+from models.user import User, Role
 from routers import admin
 from routers.utils import Token, get_admin_token, send_mail
 from globals import aredis
@@ -55,7 +55,7 @@ async def login(
             content={"message": "User not found"}
         )
 
-    if not user or not verify_password(
+    if not verify_password(
         user.password.get_secret_value(), userdb.password
     ):
         return JSONResponse(
@@ -144,7 +144,14 @@ async def reset_password(
     },
 )
 async def logout(
-    token: Annotated[Token, Security(get_admin_token)],
+    token: Annotated[Token, Security(get_admin_token, scopes=[
+        Role.SUPER_ADMIN.value,
+        Role.ADMIN.value,
+        Role.GLOBAL_ADMIN.value,
+        Role.LOCAL_ADMIN.value,
+        Role.FINANCIER.value,
+        Role.SUPPORT.value
+    ])],
 ):
     """
     Admin logout

@@ -1,10 +1,70 @@
 from httpx import AsyncClient
+from redis.asyncio import Redis
 
 from models.user import User
+from tests.test_routers.test_admin.conftest import PASSWORD
 
 
-class TestProfile:
-    async def test_profile(
+class TestAuth:
+    async def test_login(
+        self,
+        async_api: AsyncClient,
+        admin_token: str,
+        admin: User,
+        aredis: Redis
+    ):
+        response = await async_api.post(
+            "/v1/admin/login",
+            json={
+                "login": admin.username,
+                "password": PASSWORD,
+            }
+        )
+
+        assert response.status_code == 200
+        assert "access_token" in response.json()
+
+        token = await aredis.get(f"TOKEN:ADMINS:{admin.id}")
+        assert token is not None
+        assert token.decode("utf-8") == response.json()["access_token"]
+
+    async def test_login_user_not_found(
+        self,
+        async_api: AsyncClient,
+        admin_token: str,
+        admin: User,
+    ):
+        response = await async_api.post(
+            "/v1/admin/login",
+            json={
+                "login": "admin.username",
+                "password": PASSWORD,
+            }
+        )
+
+        data = response.json()
+        assert response.status_code == 404
+        assert data["message"] == "User not found"
+
+    async def test_login_fail_password(
+        self,
+        async_api: AsyncClient,
+        admin_token: str,
+        admin: User,
+    ):
+        response = await async_api.post(
+            "/v1/admin/login",
+            json={
+                "login": admin.username,
+                "password": "PASSWORD",
+            }
+        )
+
+        data = response.json()
+        assert response.status_code == 400
+        assert data["message"] == "Invalid phone number or password"
+
+    async def test_logout(
         self,
         async_api: AsyncClient,
         admin_token: str,
@@ -29,23 +89,11 @@ class TestProfile:
             "document": "string"
         }
         """
-        response = await async_api.get(
-            "/v1/admin/profile",
-            headers={
-                "Authorization": f"Bearer {admin_token}",
-            }
+        response = await async_api.post(
+            "v1/admin/logout",
+            headers={"Authorization": f"Bearer {admin_token}",}
         )
 
+        data = response.json()
         assert response.status_code == 200
-
-        response = response.json()
-        assert response["id"] == admin.id
-        assert response["fullname"] == f"{admin.firstname} {admin.lastname}"
-        assert response["telegram"] == admin.telegram
-        assert response["language_code"] == admin.language_code
-        assert response["email"] == admin.email
-        assert response["role"] == admin.role
-        assert response["phone_number"] == admin.phone_number
-        assert response["kyc"] == admin.kyc
-        assert response["avatar"] is None
-        assert response["document"] == []
+        assert data == "OK"
