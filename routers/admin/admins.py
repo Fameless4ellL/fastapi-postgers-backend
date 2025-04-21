@@ -286,7 +286,7 @@ async def create_admin(
     bg.add_task(
         send_mail,
         "New Admin",
-        f"New admin {new_admin.username} has been created",
+        f"New admin {new_admin.username} has been created. your code is {code}",
         new_admin.email,
     )
 

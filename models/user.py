@@ -3,6 +3,7 @@ import decimal
 from enum import Enum
 from typing import Union
 
+from globals import TotpFactory
 from .custom_types import FileType
 from .db import Base
 from sqlalchemy import DECIMAL, Boolean, Column, DateTime, ForeignKey, Integer, String, Enum as SQLEnum
@@ -49,6 +50,8 @@ class User(Base):
 
     avatar: Mapped[Union[str, None]] = Column(String(256), nullable=True)
     avatar_v1: Mapped[FileType] = Column(FileType(storage=FileSystemStorage(path="/app/static/avatars")))
+
+    totp: Mapped[str] = Column(String(256), nullable=True, default=TotpFactory.new().to_json())
 
     referral_id: Mapped[Union[str, None]] = Column(Integer, ForeignKey('referral_links.id'), nullable=True)
 

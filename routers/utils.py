@@ -7,7 +7,8 @@ from email.mime.text import MIMEText
 from typing import Annotated, Any
 import uuid
 from aiohttp import client_exceptions
-from fastapi import Depends, HTTPException, status, security
+from fastapi import Depends, HTTPException, status, security, Request
+from httpx import AsyncClient
 from sqlalchemy.orm import joinedload
 from datetime import datetime, timedelta
 from sqlalchemy import select
@@ -179,6 +180,10 @@ async def get_currency(
         )
 
     return cur
+
+
+async def http_client(request: Request) -> AsyncClient:
+    return request.state.client
 
 
 def get_currency_by_id(

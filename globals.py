@@ -2,7 +2,9 @@ import os
 import redis as _redis
 from redis.asyncio import Redis as _aredis
 from rq import Queue
+from passlib.totp import TOTP
 
+from settings import settings
 
 redis = _redis.Redis(host=os.environ.get("REDIS_HOST", "redis"))
 aredis = _aredis(
@@ -15,3 +17,7 @@ aredis = _aredis(
     max_connections=20,
 )
 q = Queue(connection=redis)
+TotpFactory: TOTP = TOTP.using(
+    secrets={"1": settings.twofa_secret},
+    issuer="bingo"
+)

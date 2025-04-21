@@ -2,13 +2,18 @@ import datetime
 import json
 import logging
 import time
+from typing import AsyncIterator
+
 from fastapi import FastAPI, Request, Response
 from contextlib import asynccontextmanager
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
+from httpx import AsyncClient
+
 from models.log import Action, RequestLog, UserActionLog
 from routers import public, admin, _cron
 from models.db import get_logs_db
+from settings import settings
 from utils.signature import decode_access_token
 
 
@@ -17,7 +22,7 @@ log = logging.getLogger("LOGS")
 
 console_handler = logging.StreamHandler()
 console_handler.setLevel(logging.INFO)
-if log.level == logging.DEBUG:
+if settings.debug:
     console_handler.setLevel(logging.DEBUG)
 formatter = logging.Formatter('%(asctime)s - %(name)s - %(levelname)s - %(message)s')
 console_handler.setFormatter(formatter)
@@ -25,11 +30,9 @@ log.addHandler(console_handler)
 
 
 @asynccontextmanager
-async def lifespan(*args, **kwargs):
-    try:
-        yield
-    finally:
-        log.info("Shutting down FastAPI app...")
+async def lifespan(app: FastAPI) -> AsyncIterator[dict[str, AsyncClient]]:
+    async with AsyncClient() as client:
+        yield {"client": client}
 
 
 fastapp = FastAPI(lifespan=lifespan)

@@ -13,7 +13,8 @@ from pydantic import (
     model_serializer,
     AfterValidator,
     ConfigDict,
-    field_validator
+    field_validator,
+    EmailStr
 )
 import pytz
 from typing import Optional, Annotated, Any, Union
@@ -164,12 +165,21 @@ class Admins(BaseModel):
 class AdminLogin(BaseModel):
     login: str
     password: SecretStr = Field(..., min_length=3, max_length=64, description="Password")
+    code: str = Field(default="******", min_length=6, max_length=6, description="2FA code")
 
 
 class ResetPassword(BaseModel):
-    email: str
+    email: EmailStr
     password: SecretStr
     code: str = Field(..., min_length=6, max_length=6, description="email code")
+
+
+class Totp(BaseModel):
+    code: str = Field(..., min_length=6, max_length=6, description="2FA code")
+
+
+class ForgotPassword(BaseModel):
+    email: EmailStr
 
 
 class NetworkBase(BaseModel):

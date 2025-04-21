@@ -1,18 +1,23 @@
-from fastapi import Depends, Security, background, status
-from fastapi.responses import JSONResponse
+import random
 from typing import Annotated
 
+from fastapi import Depends, Security, background, status, Response
+from fastapi.responses import JSONResponse
+from httpx import AsyncClient
+from passlib.exc import MalformedTokenError, TokenError
+from passlib.totp import TOTP
 from sqlalchemy import select, or_
+from sqlalchemy.ext.asyncio import AsyncSession
+
+from globals import aredis, TotpFactory
+from models.db import get_db
 from models.log import Action
 from models.user import User, Role
 from routers import admin
-from routers.utils import Token, get_admin_token, send_mail
-from globals import aredis
-from sqlalchemy.ext.asyncio import AsyncSession
-from models.db import get_db
+from routers.utils import Token, get_admin_token, send_mail, http_client, get_admin
 from schemes.admin import (
     ResetPassword,
-    AdminLogin,
+    AdminLogin, ForgotPassword, Totp,
 )
 from schemes.auth import AccessToken
 from schemes.base import BadResponse
@@ -63,6 +68,26 @@ async def login(
             content={"message": "Invalid phone number or password"}
         )
 
+    if userdb.totp:
+        if not user.code:
+            return JSONResponse(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                content={"message": "TOTP code is required"}
+            )
+
+        try:
+            TotpFactory.verify(user.code, userdb.totp)
+        except MalformedTokenError as err:
+            return JSONResponse(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                content={"message": str(err)}
+            )
+        except TokenError as err:
+            return JSONResponse(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                content={"message": str(err)}
+            )
+
     data = {
         "id": userdb.id,
         "scopes": [userdb.role],
@@ -88,7 +113,7 @@ async def login(
         400: {"model": BadResponse},
     },
 )
-async def reset_password(
+async def get_reset_password(
     db: Annotated[AsyncSession, Depends(get_db)],
     item: ResetPassword,
     bg: background.BackgroundTasks,
@@ -137,6 +162,46 @@ async def reset_password(
 
 
 @admin.post(
+    "/reset/password",
+    responses={
+        400: {"model": BadResponse},
+    },
+)
+async def send_reset_password(
+    db: Annotated[AsyncSession, Depends(get_db)],
+    item: ForgotPassword,
+    bg: background.BackgroundTasks,
+):
+    """
+    Reset password
+    """
+    stmt = select(User).filter(
+        User.email == item.email,
+        User.role != "user",
+    )
+    user = await db.execute(stmt)
+    user = user.scalar()
+
+    if not user:
+        return JSONResponse(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            content={"message": "Email is not valid"},
+        )
+
+    code = random.randint(100000, 999999)
+    await aredis.set(f"EMAIL:{user.email}", code, ex=300)
+
+    bg.add_task(
+        send_mail,
+        "Password Reset",
+        "Your password has been reset, your code is: " + str(code),
+        user.email,
+    )
+
+    return JSONResponse(status_code=status.HTTP_200_OK, content="Email has been sent")
+
+
+@admin.post(
     "/logout",
     tags=[Action.ADMIN_LOGOUT],
     responses={
@@ -157,5 +222,92 @@ async def logout(
     Admin logout
     """
     await aredis.delete(f"TOKEN:ADMINS:{token.id}")
+
+    return JSONResponse(status_code=status.HTTP_200_OK, content="OK")
+
+
+@admin.get(
+    "/totp",
+    responses={
+        400: {"model": BadResponse},
+    },
+)
+async def get_totp(
+    db: Annotated[AsyncSession, Depends(get_db)],
+    client: Annotated[AsyncClient, Depends(http_client)],
+    admin: Annotated[User, Security(get_admin, scopes=[
+        Role.SUPER_ADMIN.value,
+        Role.ADMIN.value,
+        Role.GLOBAL_ADMIN.value,
+        Role.LOCAL_ADMIN.value,
+        Role.FINANCIER.value,
+        Role.SUPPORT.value
+    ])],
+):
+    """
+    Get TOTP secret
+    """
+    totp: TOTP = TotpFactory.new()
+
+    # get image from url
+    qrcode = await client.get(
+        "https://api.qrserver.com/v1/create-qr-code/?",
+        params={
+            "size": "300x300",
+            "data": totp.to_uri(label=admin.username, issuer="Bingo-Admin"),
+        },
+        headers={
+            "Content-Type": "application/json",
+            "Accept": "application/json"
+        }
+    )
+
+    admin.totp = totp.to_json()
+    await db.merge(admin)
+    await db.commit()
+
+    return Response(
+        content=qrcode.content,
+        media_type="image/png",
+        headers={
+            "Content-Disposition": "inline; filename=totp.png",
+            "Secret": totp.base32_key,
+        }
+    )
+
+
+@admin.post(
+    "/totp",
+    include_in_schema=False,
+    responses={
+        400: {"model": BadResponse},
+    },
+)
+async def verify_totp(
+    item: Totp,
+    admin: Annotated[User, Security(get_admin, scopes=[
+        Role.SUPER_ADMIN.value,
+        Role.ADMIN.value,
+        Role.GLOBAL_ADMIN.value,
+        Role.LOCAL_ADMIN.value,
+        Role.FINANCIER.value,
+        Role.SUPPORT.value
+    ])]
+):
+    """
+    Verify TOTP
+    """
+    try:
+        TotpFactory.verify(item.code, admin.totp)
+    except MalformedTokenError as err:
+        return JSONResponse(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            content={"message": str(err)}
+        )
+    except TokenError as err:
+        return JSONResponse(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            content={"message": str(err)}
+        )
 
     return JSONResponse(status_code=status.HTTP_200_OK, content="OK")
