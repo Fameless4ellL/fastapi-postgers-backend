@@ -42,6 +42,7 @@ class Profile(BaseModel):
     balance: float
     address: Address
     locale: str
+    notifications: bool = False
     country: Annotated[
         str,
         AfterValidator(lambda x: pycountry.countries.get(alpha_3=x))

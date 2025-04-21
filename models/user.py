@@ -146,4 +146,5 @@ class Notification(Base):
     head: Mapped[str] = Column(String(256), nullable=False)
     body: Mapped[str] = Column(String(256), nullable=False)
     args: Mapped[dict[str, str]] = Column(String, nullable=True, default="{}")
+    read: Mapped[bool] = Column(Boolean, default=False)
     created_at: Mapped[datetime.datetime] = Column(DateTime, default=datetime.datetime.now)

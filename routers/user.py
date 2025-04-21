@@ -8,7 +8,7 @@ from eth_account import Account
 from eth_account.signers.local import LocalAccount
 from fastapi import Depends, Query, status, UploadFile, File
 from fastapi.responses import JSONResponse
-from sqlalchemy import func, select
+from sqlalchemy import func, select, update, exists
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import joinedload
 from tronpy.keys import to_base58check_address
@@ -91,6 +91,14 @@ async def profile(
             "document": url_for("static/kyc", path=document.file.name),
         }
 
+    notifications = await db.execute(
+        select(exists().where(
+            Notification.user_id == user.id,
+            Notification.read.is_(False)
+        ))
+    )
+    notifications = notifications.scalar()
+
     return JSONResponse(
         status_code=status.HTTP_200_OK,
         content=Profile(
@@ -101,7 +109,8 @@ async def profile(
                 "base58": to_base58check_address(wallet.address),
                 "evm": wallet.address,
             },
-            country=user.country,
+            notifications=notifications,
+            country=user.country or "USA",
             username=user.username
         ).model_dump()
     )
@@ -560,6 +569,13 @@ async def get_notifications(
     )
     count_result = await db.execute(count_stmt)
     count = count_result.scalar()
+
+    await db.execute(
+        update(Notification)
+        .where(Notification.user_id == user.id)
+        .values(read=True)
+    )
+    await db.commit()
 
     return JSONResponse(
         status_code=status.HTTP_200_OK,
