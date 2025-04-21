@@ -18,16 +18,16 @@ from schemes.base import BadResponse
 
 @admin.get(
     "/kyc",
-    dependencies=[Security(
-        get_admin_token,
-        scopes=[
-            Role.SUPER_ADMIN.value,
-            Role.ADMIN.value,
-            Role.GLOBAL_ADMIN.value,
-            Role.LOCAL_ADMIN.value,
-            Role.FINANCIER.value,
-            Role.SUPPORT.value
-        ])],
+    # dependencies=[Security(
+    #     get_admin_token,
+    #     scopes=[
+    #         Role.SUPER_ADMIN.value,
+    #         Role.ADMIN.value,
+    #         Role.GLOBAL_ADMIN.value,
+    #         Role.LOCAL_ADMIN.value,
+    #         Role.FINANCIER.value,
+    #         Role.SUPPORT.value
+    #     ])],
     responses={
         400: {"model": BadResponse},
         200: {"model": list[KycBase]}
@@ -144,16 +144,16 @@ async def detele_kyc_list(
 @admin.put(
     "/kyc",
     tags=[Action.ADMIN_UPDATE],
-    dependencies=[Security(
-        get_admin_token,
-        scopes=[
-            Role.SUPER_ADMIN.value,
-            Role.ADMIN.value,
-            Role.GLOBAL_ADMIN.value,
-            Role.LOCAL_ADMIN.value,
-            Role.FINANCIER.value,
-            Role.SUPPORT.value
-        ])],
+    # dependencies=[Security(
+    #     get_admin_token,
+    #     scopes=[
+    #         Role.SUPER_ADMIN.value,
+    #         Role.ADMIN.value,
+    #         Role.GLOBAL_ADMIN.value,
+    #         Role.LOCAL_ADMIN.value,
+    #         Role.FINANCIER.value,
+    #         Role.SUPPORT.value
+    #     ])],
     responses={
         400: {"model": BadResponse},
     },
@@ -167,11 +167,13 @@ async def update_kyc_list(
     """
     # Удаление всех существующих записей
     await db.execute(delete(Kyc))
+    await db.commit()
 
     # Создание новых записей
-    stmt = insert(Kyc).values([{"country": country} for country in item.countries])
-    await db.execute(stmt)
-    await db.commit()
+    if item.countries:
+        stmt = insert(Kyc).values([{"country": country} for country in item.countries])
+        await db.execute(stmt)
+        await db.commit()
 
     return JSONResponse(
         content={"message": "KYC list updated successfully"},
