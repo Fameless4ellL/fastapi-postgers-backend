@@ -1,6 +1,4 @@
 import io
-import os
-from uuid import uuid4
 
 import pytest
 from PIL import Image
@@ -8,6 +6,7 @@ from fastapi import UploadFile
 from httpx import AsyncClient
 from sqlalchemy import delete
 from sqlalchemy.ext.asyncio import AsyncSession
+
 from models import InstaBingo, Currency
 from models.user import Role, User, Kyc, ReferralLink, Document
 

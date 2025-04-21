@@ -9,7 +9,6 @@ class TestAuth:
     async def test_login(
         self,
         async_api: AsyncClient,
-        admin_token: str,
         admin: User,
         aredis: Redis
     ):
@@ -31,8 +30,6 @@ class TestAuth:
     async def test_login_user_not_found(
         self,
         async_api: AsyncClient,
-        admin_token: str,
-        admin: User,
     ):
         response = await async_api.post(
             "/v1/admin/login",
@@ -49,7 +46,6 @@ class TestAuth:
     async def test_login_fail_password(
         self,
         async_api: AsyncClient,
-        admin_token: str,
         admin: User,
     ):
         response = await async_api.post(
@@ -68,7 +64,6 @@ class TestAuth:
         self,
         async_api: AsyncClient,
         admin_token: str,
-        admin: User,
     ):
         """
         {
@@ -91,7 +86,7 @@ class TestAuth:
         """
         response = await async_api.post(
             "v1/admin/logout",
-            headers={"Authorization": f"Bearer {admin_token}",}
+            headers={"Authorization": f"Bearer {admin_token}", }
         )
 
         data = response.json()

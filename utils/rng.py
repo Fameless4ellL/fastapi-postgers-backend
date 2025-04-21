@@ -5,6 +5,7 @@ import requests
 
 client = AsyncClient()
 
+
 async def get_random(x: int = 1, y: int = 90) -> Optional[int]:
     """
     Получение случайного числа
@@ -12,7 +13,7 @@ async def get_random(x: int = 1, y: int = 90) -> Optional[int]:
     try:
         response = await client.get(
             "http://rng:8001/random",
-            params={"x": min, "y": max},
+            params={"x": x, "y": y},
             timeout=5
         )
     except Exception as e:
@@ -29,7 +30,7 @@ def get_random_sync(x: int = 1, y: int = 90) -> Optional[int]:
     try:
         response = requests.get(
             "http://rng:8001/random",
-            params={"x": min, "y": max},
+            params={"x": x, "y": y},
             timeout=5
         )
     except requests.exceptions.RequestException as e:
