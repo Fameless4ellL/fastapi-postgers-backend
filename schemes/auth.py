@@ -1,7 +1,8 @@
 from pydantic import BaseModel, Field, SecretStr
-from pydantic_extra_types.phone_numbers import PhoneNumber
 from pydantic_extra_types.country import CountryAlpha3
 from typing import Optional
+
+from schemes.base import ModPhoneNumber
 
 
 class CheckCode(BaseModel):
@@ -10,7 +11,7 @@ class CheckCode(BaseModel):
 
 class UserLogin(CheckCode):
     username: str = Field(default="", exclude=True, deprecated=True)
-    phone_number: PhoneNumber
+    phone_number: ModPhoneNumber
     password: Optional[SecretStr] = Field(default="", exclude=True, deprecated=True)
 
 
@@ -21,11 +22,11 @@ class UserCreate(UserLogin):
 
 
 class SendCode(BaseModel):
-    phone_number: PhoneNumber
+    phone_number: ModPhoneNumber
 
 
 class LoginType(UserLogin):
-    phone_number: PhoneNumber
+    phone_number: ModPhoneNumber
 
 
 class AccessToken(BaseModel):

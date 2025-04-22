@@ -25,7 +25,7 @@ from fastapi import Query, UploadFile
 from models.other import GameStatus, GameType, GameView, JackpotType, RepeatType
 from models.user import BalanceChangeHistory
 from routers.utils import get_currency_by_id, get_first_currency, url_for
-from schemes.base import Country, Country_by_name
+from schemes.base import Country, Country_by_name, ModPhoneNumber
 from settings import settings
 from utils.datastructure import MultiValueStrEnum
 
@@ -702,7 +702,7 @@ class AdminCreate(BaseAdmin):
     lastname: str
     username: str
     email: str
-    phone_number: PhoneNumber
+    phone_number: ModPhoneNumber
     role: AdminRoles
     telegram: Optional[str] = None
     country: CountryAlpha3

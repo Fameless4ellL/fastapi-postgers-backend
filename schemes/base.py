@@ -3,6 +3,7 @@ import pycountry
 from pydantic import BaseModel, Field, Json, BeforeValidator, AfterValidator
 from pydantic_extra_types.country import CountryShortName
 from fastapi.params import Form as FormType
+from pydantic_extra_types.phone_numbers import PhoneNumber
 
 
 class BadResponse(BaseModel):
@@ -28,4 +29,8 @@ Country = Annotated[
 Country_by_name = Annotated[
     CountryShortName,
     AfterValidator(lambda x: x.alpha3)
+]
+ModPhoneNumber = Annotated[
+    PhoneNumber,
+    BeforeValidator(lambda x: f"+{x}" if not x.startswith("+") else x)
 ]
