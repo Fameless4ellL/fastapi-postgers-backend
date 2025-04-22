@@ -128,7 +128,10 @@ async def get_admin_list(
     data = [
         {
             "id": a.id,
-            "username": f"{a.firstname} {a.lastname}",
+            "username": a.username,
+            "fullname": f"{a.firstname} {a.lastname}",
+            "active": a.active,
+            "telegram": a.telegram,
             "phone_number": a.phone_number if scope == Role.GLOBAL_ADMIN.value else None,
             "email": a.email if scope == Role.GLOBAL_ADMIN.value else None,
             "role": a.role,

@@ -154,6 +154,9 @@ class BalanceBase(BaseModel):
 
 class Admin(User):
     email: Optional[str]
+    fullname: str
+    active: bool
+    telegram: Optional[str]
     role: str
 
 
