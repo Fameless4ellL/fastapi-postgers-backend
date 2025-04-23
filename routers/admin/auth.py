@@ -291,12 +291,6 @@ async def verify_totp(
     """
     Verify TOTP
     """
-    if admin.totp and admin.verified:
-        return JSONResponse(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            content={"message": "TOTP already verified"}
-        )
-
     try:
         TotpFactory.verify(item.code, admin.totp)
     except MalformedTokenError as err:
@@ -310,9 +304,10 @@ async def verify_totp(
             content={"message": str(err)}
         )
 
-    admin.verified = True
-    await db.merge(admin)
-    await db.commit()
+    if not admin.verified:
+        admin.verified = True
+        await db.merge(admin)
+        await db.commit()
 
     data = {
         "id": admin.id,
