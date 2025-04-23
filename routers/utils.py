@@ -186,6 +186,10 @@ async def http_client(request: Request) -> AsyncClient:
     return request.state.client
 
 
+async def get_ip(request: Request) -> str:
+    return request.client.host
+
+
 def get_currency_by_id(
     currency_id: int
 ) -> Currency:

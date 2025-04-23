@@ -172,13 +172,15 @@ class AdminLogin(BaseModel):
 
 
 class ResetPassword(BaseModel):
-    email: EmailStr
     password: SecretStr
-    code: str = Field(..., min_length=6, max_length=6, description="email code")
 
 
 class Totp(BaseModel):
     code: str = Field(..., min_length=6, max_length=6, description="2FA code")
+
+
+class VerifyLink(BaseModel):
+    code: str
 
 
 class ForgotPassword(BaseModel):

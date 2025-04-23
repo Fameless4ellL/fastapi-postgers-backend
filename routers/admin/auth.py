@@ -1,7 +1,7 @@
-import random
+import secrets
 from typing import Annotated
 
-from fastapi import Depends, Security, background, status, Response
+from fastapi import Depends, Security, background, status, Response, Request
 from fastapi.responses import JSONResponse
 from httpx import AsyncClient
 from passlib.exc import MalformedTokenError, TokenError
@@ -14,13 +14,17 @@ from models.db import get_db
 from models.log import Action
 from models.user import User, Role
 from routers import admin
-from routers.utils import Token, get_admin_token, send_mail, http_client, get_admin
+from routers.utils import Token, get_admin_token, send_mail, http_client, get_admin, get_ip
 from schemes.admin import (
     ResetPassword,
-    AdminLogin, ForgotPassword, Totp,
+    AdminLogin,
+    ForgotPassword,
+    Totp,
+    VerifyLink,
 )
 from schemes.auth import AccessToken
 from schemes.base import BadResponse
+from settings import settings
 from utils.signature import (
     create_access_token,
     get_password_hash,
@@ -68,29 +72,9 @@ async def login(
             content={"message": "Invalid phone number or password"}
         )
 
-    if userdb.totp:
-        if not user.code:
-            return JSONResponse(
-                status_code=status.HTTP_400_BAD_REQUEST,
-                content={"message": "TOTP code is required"}
-            )
-
-        try:
-            TotpFactory.verify(user.code, userdb.totp)
-        except MalformedTokenError as err:
-            return JSONResponse(
-                status_code=status.HTTP_400_BAD_REQUEST,
-                content={"message": str(err)}
-            )
-        except TokenError as err:
-            return JSONResponse(
-                status_code=status.HTTP_400_BAD_REQUEST,
-                content={"message": str(err)}
-            )
-
     data = {
         "id": userdb.id,
-        "scopes": [userdb.role],
+        "scopes": ["auth"],
     }
 
     access_token = create_access_token(data=data)
@@ -115,14 +99,22 @@ async def login(
 )
 async def get_reset_password(
     db: Annotated[AsyncSession, Depends(get_db)],
+    ip: Annotated[str, Depends(get_ip)],
     item: ResetPassword,
     bg: background.BackgroundTasks,
 ):
     """
     Reset password
     """
+    email = await aredis.get(f"IP:EMAIL:{ip}")
+    if not email:
+        return JSONResponse(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            content={"message": "link expired"},
+        )
+
     stmt = select(User).filter(
-        User.email == item.email,
+        User.email == email.decode('utf-8'),
         User.role != "user",
     )
     user = await db.execute(stmt)
@@ -134,22 +126,16 @@ async def get_reset_password(
             content={"message": "User not found"},
         )
 
-    if not await aredis.exists(f"EMAIL:{user.email}"):
+    if user.password == item.password.get_secret_value():
         return JSONResponse(
             status_code=status.HTTP_400_BAD_REQUEST,
-            content={"message": "Code expired"},
-        )
-
-    code = await aredis.get(f"EMAIL:{user.email}")
-    if code.decode('utf-8') != item.code:
-        return JSONResponse(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            content={"message": "Invalid code"},
+            content={"message": "New password is the same as old password"},
         )
 
     hashed_password = get_password_hash(item.password.get_secret_value())
     user.password = hashed_password
     await db.commit()
+    await aredis.delete(f"IP:EMAIL:{ip}")
 
     bg.add_task(
         send_mail,
@@ -188,13 +174,17 @@ async def send_reset_password(
             content={"message": "Email is not valid"},
         )
 
-    code = random.randint(100000, 999999)
-    await aredis.set(f"EMAIL:{user.email}", code, ex=300)
+    code = secrets.token_urlsafe(16)
+    await aredis.set(f"EMAIL:{code}", user.email, ex=300)
 
     bg.add_task(
         send_mail,
-        "Password Reset",
-        "Your password has been reset, your code is: " + str(code),
+        "Восстановление доступа",
+        (
+            f"Здравствуйте, {user.firstname} !"
+            "Перейдите по ссылке, чтобы сбросить пароль для вашей учетной записи на платформе BINGO :"
+            f" {settings.web_app_url}/reset-password/{code}"
+        ),
         user.email,
     )
 
@@ -215,7 +205,8 @@ async def logout(
         Role.GLOBAL_ADMIN.value,
         Role.LOCAL_ADMIN.value,
         Role.FINANCIER.value,
-        Role.SUPPORT.value
+        Role.SUPPORT.value,
+        "auth"
     ])],
 ):
     """
@@ -241,7 +232,8 @@ async def get_totp(
         Role.GLOBAL_ADMIN.value,
         Role.LOCAL_ADMIN.value,
         Role.FINANCIER.value,
-        Role.SUPPORT.value
+        Role.SUPPORT.value,
+        "auth"
     ])],
 ):
     """
@@ -259,7 +251,8 @@ async def get_totp(
         headers={
             "Content-Type": "application/json",
             "Accept": "application/json"
-        }
+        },
+        timeout=5
     )
 
     admin.totp = totp.to_json()
@@ -278,7 +271,6 @@ async def get_totp(
 
 @admin.post(
     "/totp",
-    include_in_schema=False,
     responses={
         400: {"model": BadResponse},
     },
@@ -291,7 +283,8 @@ async def verify_totp(
         Role.GLOBAL_ADMIN.value,
         Role.LOCAL_ADMIN.value,
         Role.FINANCIER.value,
-        Role.SUPPORT.value
+        Role.SUPPORT.value,
+        "auth"
     ])]
 ):
     """
@@ -310,4 +303,49 @@ async def verify_totp(
             content={"message": str(err)}
         )
 
-    return JSONResponse(status_code=status.HTTP_200_OK, content="OK")
+    data = {
+        "id": admin.id,
+        "scopes": [admin.role],
+    }
+
+    access_token = create_access_token(data=data)
+
+    await aredis.set(
+        f"TOKEN:ADMINS:{admin.id}",
+        access_token,
+        ex=ACCESS_TOKEN_EXPIRE_MINUTES
+    )
+
+    return JSONResponse(
+        status_code=200,
+        content={"access_token": access_token, "token_type": "bearer"}
+    )
+
+
+@admin.post(
+    "/verify/link",
+    include_in_schema=False,
+    responses={
+        400: {"model": BadResponse},
+    },
+)
+async def verify_link(
+    ip: Annotated[str, Depends(get_ip)],
+    item: VerifyLink,
+):
+    """
+    Verify link
+    """
+    if not await aredis.exists(f"EMAIL:{item.code}"):
+        return JSONResponse(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            content={"message": "link expired"},
+        )
+
+    await aredis.set(f"IP:EMAIL:{ip}", item.email, ex=300)
+    await aredis.delete(f"EMAIL:{item.code}")
+
+    return JSONResponse(
+        status_code=status.HTTP_200_OK,
+        content={"message": "OK"},
+    )
