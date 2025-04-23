@@ -1,7 +1,7 @@
 import secrets
 from typing import Annotated
 
-from fastapi import Depends, Security, background, status, Response, Request
+from fastapi import Depends, Security, background, status, Response
 from fastapi.responses import JSONResponse
 from httpx import AsyncClient
 from passlib.exc import MalformedTokenError, TokenError
@@ -276,6 +276,7 @@ async def get_totp(
     },
 )
 async def verify_totp(
+    db: Annotated[AsyncSession, Depends(get_db)],
     item: Totp,
     admin: Annotated[User, Security(get_admin, scopes=[
         Role.SUPER_ADMIN.value,
@@ -290,6 +291,12 @@ async def verify_totp(
     """
     Verify TOTP
     """
+    if admin.totp and admin.verified:
+        return JSONResponse(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            content={"message": "TOTP already verified"}
+        )
+
     try:
         TotpFactory.verify(item.code, admin.totp)
     except MalformedTokenError as err:
@@ -302,6 +309,10 @@ async def verify_totp(
             status_code=status.HTTP_400_BAD_REQUEST,
             content={"message": str(err)}
         )
+
+    admin.verified = True
+    await db.merge(admin)
+    await db.commit()
 
     data = {
         "id": admin.id,

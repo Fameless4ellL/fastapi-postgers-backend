@@ -30,7 +30,8 @@ async def get_profile(
         Role.GLOBAL_ADMIN.value,
         Role.LOCAL_ADMIN.value,
         Role.FINANCIER.value,
-        Role.SUPPORT.value
+        Role.SUPPORT.value,
+        'auth'
     ])],
 
 ):
@@ -59,6 +60,7 @@ async def get_profile(
         "email": user.email,
         "role": user.role,
         "active": user.active,
+        "twofa": bool(user.verified),
         "kyc": user.kyc,
         "avatar": url_for('static/avatars', filename=user.avatar_v1.name) if user.avatar_v1 else None,
         "document": documents,

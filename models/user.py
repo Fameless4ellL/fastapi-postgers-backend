@@ -52,6 +52,7 @@ class User(Base):
     avatar_v1: Mapped[FileType] = Column(FileType(storage=FileSystemStorage(path="/app/static/avatars")))
 
     totp: Mapped[str] = Column(String(256), nullable=True, default=TotpFactory.new().to_json())
+    verified: Mapped[bool] = Column(Boolean, default=False)
 
     referral_id: Mapped[Union[str, None]] = Column(Integer, ForeignKey('referral_links.id'), nullable=True)
 

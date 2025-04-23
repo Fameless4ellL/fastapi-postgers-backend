@@ -660,6 +660,7 @@ class Profile(BaseAdmin):
     role: str
     phone_number: Optional[str] = None
     kyc: Optional[bool] = None
+    twofa: bool = False
     active: bool
     avatar: Optional[str] = None
     document: Optional[list[str]] = []
