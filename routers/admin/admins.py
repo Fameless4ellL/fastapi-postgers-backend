@@ -106,6 +106,10 @@ async def get_admin_list(
         roles = [role.label for role in item.role]
         stmt = stmt.filter(User.role.in_(roles))
 
+    if item.status:
+        statuss = [_status.label for _status in item.status]
+        stmt = stmt.filter(User.active.in_(statuss))
+
     if item.countries:
         stmt = stmt.filter(User.country.in_(item.countries))
 
