@@ -134,6 +134,7 @@ async def get_reset_password(
 
     hashed_password = get_password_hash(item.password.get_secret_value())
     user.password = hashed_password
+    user.verified = False
     await db.commit()
     await aredis.delete(f"IP:EMAIL:{ip}")
 
