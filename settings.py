@@ -1,5 +1,4 @@
 from pydantic_settings import BaseSettings
-from passlib.totp import generate_secret
 
 
 class Email(BaseSettings):
@@ -35,7 +34,7 @@ class Settings(BaseSettings):
     private_key: str = "54c302fd650d7cbb6afb8b4644a79fbb3a1177e8502d6c1b2365c8cbb97c468a"
 
     """2FA"""
-    twofa_secret: str = generate_secret()
+    twofa_secret: str = "xA1BajGnTjd8yhXIIfvtzKBGvtim7NFJsSYjH5ZL"
 
 
 class AWS(BaseSettings):
