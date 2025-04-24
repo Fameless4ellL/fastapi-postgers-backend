@@ -184,7 +184,7 @@ async def send_reset_password(
         (
             f"Здравствуйте, {user.firstname} !"
             "Перейдите по ссылке, чтобы сбросить пароль для вашей учетной записи на платформе BINGO :"
-            f" {settings.web_app_url}/reset-password/{code}"
+            f" {settings.web_app_url}/reset-password/{ik8}"
         ),
         user.email,
     )
@@ -337,7 +337,6 @@ async def verify_totp(
 
 @admin.post(
     "/verify/link",
-    include_in_schema=False,
     responses={
         400: {"model": BadResponse},
     },
