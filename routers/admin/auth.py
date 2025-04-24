@@ -239,6 +239,12 @@ async def get_totp(
     """
     Get TOTP secret
     """
+    if admin.verified:
+        return JSONResponse(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            content={"message": "TOTP already verified"}
+        )
+
     totp: TOTP = TotpFactory.new()
 
     # get image from url
