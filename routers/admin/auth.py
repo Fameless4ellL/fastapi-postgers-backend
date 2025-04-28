@@ -184,7 +184,7 @@ async def send_reset_password(
         (
             f"Здравствуйте, {user.firstname} !"
             "Перейдите по ссылке, чтобы сбросить пароль для вашей учетной записи на платформе BINGO :"
-            f" {settings.web_app_url}/reset-password/{ik8}"
+            f" {settings.web_app_url}/reset-password/{code}"
         ),
         user.email,
     )
@@ -354,7 +354,8 @@ async def verify_link(
             content={"message": "link expired"},
         )
 
-    await aredis.set(f"IP:EMAIL:{ip}", item.email, ex=300)
+    email = aredis.get(f"EMAIL:{item.code}")
+    await aredis.set(f"IP:EMAIL:{ip}", email, ex=300)
     await aredis.delete(f"EMAIL:{item.code}")
 
     return JSONResponse(
