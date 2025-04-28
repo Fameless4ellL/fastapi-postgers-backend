@@ -354,8 +354,8 @@ async def verify_link(
             content={"message": "link expired"},
         )
 
-    email = aredis.get(f"EMAIL:{item.code}")
-    await aredis.set(f"IP:EMAIL:{ip}", email, ex=300)
+    email = await aredis.get(f"EMAIL:{item.code}")
+    await aredis.set(f"IP:EMAIL:{ip}", email.decode('utf-8'), ex=300)
     await aredis.delete(f"EMAIL:{item.code}")
 
     return JSONResponse(
