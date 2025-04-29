@@ -176,7 +176,7 @@ async def send_reset_password(
         )
 
     code = secrets.token_urlsafe(16)
-    await aredis.set(f"EMAIL:{code}", user.email, ex=300)
+    await aredis.set(f"EMAIL:{code}", user.email, ex=60 * 15)
 
     bg.add_task(
         send_mail,
@@ -355,8 +355,8 @@ async def verify_link(
         )
 
     email = await aredis.get(f"EMAIL:{item.code}")
-    await aredis.set(f"IP:EMAIL:{ip}", email.decode('utf-8'), ex=300)
-    await aredis.delete(f"EMAIL:{item.code}")
+    await aredis.set(f"IP:EMAIL:{ip}", email.decode('utf-8'), ex=60 * 10)
+    # await aredis.delete(f"EMAIL:{item.code}")
 
     return JSONResponse(
         status_code=status.HTTP_200_OK,
