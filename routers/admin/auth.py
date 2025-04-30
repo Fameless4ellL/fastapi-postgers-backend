@@ -97,7 +97,7 @@ async def login(
         400: {"model": BadResponse},
     },
 )
-async def get_reset_password(
+async def set_reset_password(
     db: Annotated[AsyncSession, Depends(get_db)],
     ip: Annotated[str, Depends(get_ip)],
     item: ResetPassword,
@@ -146,6 +146,22 @@ async def get_reset_password(
     )
 
     return JSONResponse(status_code=status.HTTP_200_OK, content="OK")
+
+
+@admin.post(
+    "/registration",
+    responses={
+        400: {"model": BadResponse},
+    },
+)
+async def set_new_user_password(
+    db: Annotated[AsyncSession, Depends(get_db)],
+    ip: Annotated[str, Depends(get_ip)],
+    item: ResetPassword,
+    bg: background.BackgroundTasks,
+):
+    response = await set_reset_password(db, ip, item, bg)
+    return response
 
 
 @admin.post(
