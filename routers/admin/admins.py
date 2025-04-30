@@ -32,6 +32,7 @@ from schemes.admin import (
     Profile, AdminRoles
 )
 from schemes.base import BadResponse, JsonForm
+from settings import settings
 
 
 @admin.get(
@@ -294,7 +295,7 @@ async def create_admin(
         send_mail,
         "New Admin",
         f"New admin {new_admin.username} has been created. your code is {code}",
-        new_admin.email,
+        f" {settings.web_app_url}/registration/{code}"
     )
 
     return JSONResponse(
