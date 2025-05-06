@@ -88,14 +88,14 @@ get_crud_router(
 async def get_admin_list(
     db: Annotated[AsyncSession, Depends(get_db)],
     item: Annotated[AdminFilter, Depends(AdminFilter)],
-    token: Annotated[Token, Security(
-        get_admin_token,
-        scopes=[
-            Role.SUPER_ADMIN.value,
-            Role.ADMIN.value,
-            Role.GLOBAL_ADMIN.value,
-        ]
-    )],
+    # token: Annotated[Token, Security(
+    #     get_admin_token,
+    #     scopes=[
+    #         Role.SUPER_ADMIN.value,
+    #         Role.ADMIN.value,
+    #         Role.GLOBAL_ADMIN.value,
+    #     ]
+    # )],
     offset: int = 0,
     limit: int = 10,
 ):
@@ -128,7 +128,7 @@ async def get_admin_list(
     count = await db.execute(stmt.with_only_columns(func.count(User.id)))
     count = count.scalar()
 
-    scope = next(iter(token.scopes), None)
+    # scope = next(iter(token.scopes), None)
 
     data = [
         {
@@ -137,8 +137,8 @@ async def get_admin_list(
             "fullname": f"{a.firstname} {a.lastname}",
             "active": a.active,
             "telegram": a.telegram,
-            "phone_number": a.phone_number if scope == Role.GLOBAL_ADMIN.value else None,
-            "email": a.email if scope == Role.GLOBAL_ADMIN.value else None,
+            # "phone_number": a.phone_number if scope == Role.GLOBAL_ADMIN.value else None,
+            # "email": a.email if scope == Role.GLOBAL_ADMIN.value else None,
             "role": a.role,
             "country": a.country,
         }
@@ -319,7 +319,7 @@ async def update_admin(
     db: Annotated[AsyncSession, Depends(get_db)],
     item: Annotated[AdminCreate, JsonForm()],
     admin_id: Annotated[int, Path()],
-    avatar: Union[UploadFile, None] = None,
+    avatar: Union[UploadFile, str, None] = None,
     documents: Union[list[UploadFile], None] = None
 ):
     """
@@ -355,7 +355,11 @@ async def update_admin(
     for key, value in item.model_dump().items():
         setattr(admin, key, value)
 
-    if avatar:
+    if (
+        avatar
+        and admin.avatar_v1
+        and admin.avatar_v1.filename != avatar.filename
+    ):
         avatar.filename = f"{admin.id}_{avatar.filename}"
         admin.avatar_v1 = avatar
 

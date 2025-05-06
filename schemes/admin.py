@@ -1,7 +1,6 @@
 import pycountry
 from dataclasses import dataclass
 from secrets import token_urlsafe
-from pydantic_extra_types.phone_numbers import PhoneNumber
 from phonenumbers import parse, geocoder
 from pydantic import (
     BaseModel,
@@ -23,7 +22,7 @@ from pydantic_extra_types.country import CountryAlpha3
 from fastapi import Query, UploadFile
 
 from models.other import GameStatus, GameType, GameView, JackpotType, RepeatType
-from models.user import BalanceChangeHistory
+from models.user import BalanceChangeHistory, Role
 from routers.utils import get_currency_by_id, get_first_currency, url_for
 from schemes.base import Country, Country_by_name, ModPhoneNumber
 from settings import settings
@@ -152,12 +151,24 @@ class BalanceBase(BaseModel):
     balance: float
 
 
+class AdminRoles(MultiValueStrEnum):
+    SUPER_ADMIN = "Super Admin", "super_admin"
+    ADMIN = "Admin", "admin"
+    GLOBAL_ADMIN = "Global Admin", "global_admin"
+    LOCAL_ADMIN = "Local Admin", "local_admin"
+    SUPPORT = "Support manager", "support"
+    FINANCE = "Financier", "financier"
+    SMM = "SMM", "smm"
+
+
 class Admin(User):
-    email: Optional[str]
+    username: Optional[str] = None
+    email: Optional[str] = None
     fullname: str
     active: bool
-    telegram: Optional[str]
-    role: str
+    telegram: Optional[str] = None
+    role: Annotated[Role, AfterValidator(lambda v: AdminRoles[v.name])]
+
 
 
 class Admins(BaseModel):
@@ -679,19 +690,9 @@ class ReferralUsersList(BaseModel):
     count: int = 0
 
 
-class AdminRoles(MultiValueStrEnum):
-    SUPER_ADMIN = "Super Admin", "super_admin"
-    ADMIN = "Admin", "admin"
-    GLOBAL_ADMIN = "Global Admin", "global_admin"
-    LOCAL_ADMIN = "Local Admin", "local_admin"
-    SUPPORT = "Support manager", "support"
-    FINANCE = "Financier", "financier"
-    SMM = "SMM", "smm"
-
-
 class AdminStatus(MultiValueStrEnum):
     ACTIVE = "Active", False
-    INACTIVE = "Inactive", True
+    INACTIVE = "Removed", True
 
 
 @dataclass
@@ -706,9 +707,9 @@ class AdminCreate(BaseAdmin):
     username: str
     email: str
     phone_number: ModPhoneNumber
-    role: AdminRoles
+    role: Role
     telegram: Optional[str] = None
-    country: CountryAlpha3
+    country: Optional[CountryAlpha3] = None
 
     @model_serializer
     def ser_model(self):
