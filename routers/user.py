@@ -235,8 +235,7 @@ async def withdraw(
 
     await db.commit()
 
-    q.enqueue_at(
-        item.datetime,
+    q.enqueue(
         getattr(worker, "withdraw"),
         history.id,
         job_id=f"withdraw_{history.id}",
