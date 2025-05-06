@@ -19,7 +19,7 @@ from routers import public
 from routers.utils import get_user
 from schemes.base import BadResponse
 from schemes.game import BuyInstaTicket
-from schemes.instabingo import InstaBingoInfo
+from schemes.instabingo import InstaBingoInfo, InstaBingoResults
 from settings import settings
 from utils.workers import deposit, withdraw
 from utils.rng import get_random
@@ -327,10 +327,11 @@ async def buy_tickets(
 
     return JSONResponse(
         status_code=status.HTTP_201_CREATED,
-        content={
+        content=InstaBingoResults(**{
             "won": won,
             "gen": [number for number, _, _, in win_numbers],
-            "won_amount": str(ticket.amount),
+            "won_amount": ticket.amount,
+            "winnings": game.winnings,
             "numbers": item.numbers
-        }
+        }).model_dump(mode="json")
     )

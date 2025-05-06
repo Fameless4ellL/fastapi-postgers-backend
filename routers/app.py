@@ -212,7 +212,8 @@ async def read_game(
         "currency": game.currency.code if game.currency else None,
         "status": game.status.value,
         "image": url_for("static", path=game.image),
-        "game_type": game.game_type.value,
+        "game_type": game.game_type,
+        "kind": game.kind,
         "limit_by_ticket": game.limit_by_ticket,
         "min_ticket_count": game.min_ticket_count,
         "max_limit_grid": game.max_limit_grid,
@@ -224,7 +225,7 @@ async def read_game(
 
     return JSONResponse(
         status_code=status.HTTP_200_OK,
-        content=GameInstanceModel(**data).model_dump()
+        content=GameInstanceModel(**data).model_dump(mode='json')
     )
 
 

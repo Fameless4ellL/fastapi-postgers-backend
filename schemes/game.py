@@ -3,6 +3,7 @@ from pydantic import BaseModel, Field, AfterValidator, field_validator
 from annotated_types import Len
 from enum import Enum
 
+from models import GameType, GameView
 
 CommaList = Annotated[str, AfterValidator(lambda x: set(x.split(",")))]
 
@@ -41,7 +42,8 @@ class Game(BaseModel):
 
 class GameInstance(Game):
     description: str
-    game_type: str
+    game_type: GameType
+    kind: GameView
     limit_by_ticket: int
     min_ticket_count: int
     max_limit_grid: int
