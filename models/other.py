@@ -149,6 +149,7 @@ class InstaBingo(Base):
 
     currency = relationship("Currency", uselist=False)
 
+
 class Number(Base):
     __tablename__ = "numbers"
 
@@ -227,3 +228,4 @@ class Ticket(Base):
     currency = relationship("Currency", uselist=False)
     jackpot = relationship("Jackpot", back_populates="tickets", uselist=False)
     game = relationship("Game", back_populates="tickets", uselist=False)
+

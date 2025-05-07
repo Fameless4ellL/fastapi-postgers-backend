@@ -1,4 +1,5 @@
 import random
+from datetime import datetime
 
 from fastapi.security import OAuth2PasswordRequestForm
 from phonenumbers import parse
@@ -79,6 +80,7 @@ async def register(
             # password=hashed_password,
             username=user.username,
             country=user.country,
+            last_session=datetime.now()
         )
         db.add(user_in_db)
 

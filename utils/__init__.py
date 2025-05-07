@@ -23,6 +23,22 @@ class FuncRegister:
     def __contains__(self, item):
         return item in self.__dict__.keys()
 
+    @staticmethod
+    def deposit(history_id: int, change_type: str = 'jackpot', counter: int = 0):
+        """
+        See the related method for more details:
+        utils/workers/transaction.py
+        """
+        pass
+
+    @staticmethod
+    def withdraw(history_id: int, counter: int = 0):
+        """
+        See the related method for more details:
+        utils/workers/transaction.py
+        """
+        pass
+
 
 worker = FuncRegister()
 

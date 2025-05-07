@@ -57,6 +57,7 @@ class User(Base):
     referral_id: Mapped[Union[str, None]] = Column(Integer, ForeignKey('referral_links.id'), nullable=True)
 
     created_at: Mapped[datetime.datetime] = Column(DateTime, default=datetime.datetime.now)
+    last_session: Mapped[Union[datetime.datetime, None]] = Column(DateTime, nullable=True)
     updated_at: Mapped[datetime.datetime] = Column(DateTime, default=datetime.datetime.now, onupdate=datetime.datetime.now)
 
 

@@ -1,6 +1,7 @@
 import datetime
 import decimal
 from enum import Enum
+from typing import Union
 
 from sqlalchemy.orm import Mapped
 
@@ -25,6 +26,7 @@ class Action(Enum):
     WITHDRAW = 'withdraw'
     TRANSACTION = 'transaction'
     UPDATE = 'update'
+    OTHER = 'other'
     ADMIN_LOGIN = 'admin_login'
     ADMIN_LOGOUT = 'admin_logout'
     ADMIN_CREATE = 'admin_create'
@@ -76,3 +78,24 @@ class UserActionLog(LogsBase):
     action: Mapped[Action] = Column(EnumColumn(Action), index=True)
     request_id: Mapped[int] = Column(Integer, ForeignKey('request_logs.id', ondelete="CASCADE"))
     timestamp: Mapped[datetime.datetime] = Column(DateTime, default=datetime.datetime.now)
+
+
+class Metric(LogsBase):
+    __tablename__ = 'metrics'
+
+    class MetricType(Enum):
+        TOTAL_SOLD_TICKETS = "total_sold_tickets"
+        ARPU = "arpu"
+        ARPPU = "arppu"
+        LTV = "ltv"
+        GGR = "ggr"
+        FTD = "ftd"
+        CPA = "cpa"
+        DAU = "dau"
+        AVG_SESSION_TIME = "session_time"
+
+    id: Mapped[int] = Column(Integer, primary_key=True, index=True)
+    currency_id: Mapped[Union[int, None]] = Column(Integer, index=True)
+    name: Mapped[str] = Column(EnumColumn(MetricType), index=True)
+    value: Mapped[decimal.Decimal] = Column(DECIMAL(10, 2))
+    created: Mapped[datetime.datetime] = Column(DateTime, default=datetime.datetime.now)

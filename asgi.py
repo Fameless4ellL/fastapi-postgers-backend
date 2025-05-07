@@ -126,7 +126,7 @@ async def logger(
             tags = getattr(route, "tags", [])
             action = next((tag for tag in tags if tag in actions), None)
             if not action:
-                continue
+                action = Action.OTHER
 
             token = None
 
@@ -144,7 +144,9 @@ async def logger(
                 continue
 
             user_id = payload.get("id", "")
-            if not user_id:
+            scope = payload.get("scopes", [])
+
+            if not user_id or scope:
                 continue
 
             user_action_log = UserActionLog(
