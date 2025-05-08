@@ -152,6 +152,9 @@ class BalanceBase(BaseModel):
 
 
 class AdminRoles(MultiValueStrEnum):
+    """
+    alias List of admin roles
+    """
     SUPER_ADMIN = "Super Administrator", "super_admin"
     ADMIN = "Administrator", "admin"
     GLOBAL_ADMIN = "Global Administrator", "global_admin"
@@ -707,7 +710,7 @@ class AdminCreate(BaseAdmin):
     username: str
     email: str
     phone_number: ModPhoneNumber
-    role: Role
+    role: AdminRoles
     telegram: Optional[str] = None
     country: Optional[CountryAlpha3] = None
 

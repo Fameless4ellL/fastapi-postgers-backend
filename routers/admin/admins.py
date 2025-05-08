@@ -1,7 +1,7 @@
 import random
 from typing import Annotated, Union
 
-from fastapi import Depends, Path, background, status, Security, UploadFile
+from fastapi import Depends, Path, background, status, Security, UploadFile, File
 from fastapi.responses import JSONResponse
 from rq.job import Job
 from sqlalchemy import func, select, or_
@@ -227,7 +227,7 @@ async def create_admin(
             Role.GLOBAL_ADMIN.value,
         ]
     )],
-    item: Annotated[AdminCreate, JsonForm],
+    item: Annotated[AdminCreate, JsonForm()],
     bg: background.BackgroundTasks,
     avatar: UploadFile,
     documents: list[UploadFile],
@@ -319,7 +319,7 @@ async def update_admin(
     db: Annotated[AsyncSession, Depends(get_db)],
     item: Annotated[AdminCreate, JsonForm()],
     admin_id: Annotated[int, Path()],
-    avatar: Union[UploadFile, str, None] = None,
+    avatar: Union[str, UploadFile, None] = None,
     documents: Union[list[UploadFile], None] = None
 ):
     """
@@ -338,8 +338,8 @@ async def update_admin(
 
     if item.phone_number:
         stmt = stmt.filter(User.phone_number == item.phone_number)
-    if item.telegram_id:
-        stmt = stmt.filter(User.telegram_id != item.telegram_id)
+    if item.telegram:
+        stmt = stmt.filter(User.telegram != item.telegram)
     if item.username:
         stmt = stmt.filter(User.username != item.username)
 
@@ -355,11 +355,16 @@ async def update_admin(
     for key, value in item.model_dump().items():
         setattr(admin, key, value)
 
-    if (
-        avatar
-        and admin.avatar_v1
-        and admin.avatar_v1.filename != avatar.filename
-    ):
+    if avatar is None:
+        admin.avatar_v1 = None
+
+    if isinstance(avatar, UploadFile):
+        if not avatar.content_type.startswith("image"):
+            return JSONResponse(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                content="Invalid file type"
+            )
+
         avatar.filename = f"{admin.id}_{avatar.filename}"
         admin.avatar_v1 = avatar
 
