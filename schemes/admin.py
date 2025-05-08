@@ -668,7 +668,7 @@ class Profile(BaseAdmin):
     language_code: Optional[str] = None
     country: Country
     email: Optional[str] = None
-    role: str
+    role: Annotated[Role, AfterValidator(lambda v: AdminRoles[v.name])]
     phone_number: Optional[str] = None
     kyc: Optional[bool] = None
     twofa: bool = False
