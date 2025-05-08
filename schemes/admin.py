@@ -152,10 +152,10 @@ class BalanceBase(BaseModel):
 
 
 class AdminRoles(MultiValueStrEnum):
-    SUPER_ADMIN = "Super Admin", "super_admin"
-    ADMIN = "Admin", "admin"
-    GLOBAL_ADMIN = "Global Admin", "global_admin"
-    LOCAL_ADMIN = "Local Admin", "local_admin"
+    SUPER_ADMIN = "Super Administrator", "super_admin"
+    ADMIN = "Administrator", "admin"
+    GLOBAL_ADMIN = "Global Administrator", "global_admin"
+    LOCAL_ADMIN = "Local Administrator", "local_admin"
     SUPPORT = "Support manager", "support"
     FINANCE = "Financier", "financier"
     SMM = "SMM", "smm"
