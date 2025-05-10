@@ -112,3 +112,8 @@ async def transfer(
     await db.commit()
 
     return {"status": "ok"}
+
+
+@_cron.post("/hourly")
+async def hourly():
+    q.enqueue(worker.calculate_metrics)

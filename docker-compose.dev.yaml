@@ -91,6 +91,14 @@ services:
       - rng
     restart: on-failure
 
+  cronjobs:
+    restart: unless-stopped
+    image: tigpt/cronjobs
+    depends_on:
+      - api
+    volumes:
+      - ./cron:/etc/crontabs/root
+
   blocker:
     build:
       context: .

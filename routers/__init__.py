@@ -31,7 +31,7 @@ _cron = APIRouter(
     prefix="/v1/cron",
     tags=["cron"],
     dependencies=[Depends(cron_key)],
-    include_in_schema=True
+    include_in_schema=settings.debug
 )
 
 

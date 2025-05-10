@@ -1,4 +1,6 @@
+from datetime import datetime
 from functools import wraps
+from typing import Optional
 
 
 class FuncRegister:
@@ -36,6 +38,14 @@ class FuncRegister:
         """
         See the related method for more details:
         utils/workers/transaction.py
+        """
+        pass
+
+    @staticmethod
+    def calculate_metrics(date: Optional[datetime] = None):
+        """
+        See the related method for more details:
+        utils/workers/cron.py
         """
         pass
 

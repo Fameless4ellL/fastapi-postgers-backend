@@ -1,0 +1,1 @@
+0 * * * * curl -v http://api:8000/v1/cron/hourly?key=thisisatest > /dev/stdout

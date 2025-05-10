@@ -447,3 +447,4 @@ from .kyc import *
 from .profile import *
 from .jackpots import *
 from .lobby import *
+from .dashboard import *

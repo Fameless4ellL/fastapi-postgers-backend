@@ -77,6 +77,7 @@ class UserActionLog(LogsBase):
     user_id: Mapped[int] = Column(Integer, index=True)
     action: Mapped[Action] = Column(EnumColumn(Action), index=True)
     request_id: Mapped[int] = Column(Integer, ForeignKey('request_logs.id', ondelete="CASCADE"))
+    country: Mapped[Union[str, None]] = Column(String(32), index=True)
     timestamp: Mapped[datetime.datetime] = Column(DateTime, default=datetime.datetime.now)
 
 
@@ -96,6 +97,7 @@ class Metric(LogsBase):
 
     id: Mapped[int] = Column(Integer, primary_key=True, index=True)
     currency_id: Mapped[Union[int, None]] = Column(Integer, index=True)
-    name: Mapped[str] = Column(EnumColumn(MetricType), index=True)
+    country: Mapped[Union[str, None]] = Column(String(32), index=True)
+    name: Mapped[str] = Column(EnumColumn(MetricType))
     value: Mapped[decimal.Decimal] = Column(DECIMAL(10, 2))
     created: Mapped[datetime.datetime] = Column(DateTime, default=datetime.datetime.now)
