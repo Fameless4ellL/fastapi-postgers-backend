@@ -14,7 +14,8 @@ from sqlalchemy import (
     String,
     JSON,
     Enum as EnumColumn,
-    ForeignKey
+    ForeignKey,
+    Boolean
 )
 
 
@@ -101,3 +102,13 @@ class Metric(LogsBase):
     name: Mapped[str] = Column(EnumColumn(MetricType))
     value: Mapped[decimal.Decimal] = Column(DECIMAL(10, 2))
     created: Mapped[datetime.datetime] = Column(DateTime, default=datetime.datetime.now)
+
+
+class HiddenMetric(LogsBase):
+    __tablename__ = 'hidden_metrics'
+
+    id: Mapped[int] = Column(Integer, primary_key=True, index=True)
+    user_id: Mapped[int] = Column(Integer, index=True)
+    metric_name: Mapped[str] = Column(EnumColumn(Metric.MetricType), index=True)
+    is_hidden: Mapped[bool] = Column(Boolean, default=False)
+    created_at: Mapped[datetime.datetime] = Column(DateTime, default=datetime.datetime.now)

@@ -8,10 +8,10 @@ from pydantic import BaseModel, ConfigDict
 from sqlalchemy import select, func
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from models import get_logs_db, Metric
+from models import get_logs_db, Metric, HiddenMetric
 from models.user import Role
 from routers import admin
-from routers.utils import get_admin_token
+from routers.utils import get_admin_token, Token
 from schemes.admin import DatePicker, Countries
 from schemes.base import BadResponse
 from utils.datastructure import MultiValueStrEnum
@@ -40,25 +40,27 @@ class Dashboard(BaseModel):
     metrics: list[dict[Metric.MetricType, Union[dict[datetime, float]], float]]
 
 
+class UpdateMetricVisibilityRequest(BaseModel):
+    metric: Metric.MetricType
+    is_hidden: bool
+
 
 @admin.get(
     "/dashboard",
-    dependencies=[Security(
-        get_admin_token,
-        scopes=[
-            Role.SUPER_ADMIN.value,
-            Role.ADMIN.value,
-            Role.GLOBAL_ADMIN.value,
-            Role.LOCAL_ADMIN.value,
-            Role.FINANCIER.value,
-            Role.SUPPORT.value
-        ])],
     responses={
         400: {"model": BadResponse},
         200: {"model": Dashboard},
     },
 )
 async def dashboard(
+    token: Annotated[Token, Security(get_admin_token, scopes=[
+        Role.GLOBAL_ADMIN.value,
+        Role.ADMIN.value,
+        Role.SUPER_ADMIN.value,
+        Role.LOCAL_ADMIN.value,
+        Role.FINANCIER.value,
+        Role.SUPPORT.value
+    ]),],
     db: Annotated[AsyncSession, Depends(get_logs_db)],
     item: Annotated[DashboardFilter, Depends(DashboardFilter)],
 ):
@@ -70,6 +72,13 @@ async def dashboard(
             Metric.name,
             func.date_trunc(item.period.label.trunc, Metric.created).label('period'),
             func.sum(Metric.value).label('total_value')
+        )
+        .outerjoin(
+            HiddenMetric,
+            (HiddenMetric.metric_name == Metric.name) & (HiddenMetric.user_id == token.id)
+        )
+        .where(
+            (HiddenMetric.is_hidden.is_(None)) | (HiddenMetric.is_hidden.is_(False))
         )
         .group_by(Metric.name, 'period')
         .order_by('period')
@@ -113,4 +122,50 @@ async def dashboard(
         content={
             "metrics": metrics_dict
         }
+    )
+
+
+@admin.post(
+    "/dashboard/metrics/visibility",
+    responses={
+        400: {"model": BadResponse},
+        200: {"description": "Metric visibility updated successfully"},
+    },
+)
+async def update_metric_visibility(
+    token: Annotated[Token, Security(get_admin_token, scopes=[
+        Role.GLOBAL_ADMIN.value,
+        Role.ADMIN.value,
+        Role.SUPER_ADMIN.value,
+        Role.LOCAL_ADMIN.value,
+    ])],
+    db: Annotated[AsyncSession, Depends(get_logs_db)],
+    request: UpdateMetricVisibilityRequest,
+):
+    """
+    Update the visibility of a metric for the current user.
+    """
+    hidden_metric = await db.execute(
+        select(HiddenMetric).filter(
+            HiddenMetric.user_id == token.id,
+            HiddenMetric.metric_name == request.metric
+        )
+    )
+    hidden_metric = hidden_metric.scalar()
+
+    if hidden_metric:
+        hidden_metric.is_hidden = request.is_hidden
+    else:
+        hidden_metric = HiddenMetric(
+            user_id=token.id,
+            metric_name=request.metric,
+            is_hidden=request.is_hidden
+        )
+        db.add(hidden_metric)
+
+    await db.commit()
+
+    return JSONResponse(
+        status_code=status.HTTP_200_OK,
+        content={"message": "Metric visibility updated successfully"}
     )
