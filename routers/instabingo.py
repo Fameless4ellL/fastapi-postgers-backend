@@ -47,7 +47,7 @@ async def get_instabingo(
     if not game:
         return JSONResponse(
             status_code=status.HTTP_200_OK,
-            content=InstaBingoInfo().model_dump()
+            content=InstaBingoInfo().model_dump(mode="json")
         )
 
     data = {
