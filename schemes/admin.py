@@ -1,6 +1,11 @@
-import pycountry
 from dataclasses import dataclass
+from datetime import datetime, date
 from secrets import token_urlsafe
+from typing import Optional, Annotated, Any, Union
+
+import pycountry
+import pytz
+from fastapi import Query, UploadFile
 from phonenumbers import parse, geocoder
 from pydantic import (
     BaseModel,
@@ -15,11 +20,7 @@ from pydantic import (
     field_validator,
     EmailStr
 )
-import pytz
-from typing import Optional, Annotated, Any, Union
-from datetime import datetime, date
 from pydantic_extra_types.country import CountryAlpha3
-from fastapi import Query, UploadFile
 
 from models.other import GameStatus, GameType, GameView, JackpotType, RepeatType
 from models.user import BalanceChangeHistory, Role
@@ -37,10 +38,10 @@ Image = Annotated[str, WrapSerializer(get_image)]
 
 
 class Category(MultiValueStrEnum):
-    _5x36 = "5/36", {"limit_by_ticket": 5, "max_limit_grid": 36}
-    _6x45 = "6/45", {"limit_by_ticket": 6, "max_limit_grid": 45}
-    _10x75 = "10/75", {"limit_by_ticket": 10, "max_limit_grid": 75}
-    _15x90 = "15/90", {"limit_by_ticket": 15, "max_limit_grid": 90}
+    _5X36 = "5/36", {"limit_by_ticket": 5, "max_limit_grid": 36}
+    _6X45 = "6/45", {"limit_by_ticket": 6, "max_limit_grid": 45}
+    _10X75 = "10/75", {"limit_by_ticket": 10, "max_limit_grid": 75}
+    _15X90 = "15/90", {"limit_by_ticket": 15, "max_limit_grid": 90}
 
 
 class GameViewType(MultiValueStrEnum):
@@ -171,7 +172,6 @@ class Admin(User):
     active: bool
     telegram: Optional[str] = None
     role: Annotated[Role, AfterValidator(lambda v: AdminRoles[v.name])]
-
 
 
 class Admins(BaseModel):
