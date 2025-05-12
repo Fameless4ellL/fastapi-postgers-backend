@@ -31,7 +31,6 @@ class FuncRegister:
         See the related method for more details:
         utils/workers/transaction.py
         """
-        pass
 
     @staticmethod
     def withdraw(history_id: int, counter: int = 0):
@@ -39,7 +38,6 @@ class FuncRegister:
         See the related method for more details:
         utils/workers/transaction.py
         """
-        pass
 
     @staticmethod
     def calculate_metrics(date: Optional[datetime] = None):
@@ -47,7 +45,6 @@ class FuncRegister:
         See the related method for more details:
         utils/workers/cron.py
         """
-        pass
 
 
 worker = FuncRegister()

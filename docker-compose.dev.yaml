@@ -19,12 +19,14 @@ services:
       - POSTGRES_PASSWORD=postgres
       - POSTGRES_DB=logs
     volumes:
-      - logs-data:/var/lib/logsdb/data
+      - logs-data:/var/lib/postgresql/data
     restart: on-failure
 
   api:
     build:
       context: .
+      args:
+        ENVIRONMENT: ${ENVIRONMENT:-dev}
     command: >
       bash -c 'while !</dev/tcp/db/5432; do sleep 1; done;
       uvicorn asgi:fastapp --port 8000 --host 0.0.0.0 --reload'

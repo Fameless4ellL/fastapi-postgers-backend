@@ -1,19 +1,32 @@
+# Use a smaller base image
 FROM python:3.9-slim
 
-# set work directory
+# Set work directory
 WORKDIR /app
 
-# set env variables
-ENV PYTHONDONTWRITEBYTECODE 1
-ENV PYTHONUNBUFFERED 1
+# Set environment variables to prevent cache files
+ENV PYTHONDONTWRITEBYTECODE=1 \
+    PYTHONUNBUFFERED=1
 
-RUN apt-get update
-RUN apt-get install -y python3-dev gcc libc-dev libffi-dev
-RUN apt-get -y install libpq-dev gcc 
+# Add build argument for environment
+ARG ENVIRONMENT
+ENV ENVIRONMENT=${ENVIRONMENT:-dev}
 
-# install dependencies
-COPY requirements.txt .
-RUN pip install --upgrade pip
-RUN pip install -r requirements.txt
-# copy project
+COPY pyproject.toml poetry.lock ./
+
+
+# Install dependencies only if required
+RUN apt-get update && \
+    apt-get install -y --no-install-recommends \
+        libpq-dev && \
+    pip install --no-cache-dir --upgrade pip && \
+    pip install --no-cache-dir poetry && \
+    poetry config virtualenvs.create false && \
+    poetry install --no-root $(if [ "$ENVIRONMENT" != "dev" ]; then echo "--without dev"; fi) && \
+    apt-get remove -y && \
+    apt-get clean && \
+    rm -rf /var/lib/apt/lists/*
+
+# Copy project files last to optimize caching
 COPY . .
+

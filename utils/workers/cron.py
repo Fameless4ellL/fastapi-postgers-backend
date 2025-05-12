@@ -16,8 +16,8 @@ from models import (
     UserActionLog,
     Currency
 )
-from utils import worker
 from settings import settings
+from utils import worker
 
 
 def yesterday():
