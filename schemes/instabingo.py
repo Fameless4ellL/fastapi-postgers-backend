@@ -4,17 +4,7 @@ from typing import Optional
 from pydantic import BaseModel, Field, computed_field
 
 
-class InstaBingoInfo(BaseModel):
-    id: int = 1
-    price: Decimal = "1"
-    currency: str = "USDT"
-
-
-class InstaBingoResults(BaseModel):
-    won: bool = False
-    gen: list[int]
-    won_amount: Decimal
-    numbers: list[int] = Field(default_factory=list)
+class Winnings(BaseModel):
     winnings: Optional[dict[int, int]] = Field(default_factory=dict, exclude=True)
 
     def get_winnings(self):
@@ -43,3 +33,16 @@ class InstaBingoResults(BaseModel):
     @computed_field
     def x36_40(self) -> int:
         return self.get_winnings().get(36, 1)
+
+
+class InstaBingoInfo(BaseModel, Winnings):
+    id: int = 1
+    price: Decimal = Field(default=Decimal(1))
+    currency: str = "USDT"
+
+
+class InstaBingoResults(BaseModel, Winnings):
+    won: bool = False
+    gen: list[int]
+    won_amount: Decimal
+    numbers: list[int] = Field(default_factory=list)

@@ -53,7 +53,8 @@ async def get_instabingo(
     data = {
         "id": game.id,
         "price": game.price,
-        "currency": game.currency.code if game.currency else ""
+        "currency": game.currency.code if game.currency else "",
+        "winnings": game.winnings,
     }
 
     return JSONResponse(
