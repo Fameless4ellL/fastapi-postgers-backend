@@ -6,8 +6,8 @@ from concurrent.futures import ThreadPoolExecutor
 from datetime import datetime
 
 from typing import Callable
-from globals import redis
-from utils import worker
+from src.globals import redis
+from src.utils import worker
 
 
 logger = logging.getLogger(__name__)
