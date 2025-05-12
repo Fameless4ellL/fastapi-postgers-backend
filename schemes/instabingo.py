@@ -35,13 +35,13 @@ class Winnings(BaseModel):
         return self.get_winnings().get(36, 1)
 
 
-class InstaBingoInfo(BaseModel, Winnings):
+class InstaBingoInfo(Winnings):
     id: int = 1
     price: Decimal = Field(default=Decimal(1))
     currency: str = "USDT"
 
 
-class InstaBingoResults(BaseModel, Winnings):
+class InstaBingoResults(Winnings):
     won: bool = False
     gen: list[int]
     won_amount: Decimal
