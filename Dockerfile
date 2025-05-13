@@ -6,13 +6,10 @@ WORKDIR /app
 
 # Set environment variables to prevent cache files
 ENV PYTHONDONTWRITEBYTECODE=1 \
-    PYTHONUNBUFFERED=1
-
-# environment
-ENV ENVIRONMENT=${ENVIRONMENT:-dev}
+    PYTHONUNBUFFERED=1 \
+    ENVIRONMENT=${ENVIRONMENT:-dev}
 
 COPY pyproject.toml poetry.lock ./
-
 
 # Install dependencies only if required
 RUN apt-get update && \
