@@ -317,7 +317,7 @@ def send_mail(
     to_email: str,
 ):
     msg = MIMEMultipart()
-    msg["From"] = email._from
+    msg["From"] = email.FROM
     msg["To"] = to_email
     msg["subject"] = subject
     msg.attach(MIMEText(body))
@@ -330,7 +330,7 @@ def send_mail(
 
         text = msg.as_string()
 
-        server.sendmail(email._from, to_email, text)
+        server.sendmail(email.FROM, to_email, text)
 
         server.quit()
     except smtplib.SMTPException:

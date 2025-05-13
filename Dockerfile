@@ -8,8 +8,7 @@ WORKDIR /app
 ENV PYTHONDONTWRITEBYTECODE=1 \
     PYTHONUNBUFFERED=1
 
-# Add build argument for environment
-ARG ENVIRONMENT
+# environment
 ENV ENVIRONMENT=${ENVIRONMENT:-dev}
 
 COPY pyproject.toml poetry.lock ./

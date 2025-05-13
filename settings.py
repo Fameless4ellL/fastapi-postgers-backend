@@ -1,8 +1,10 @@
-from pydantic_settings import BaseSettings
+from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
 class Email(BaseSettings):
-    _from: str = "string"
+    model_config = SettingsConfigDict(env_prefix='EMAIL_')
+
+    FROM: str = "string"
     host: str = ""
     port: int = 587
     login: str = ""
@@ -21,7 +23,6 @@ class Settings(BaseSettings):
     admins: list[str] = ["zaurDzass"]
     """Able to see additional logs"""
     debug: bool = True
-    database_url: str = "postgresql+{mode}://postgres:postgres@{database}/postgres"
     """Secret key for JWT token"""
     jwt_secret: str = "thisisatest"
     """Cron key for cron jobs"""
@@ -36,8 +37,15 @@ class Settings(BaseSettings):
     """2FA"""
     twofa_secret: str = "xA1BajGnTjd8yhXIIfvtzKBGvtim7NFJsSYjH5ZL"
 
+    """DB settings"""
+    postgres_user: str = "postgres"
+    postgres_password: str = "postgres"
+    database_url: str = "postgresql+{mode}://{user}:{password}@{database}/postgres"
+
 
 class AWS(BaseSettings):
+    model_config = SettingsConfigDict(env_prefix='AWS_')
+
     access_key: str = "AKIA3RYC6GBNMSHQQLBB"
     secret_key: str = "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"
     region: str = "us-east-1"
