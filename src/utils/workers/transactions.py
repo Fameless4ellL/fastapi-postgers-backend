@@ -2,8 +2,10 @@ import json
 from datetime import datetime, timedelta
 from decimal import Decimal
 from functools import wraps
+
 from sqlalchemy.orm import joinedload
 
+from settings import settings
 from src.globals import q
 from src.models.db import get_sync_db, get_sync_logs_db
 from src.models.log import TransactionLog
@@ -12,10 +14,8 @@ from src.models.other import (
 )
 from src.models.user import Balance, BalanceChangeHistory
 from src.models.user import Wallet
-from settings import settings
 from src.utils import worker
 from src.utils.web3 import transfer
-
 
 
 class TransactionLogError(Exception):

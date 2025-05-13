@@ -1,18 +1,18 @@
-from fastapi import status, Security, Depends
-from fastapi.responses import JSONResponse
 from typing import Annotated
 
+from fastapi import status, Security, Depends
+from fastapi.responses import JSONResponse
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from src.models import get_db
 from src.models.user import Role, User, Document
 from src.routers import admin
-from src.utils.dependencies import get_admin, url_for
+from src.schemes import BadResponse
 from src.schemes import (
     Profile,
 )
-from src.schemes import BadResponse
+from src.utils.dependencies import get_admin, url_for
 
 
 @admin.get(

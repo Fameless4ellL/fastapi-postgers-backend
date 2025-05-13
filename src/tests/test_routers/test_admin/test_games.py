@@ -12,7 +12,7 @@ class TestGames:
     @pytest.mark.parametrize('kind', GameView)
     @pytest.mark.parametrize('date_from', ['2022-01-01'])
     @pytest.mark.parametrize('date_to', ['2022-01-01'])
-    @pytest.mark.parametrize('filter', [None, ''])
+    @pytest.mark.parametrize('_filter', [None, ''])
     async def test_admin_games_is_empty(
         self,
         async_api: AsyncClient,
@@ -22,7 +22,7 @@ class TestGames:
         kind: str,
         date_from: str,
         date_to: str,
-        filter: str,
+        _filter: str,
     ):
         response = await async_api.get(
             "/v1/admin/games",
@@ -35,7 +35,7 @@ class TestGames:
                 "kind": kind.value,
                 "date_from": date_from,
                 "date_to": date_to,
-                "filter": filter,
+                "filter": _filter,
             },
         )
         assert response.status_code == 200
@@ -47,7 +47,7 @@ class TestGames:
     @pytest.mark.parametrize('kind', GameView)
     @pytest.mark.parametrize('date_from', ['2022-01-01'])
     @pytest.mark.parametrize('date_to', ['2022-01-01'])
-    @pytest.mark.parametrize('filter', [None, ''])
+    @pytest.mark.parametrize('_filter', [None, ''])
     @pytest.mark.usefixtures("game")
     async def test_admin_games(
         self,
@@ -58,7 +58,7 @@ class TestGames:
         kind: str,
         date_from: str,
         date_to: str,
-        filter: str,
+        _filter: str,
         game: Game,
     ):
         response = await async_api.get(
@@ -72,7 +72,7 @@ class TestGames:
                 "kind": kind.value,
                 "date_from": date_from,
                 "date_to": date_to,
-                "filter": filter,
+                "filter": _filter,
             },
         )
         assert response.status_code == 200

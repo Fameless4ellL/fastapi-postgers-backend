@@ -33,12 +33,15 @@ lint.select = [
     "RUF018",  # assignment-in-assert
 ]
 
-line-length = 120
+line-length = 150
 
 exclude = [
     "static/",
     "misc/",
     "templates/",
+    "src/models/main/",
+    "src/models/logs/",
+    "src/routers/admin/profile.py",
     ".git",
     ".pytest_cache",
     ".ruff_cache",

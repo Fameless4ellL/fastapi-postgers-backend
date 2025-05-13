@@ -7,7 +7,8 @@ def generate_unique_ticket_number(
     length: int = 15
 ) -> str:
     """
-    Generate a unique ticket number using UUID4, converted to digits, and ensure it is not too similar to existing tickets.
+    Generate a unique ticket number using UUID4,
+    converted to digits, and ensure it is not too similar to existing tickets.
 
     :param db: SQLAlchemy session for database access.
     :param game_id: ID of the game for which the ticket is being generated.

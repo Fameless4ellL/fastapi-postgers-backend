@@ -46,6 +46,13 @@ class FuncRegister:
         utils/workers/cron.py
         """
 
+    @staticmethod
+    def proceed_game(game_id=None):
+        """
+        See the related method for more details:
+        utils/workers/games.py
+        """
+
 
 worker = FuncRegister()
 

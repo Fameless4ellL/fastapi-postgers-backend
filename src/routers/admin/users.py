@@ -177,7 +177,7 @@ async def get_user(
         "tickets": {"purchased": tickets or 0},
         "winnings": {
             "cash": winnings or 0,
-            "material": [i for i in material_winnings]
+            "material": list(material_winnings)
         },
     }
     return JSONResponse(

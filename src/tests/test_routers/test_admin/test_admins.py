@@ -65,7 +65,18 @@ class TestAdminPage:
         Creates a new admin successfully.
         """
         payload = {
-            "item": (None,'{"username":"username","firstname":"John","lastname":"Doe","email":"john.doe@example.com","phone_number":"+77073993000","role":"Super Admin","telegram":"johndoe","country":"USA"}'),
+            "item": (
+                None,
+                (
+                    '{"username":"username",'
+                    '"firstname":"John",'
+                    '"lastname":"Doe",'
+                    '"email":"john.doe@example.com",'
+                    '"phone_number":"+77073993000",'
+                    '"role":"Super Admin",'
+                    '"telegram":"johndoe",'
+                    '"country":"USA"}'
+                )),
         }
         files = {
             "avatar": ("avatar.jpg", b"fake image content", "image/jpeg"),
@@ -92,7 +103,19 @@ class TestAdminPage:
         Updates an existing admin successfully.
         """
         payload = {
-            "item": (None, '{"username":"username","firstname":"John","lastname":"Doe","email":"john.doe@example.com","phone_number":"+77073993000","role":"Super Admin","telegram":"johndoe","country":"USA"}'),
+            "item": (
+                None,
+                (
+                    '{"username":"username",'
+                    '"firstname":"John",'
+                    '"lastname":"Doe",'
+                    '"email":"john.doe@example.com",'
+                    '"phone_number":"+77073993000",'
+                    '"role":"Super Admin",'
+                    '"telegram":"johndoe",'
+                    '"country":"USA"}'
+                )
+            ),
             "avatar": ("avatar.jpg", b"fake image content", "image/jpeg"),
             "document": ("document.pdf", b"fake document content", "application/pdf"),
         }
@@ -114,7 +137,18 @@ class TestAdminPage:
         Fails to update an admin that does not exist.
         """
         payload = {
-            "item": (None,'{"username":"username","firstname":"John","lastname":"Doe","email":"john.doe@example.com","phone_number":"+77073993000","role":"Super Admin","telegram":"johndoe","country":"USA"}'),
+            "item": (
+                None,
+                (
+                    '{"username":"username",'
+                    '"firstname":"John",'
+                    '"lastname":"Doe",'
+                    '"email":"john.doe@example.com",'
+                    '"phone_number":"+77073993000",'
+                    '"role":"Super Admin",'
+                    '"telegram":"johndoe",'
+                    '"country":"USA"}'
+                )),
             "avatar": ("avatar.jpg", b"fake image content", "image/jpeg"),
             "document": ("document.pdf", b"fake document content", "application/pdf"),
         }

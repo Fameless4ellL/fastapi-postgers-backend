@@ -316,9 +316,9 @@ def _retry_web3_call(
                 end_block = start_block + ((end_block - start_block) // 2)
                 time.sleep(delay)
                 continue
-            else:
-                logger.warning("Out of retries")
-                raise
+
+            logger.warning("Out of retries")
+            raise
 
 
 def _fetch_events_for_all_contracts(
