@@ -1,5 +1,5 @@
-from models.db import get_sync_db
-from models.other import Network, Currency
+from src.models import get_sync_db
+from src.models import Network, Currency
 
 
 def default_network():
