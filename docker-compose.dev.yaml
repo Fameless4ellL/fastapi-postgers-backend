@@ -27,7 +27,7 @@ services:
       context: .
     command: >
       bash -c 'while !</dev/tcp/db/5432; do sleep 1; done;
-      uvicorn asgi:fastapp --port 8000 --host 0.0.0.0 --reload'
+      uvicorn src.asgi:fastapp --port 8000 --host 0.0.0.0 --reload'
     depends_on:
       - db
       - logs

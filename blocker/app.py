@@ -5,7 +5,7 @@ import requests
 import logging
 import time
 
-from utils import AWSHTTPProvider
+from src.utils import AWSHTTPProvider
 from abc import ABC, abstractmethod
 
 from typing import Tuple, List, Dict, Any, Iterable
