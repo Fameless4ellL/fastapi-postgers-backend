@@ -119,7 +119,6 @@ async def register(
                 db.add(refferal)
 
         await db.commit()
-        await db.refresh(user_in_db)
 
     data = {
         "id": user_in_db.id,
