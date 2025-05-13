@@ -1,19 +1,22 @@
 import random
 from datetime import datetime
+from typing import Annotated
 
+from eth_account import Account
+from eth_account.signers.local import LocalAccount
+from fastapi import Depends, Request, status
+from fastapi.responses import JSONResponse
 from fastapi.security import OAuth2PasswordRequestForm
 from phonenumbers import parse
-from fastapi import Depends, Request, status
+from sqlalchemy import select, or_
+from sqlalchemy.ext.asyncio import AsyncSession
+
+from src.globals import aredis
 from src.models.db import get_db
 from src.models.log import Action
 from src.models.user import User, ReferralLink, Wallet
-from typing import Annotated
-from eth_account.signers.local import LocalAccount
-from eth_account import Account
 from src.routers import public
-from fastapi.responses import JSONResponse
-from sqlalchemy import select, or_
-from sqlalchemy.ext.asyncio import AsyncSession
+from src.schemes import BadResponse
 from src.schemes import (
     CheckCode,
     SendCode,
@@ -21,9 +24,6 @@ from src.schemes import (
     UserLogin,
     AccessToken
 )
-from src.schemes import BadResponse
-from src.globals import aredis
-
 from src.utils.signature import create_access_token, verify_password
 
 
