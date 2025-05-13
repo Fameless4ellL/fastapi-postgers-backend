@@ -237,7 +237,7 @@ async def withdraw(
 
     q.enqueue(
         worker.withdraw,
-        history.id,
+        history_id=history.id,
         job_id=f"withdraw_{history.id}",
     )
 

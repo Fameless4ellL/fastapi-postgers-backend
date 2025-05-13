@@ -85,7 +85,8 @@ def track(action):
 def deposit(
     history_id: int,
     change_type: str = 'jackpot',
-    counter: int = 0
+    counter: int = 0,
+    **_
 ):
     db = next(get_sync_db())
 
@@ -154,9 +155,9 @@ def deposit(
         q.enqueue_at(
             datetime.now() + timedelta(minutes=1),
             deposit,
-            history_id,
-            change_type,
-            counter + 1
+            history_id=history_id,
+            change_type=change_type,
+            counter=counter + 1
         )
         raise TransactionLogError(str(err))
 
@@ -190,14 +191,15 @@ def deposit(
 @worker.register
 def withdraw(
     history_id: int,
-    counter: int = 0
+    counter: int = 0,
+    **_
 ):
     db = next(get_sync_db())
 
-    balance_change_history = db.query(BalanceChangeHistory).filter(
-        BalanceChangeHistory.id == history_id,
-        BalanceChangeHistory.change_type == "withdraw",
-        BalanceChangeHistory.status == BalanceChangeHistory.Status.PENDING
+    balance_change_history = db.query(BalanceChangeHistory).filter_by(
+        id=history_id,
+        change_type="withdraw",
+        status=BalanceChangeHistory.Status.PENDING
     ).first()
 
     if not balance_change_history:
@@ -277,8 +279,8 @@ def withdraw(
         q.enqueue_at(
             datetime.now() + timedelta(minutes=1),
             withdraw,
-            history_id,
-            counter + 1
+            history_id=history_id,
+            counter=counter + 1
         )
         return False
 
@@ -308,5 +310,3 @@ def withdraw(
     db.commit()
 
     return tx
-
-

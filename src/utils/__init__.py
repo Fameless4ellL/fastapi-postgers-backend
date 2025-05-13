@@ -26,14 +26,14 @@ class FuncRegister:
         return item in self.__dict__.keys()
 
     @staticmethod
-    def deposit(history_id: int, change_type: str = 'jackpot', counter: int = 0):
+    def deposit(history_id: int, change_type: str = 'jackpot', counter: int = 0, **_):
         """
         See the related method for more details:
         utils/workers/transaction.py
         """
 
     @staticmethod
-    def withdraw(history_id: int, counter: int = 0):
+    def withdraw(history_id: int, counter: int = 0, **_):
         """
         See the related method for more details:
         utils/workers/transaction.py
