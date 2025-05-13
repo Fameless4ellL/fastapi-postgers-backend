@@ -83,6 +83,8 @@ async def register(
             last_session=datetime.now()
         )
         db.add(user_in_db)
+        await db.commit()
+        await db.refresh(user_in_db)
 
         wallet_result = await db.execute(
             select(Wallet)
