@@ -1,3 +1,5 @@
+x-env-vars: &x_env_vars .env
+
 services:
   db:
     image: postgres:latest
@@ -137,8 +139,63 @@ services:
       - REDIS_HOSTS=local:redis:6379
       - URL_PREFIX=/redis_admin
 
+  prometheus:
+    image: prom/prometheus:latest
+    env_file: *x_env_vars
+    ports:
+      - "9090:9090"
+    volumes:
+      - ./observability/prometheus/prometheus.yml:/etc/prometheus/prometheus.yml
+    restart: on-failure
+
+  grafana:
+    image: grafana/grafana:latest
+    env_file: *x_env_vars
+    ports:
+      - "3000:3000"
+    volumes:
+      - grafana-data:/var/lib/grafana
+    depends_on:
+      - prometheus
+      - loki
+    restart: on-failure
+
+  loki:
+    image: grafana/loki:3.4.3
+    env_file: *x_env_vars
+    ports:
+      - "3100:3100"
+    volumes:
+      - ./observability/loki/config.yml:/etc/loki/config.yml
+      - loki-data:/loki
+    command: -config.file=/etc/loki/config.yml
+    restart: on-failure
+
+  alloy:
+    image: grafana/alloy:latest
+    env_file: *x_env_vars
+    command:
+      - run
+      - --server.http.listen-addr=0.0.0.0:12345
+      - --storage.path=/var/lib/alloy/data
+      - /etc/alloy/config.alloy
+    ports:
+      - "12345:12345"
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock
+      - ./observability/alloy/config.alloy:/etc/alloy/config.alloy
+      - /var/log:/var/log:ro
+      - /var/lib/docker/containers:/var/lib/docker/containers:ro
+      - /etc/machine-id:/etc/machine-id:ro
+    depends_on:
+      - prometheus
+      - loki
+    restart: on-failure
+
 volumes:
   postgresql-data:
   logs-data:
   redis-data:
   static:
+  grafana-data:
+  loki-data:
