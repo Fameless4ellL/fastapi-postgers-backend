@@ -128,6 +128,9 @@ def get_crud_router(
                 model.deleted.isnot(True)
             )
 
+            if filters.countries:
+                stmt = stmt.filter(model.country.in_(filters.countries))
+
         items = await db.execute(stmt.order_by(model.id.desc()).offset(offset).limit(limit))
         items = items.scalars().all()
 

@@ -9,7 +9,7 @@ from src.models import get_db
 from src.models.user import Role, User, Document
 from src.routers import admin
 from src.schemes import BadResponse
-from src.schemes import (
+from src.schemes.admin import (
     Profile,
 )
 from src.utils.dependencies import get_admin, url_for

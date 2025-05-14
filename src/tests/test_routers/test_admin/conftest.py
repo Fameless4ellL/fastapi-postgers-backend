@@ -4,7 +4,7 @@ import pytest
 from PIL import Image
 from fastapi import UploadFile
 from httpx import AsyncClient
-from sqlalchemy import delete
+from sqlalchemy import delete, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from src.globals import aredis
@@ -40,6 +40,27 @@ async def admin_token(
     assert response.status_code == 200
     assert "access_token" in response.json()
 
+    data = {
+        "id": admin.id,
+        "scopes": ["super_admin"],
+    }
+
+    access_token = create_access_token(data=data)
+
+    await aredis.set(
+        f"TOKEN:ADMINS:{admin.id}",
+        access_token,
+        ex=ACCESS_TOKEN_EXPIRE_MINUTES
+    )
+
+    yield access_token
+
+
+@pytest.fixture
+async def admin_global_token(
+    async_api: AsyncClient,
+    admin: User,
+):
     data = {
         "id": admin.id,
         "scopes": ["global_admin"],
@@ -194,3 +215,28 @@ async def doc(
         await db.commit()
     except Exception as e:
         print(e)
+
+
+@pytest.fixture
+async def admin_data(db: AsyncSession):
+    yield (
+        '{"username":"username",'
+        '"firstname":"John",'
+        '"lastname":"Doe",'
+        '"email":"john.doe@example.com",'
+        '"phone_number":"+77073993521",'
+        '"role":"Super Admin",'
+        '"telegram":"johndoe",'
+        '"country":"USA"}'
+    )
+
+    user = await db.execute(
+        select(User).where(User.phone_number == "77073993521")
+    )
+    user = user.scalars().first()
+
+    if user:
+        await db.execute(
+            delete(User).where(User.id == user.id)
+        )
+        await db.commit()
