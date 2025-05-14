@@ -3,11 +3,10 @@ from typing import Annotated, Union
 
 from fastapi import Depends, Path, background, status, Security, UploadFile
 from fastapi.responses import JSONResponse
-from rq.job import Job
 from sqlalchemy import func, select, or_
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from src.globals import aredis, q
+from src.globals import aredis
 from src.models.db import get_db
 from src.models.log import Action
 from src.models.other import Network, Currency
@@ -34,27 +33,6 @@ from src.schemes.admin import (
 )
 from src.schemes import BadResponse, JsonForm
 from settings import settings
-
-
-@admin.get(
-    "/jobs",
-    dependencies=[Security(get_admin_token, scopes=[Role.SUPER_ADMIN.value])]
-)
-async def get_jobs():
-    """
-    Get active jobs after creation
-    """
-    jobs: list[Job] = q.get_jobs()
-    data = [
-        {
-            "id": job.id,
-            "name": job.func_name,
-            "next_run_time": job.func.next_run_time.strftime("%Y-%m-%d %H:%M:%S"),
-            "args": job.args,
-        }
-        for job in jobs
-    ]
-    return JSONResponse(status_code=status.HTTP_200_OK, content=data)
 
 
 get_crud_router(
@@ -87,18 +65,18 @@ get_crud_router(
     },
 )
 async def get_admin_list(
-    db: Annotated[AsyncSession, Depends(get_db)],
-    item: Annotated[AdminFilter, Depends(AdminFilter)],
-    token: Annotated[Token, Security(
-        get_admin_token,
-        scopes=[
-            Role.SUPER_ADMIN.value,
-            Role.ADMIN.value,
-            Role.GLOBAL_ADMIN.value,
-        ]
-    )],
-    offset: int = 0,
-    limit: int = 10,
+        db: Annotated[AsyncSession, Depends(get_db)],
+        item: Annotated[AdminFilter, Depends(AdminFilter)],
+        token: Annotated[Token, Security(
+            get_admin_token,
+            scopes=[
+                Role.SUPER_ADMIN.value,
+                Role.ADMIN.value,
+                Role.GLOBAL_ADMIN.value,
+            ]
+        )],
+        offset: int = 0,
+        limit: int = 10,
 ):
     """
     Get all admins
@@ -163,8 +141,8 @@ async def get_admin_list(
     },
 )
 async def get_admin(
-    db: Annotated[AsyncSession, Depends(get_db)],
-    admin_id: Annotated[int, Path()],
+        db: Annotated[AsyncSession, Depends(get_db)],
+        admin_id: Annotated[int, Path()],
 ):
     """
     Get all admins
@@ -219,27 +197,27 @@ async def get_admin(
     },
 )
 async def create_admin(
-    db: Annotated[AsyncSession, Depends(get_db)],
-    token: Annotated[Token, Security(
-        get_admin_token,
-        scopes=[
-            Role.SUPER_ADMIN.value,
-            Role.ADMIN.value,
-            Role.GLOBAL_ADMIN.value,
-        ]
-    )],
-    item: Annotated[AdminCreate, JsonForm()],
-    bg: background.BackgroundTasks,
-    avatar: UploadFile,
-    documents: list[UploadFile],
+        db: Annotated[AsyncSession, Depends(get_db)],
+        token: Annotated[Token, Security(
+            get_admin_token,
+            scopes=[
+                Role.SUPER_ADMIN.value,
+                Role.ADMIN.value,
+                Role.GLOBAL_ADMIN.value,
+            ]
+        )],
+        item: Annotated[AdminCreate, JsonForm()],
+        bg: background.BackgroundTasks,
+        avatar: UploadFile,
+        documents: list[UploadFile],
 ):
     """
     Create new admin
     """
     scope = next(iter(token.scopes), None)
     if (
-        scope == Role.GLOBAL_ADMIN.value
-        and item.role in {AdminRoles.SUPER_ADMIN, AdminRoles.ADMIN}
+            scope == Role.GLOBAL_ADMIN.value
+            and item.role in {AdminRoles.SUPER_ADMIN, AdminRoles.ADMIN}
     ):
         return JSONResponse(
             status_code=status.HTTP_400_BAD_REQUEST,
@@ -317,11 +295,11 @@ async def create_admin(
     },
 )
 async def update_admin(
-    db: Annotated[AsyncSession, Depends(get_db)],
-    item: Annotated[AdminCreate, JsonForm()],
-    admin_id: Annotated[int, Path()],
-    avatar: Union[str, UploadFile, None] = None,
-    documents: Union[list[UploadFile], None] = None
+        db: Annotated[AsyncSession, Depends(get_db)],
+        item: Annotated[AdminCreate, JsonForm()],
+        admin_id: Annotated[int, Path()],
+        avatar: Union[str, UploadFile, None] = None,
+        documents: Union[list[UploadFile], None] = None
 ):
     """
     Update admin
@@ -400,15 +378,15 @@ async def update_admin(
     },
 )
 async def delete_admin(
-    db: Annotated[AsyncSession, Depends(get_db)],
-    token: Annotated[Token, Security(
-        get_admin_token,
-        scopes=[
-            Role.SUPER_ADMIN.value,
-            Role.ADMIN.value,
-        ]
-    )],
-    admin_id: Annotated[int, Path()],
+        db: Annotated[AsyncSession, Depends(get_db)],
+        token: Annotated[Token, Security(
+            get_admin_token,
+            scopes=[
+                Role.SUPER_ADMIN.value,
+                Role.ADMIN.value,
+            ]
+        )],
+        admin_id: Annotated[int, Path()],
 ):
     """
     Delete admin

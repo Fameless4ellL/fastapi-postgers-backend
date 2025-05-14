@@ -106,7 +106,11 @@ class Jackpot(Base):
     image: Mapped[str] = Column(String(255), nullable=True, default="default_jackpot.png", doc="The image of the instance")
     country: Mapped[str] = Column(String(32), nullable=True)
 
-    scheduled_datetime: Mapped[datetime.datetime] = Column(DateTime(timezone=True), default=datetime.datetime.now, doc="The date and time when the game instance will be held")
+    scheduled_datetime: Mapped[datetime.datetime] = Column(
+        DateTime(timezone=True),
+        default=datetime.datetime.now,
+        doc="The date and time when the game instance will be held"
+    )
     tzone: Mapped[int] = Column(Integer, default=1, doc="The timezone of the game instance in UTC format")
     repeat_type: Mapped[RepeatType] = Column(SqlEnum(RepeatType), default=RepeatType.NONE, doc="The type of repetition (weekly, monthly, yearly)")
 
@@ -114,11 +118,27 @@ class Jackpot(Base):
     status: Mapped[GameStatus] = Column(SqlEnum(GameStatus), default=GameStatus.NEW)
 
     numbers: Mapped[list[int]] = Column(ARRAY(Integer), nullable=True)
-    fund_start: Mapped[datetime.datetime] = Column(DateTime(timezone=True), default=datetime.datetime.now, doc="The date and time when the fundraising will be held")
-    fund_end: Mapped[datetime.datetime] = Column(DateTime(timezone=True), default=datetime.datetime.now, doc="The date and time when the fundraising will be ended")
+    fund_start: Mapped[datetime.datetime] = Column(
+        DateTime(timezone=True),
+        default=datetime.datetime.now,
+        doc="The date and time when the fundraising will be held"
+    )
+    fund_end: Mapped[datetime.datetime] = Column(
+        DateTime(timezone=True),
+        default=datetime.datetime.now,
+        doc="The date and time when the fundraising will be ended"
+    )
 
-    event_start: Mapped[datetime.datetime] = Column(DateTime(timezone=True), default=datetime.datetime.now, doc="The date and time when the game instance will be started")
-    event_end: Mapped[datetime.datetime] = Column(DateTime(timezone=True), default=datetime.datetime.now, doc="The date and time when the game instance will be ended")
+    event_start: Mapped[datetime.datetime] = Column(
+        DateTime(timezone=True),
+        default=datetime.datetime.now,
+        doc="The date and time when the game instance will be started"
+    )
+    event_end: Mapped[datetime.datetime] = Column(
+        DateTime(timezone=True),
+        default=datetime.datetime.now,
+        doc="The date and time when the game instance will be ended"
+    )
     created_at: Mapped[datetime.datetime] = Column(DateTime, default=datetime.datetime.now)
     updated_at: Mapped[datetime.datetime] = Column(DateTime, default=datetime.datetime.now, onupdate=datetime.datetime.now)
 
@@ -183,7 +203,11 @@ class Game(Base):
     image: Mapped[str] = Column(String(255), nullable=True, default="default_image.png", doc="The image of the game instance")
     status: Mapped[GameStatus] = Column(SqlEnum(GameStatus), default=GameStatus.PENDING)
 
-    scheduled_datetime: Mapped[datetime.datetime] = Column(DateTime(timezone=True), default=datetime.datetime.now, doc="The date and time when the game instance will be held")
+    scheduled_datetime: Mapped[datetime.datetime] = Column(
+        DateTime(timezone=True),
+        default=datetime.datetime.now,
+        doc="The date and time when the game instance will be held"
+    )
     zone: Mapped[int] = Column(Integer, default=1, doc="The timezone of the game instance in UTC format")
 
     repeat: Mapped[bool] = Column(Boolean, default=False, doc="Indicates if the game instance is repeated")
@@ -193,8 +217,16 @@ class Game(Base):
         doc="The days of the week when the game instance is repeated, required if repeat is True"
     )
 
-    event_start: Mapped[datetime.datetime] = Column(DateTime(timezone=True), default=datetime.datetime.now, doc="The date and time when the game instance will be started")
-    event_end: Mapped[datetime.datetime] = Column(DateTime(timezone=True), default=datetime.datetime.now, doc="The date and time when the game instance will be ended")
+    event_start: Mapped[datetime.datetime] = Column(
+        DateTime(timezone=True),
+        default=datetime.datetime.now,
+        doc="The date and time when the game instance will be started"
+    )
+    event_end: Mapped[datetime.datetime] = Column(
+        DateTime(timezone=True),
+        default=datetime.datetime.now,
+        doc="The date and time when the game instance will be ended"
+    )
     created_at: Mapped[datetime.datetime] = Column(DateTime, default=datetime.datetime.now)
     updated_at: Mapped[datetime.datetime] = Column(DateTime, default=datetime.datetime.now, onupdate=datetime.datetime.now)
 

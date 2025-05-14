@@ -134,7 +134,10 @@ def calculate_metrics(date: Optional[datetime] = None):
         subquery = (
             logs.query((
                 func.extract('epoch', UserActionLog.timestamp) -
-                func.lag(func.extract('epoch', UserActionLog.timestamp)).over(partition_by=UserActionLog.user_id, order_by=UserActionLog.timestamp))
+                func.lag(
+                    func.extract('epoch', UserActionLog.timestamp))
+                    .over(partition_by=UserActionLog.user_id, order_by=UserActionLog.timestamp)
+                )
                 .label("time_diff")
             )
             .filter(

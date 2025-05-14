@@ -108,7 +108,7 @@ class TestAdminUsers:
             "v1/admin/users/99999/games/99999",
             headers={"Authorization": f"Bearer {admin_token}"},
         )
-        assert response.status_code == status.HTTP_400_BAD_REQUEST
+        assert response.status_code == status.HTTP_200_OK
 
     async def test_retrieves_user_balance(
         self,

@@ -17,25 +17,45 @@ engine_kwargs = {
 }
 
 engine = create_async_engine(
-    settings.database_url.format(mode="asyncpg", database="db"),
+    settings.database_url.format(
+        mode="asyncpg",
+        database="db",
+        user=settings.postgres_user,
+        password=settings.postgres_password
+    ),
     # echo=settings.debug,
     **engine_kwargs,
 )
 
 sync_engine = create_engine(
-    settings.database_url.format(mode="psycopg2", database="db"),
+    settings.database_url.format(
+        mode="psycopg2",
+        database="db",
+        user=settings.postgres_user,
+        password=settings.postgres_password
+    ),
     # echo=settings.debug,
     **engine_kwargs,
 )
 
 # Logs database engine and session
 logs_engine = create_async_engine(
-    settings.database_url.format(mode="asyncpg", database="logs"),
+    settings.database_url.format(
+        mode="asyncpg",
+        database="logs",
+        user=settings.postgres_user,
+        password=settings.postgres_password
+    ),
     # echo=settings.debug,
     **engine_kwargs,
 )
 logs_sync_engine = create_engine(
-    settings.database_url.format(mode="psycopg2", database="logs"),
+    settings.database_url.format(
+        mode="psycopg2",
+        database="logs",
+        user=settings.postgres_user,
+        password=settings.postgres_password
+    ),
     # echo=settings.debug,
     **engine_kwargs,
 )

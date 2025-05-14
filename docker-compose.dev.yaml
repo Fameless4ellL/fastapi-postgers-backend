@@ -3,8 +3,8 @@ services:
     image: postgres:latest
     command: postgres -c 'max_connections=200'
     environment:
-      - POSTGRES_USER=postgres
-      - POSTGRES_PASSWORD=postgres
+      - POSTGRES_USER=${POSTGRES_USER:-postgres}
+      - POSTGRES_PASSWORD=${POSTGRES_PASSWORD:-postgres}
       - POSTGRES_DB=postgres
     volumes:
       - postgresql-data:/var/lib/postgresql/data
@@ -15,8 +15,8 @@ services:
     container_name: logs
     command: postgres -c 'max_connections=200'
     environment:
-      - POSTGRES_USER=postgres
-      - POSTGRES_PASSWORD=postgres
+      - POSTGRES_USER=${POSTGRES_USER:-postgres}
+      - POSTGRES_PASSWORD=${POSTGRES_PASSWORD:-postgres}
       - POSTGRES_DB=logs
     volumes:
       - logs-data:/var/lib/postgresql/data
@@ -37,6 +37,7 @@ services:
       - "0.0.0.0:8000:8000"
     environment:
       - PYTHONPATH=/app
+    env_file: .env
     volumes:
       - .:/app/
       - ./static:/app/static
@@ -83,6 +84,7 @@ services:
     environment:
       - PYTHONPATH=/app
       - REDIS_HOST=redis
+    env_file: .env
     depends_on:
       - api
       - db

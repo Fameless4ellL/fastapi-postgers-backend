@@ -5,7 +5,7 @@ import time
 from typing import AsyncIterator
 
 from fastapi import FastAPI, Request, Response
-from contextlib import asynccontextmanager
+from contextlib import asynccontextmanager, suppress
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
 from httpx import AsyncClient
@@ -60,10 +60,8 @@ async def logger(
 ):
     json_body = {}
     if request.headers.get("Content-Type") == "application/json":
-        try:
+        with suppress(json.JSONDecodeError):
             json_body = await request.json()
-        except json.JSONDecodeError:
-            pass
 
     if request.url.path == "/docs" or request.url.path == "/redoc" or request.url.path.startswith("/static"):
         return await call_next(request)

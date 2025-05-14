@@ -223,21 +223,21 @@ async def withdraw(
         change_amount=item.amount,
         change_type="withdraw",
         status=BalanceChangeHistory.Status.PENDING,
-        previous_balance=balance.balance - Decimal(item.amount),
-        new_balance=balance.balance,
+        previous_balance=balance.balance,
+        new_balance=balance.balance - Decimal(item.amount),
         args=json.dumps({"address": item.address})
     )
 
     db.add(history)
 
-    balance.balance -= Decimal(item.amount)
+    balance.balance = history.new_balance
     db.add(balance)
 
     await db.commit()
 
     q.enqueue(
-        getattr(worker, "withdraw"),
-        history.id,
+        worker.withdraw,
+        history_id=history.id,
         job_id=f"withdraw_{history.id}",
     )
 
@@ -386,7 +386,7 @@ async def get_history(
     """
     Получение истории изменения баланса
     """
-    history = await db.execute(
+    history = db.execute(
         select(
             BalanceChangeHistory.id,
             BalanceChangeHistory.change_amount,

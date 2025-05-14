@@ -19,7 +19,8 @@ from src.schemes.admin import (
     InstaBingoCreate,
     InstaBingoUpdate,
     InstaBingoList,
-    Empty
+    Empty,
+    Countries
 )
 from src.schemes import BadResponse
 
@@ -31,7 +32,7 @@ get_crud_router(
     create_schema=InstaBingoCreate,
     update_schema=InstaBingoUpdate,
     files=Annotated[Empty, Depends(Empty)],
-    filters=Annotated[Empty, Depends(Empty)],
+    filters=Annotated[Countries, Depends(Countries)],
     security_scopes=[
         Role.SUPER_ADMIN.value,
         Role.ADMIN.value,

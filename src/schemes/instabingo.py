@@ -8,7 +8,7 @@ class Winnings(BaseModel):
     winnings: Optional[dict[int, int]] = Field(default_factory=dict, exclude=True)
 
     def get_winnings(self):
-        return self.winnings if self.winnings else {}
+        return self.winnings or {}
 
     @computed_field
     def x15(self) -> int:

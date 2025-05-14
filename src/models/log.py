@@ -109,6 +109,6 @@ class HiddenMetric(LogsBase):
 
     id: Mapped[int] = Column(Integer, primary_key=True, index=True)
     user_id: Mapped[int] = Column(Integer, index=True)
-    metric_name: Mapped[str] = Column(EnumColumn(Metric.MetricType), index=True)
+    metric_name: Mapped[Metric.MetricType] = Column(EnumColumn(Metric.MetricType), index=True)
     is_hidden: Mapped[bool] = Column(Boolean, default=False)
     created_at: Mapped[datetime.datetime] = Column(DateTime, default=datetime.datetime.now)

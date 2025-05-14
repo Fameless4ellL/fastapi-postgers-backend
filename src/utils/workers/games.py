@@ -78,7 +78,7 @@ def generate_game(
     q.enqueue_at(
         scheduled_datetime,
         proceed_game,
-        game_inst.id,
+        game_id=game_inst.id,
         job_id=f"proceed_game_{game_inst.id}",
     )
 
@@ -367,7 +367,7 @@ def generate_jackpot(
     q.enqueue_at(
         scheduled_datetime,
         proceed_jackpot,
-        jackpot_inst.id,
+        jackpot_id=jackpot_inst.id,
         job_id=f"proceed_jackpot_{jackpot_inst.id}",
     )
 

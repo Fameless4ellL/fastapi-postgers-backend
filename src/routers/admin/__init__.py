@@ -1,4 +1,3 @@
-"""Admin CRUD API Router"""
 import os
 from typing import Type, List, Annotated
 from fastapi import APIRouter, Depends, Path, status, Security, Query
@@ -129,6 +128,9 @@ def get_crud_router(
                 model.deleted.isnot(True)
             )
 
+            if filters.countries:
+                stmt = stmt.filter(model.country.in_(filters.countries))
+
         items = await db.execute(stmt.order_by(model.id.desc()).offset(offset).limit(limit))
         items = items.scalars().all()
 
@@ -137,7 +139,7 @@ def get_crud_router(
 
         return JSONResponse(
             status_code=status.HTTP_200_OK,
-            content=schema(items=[item for item in items], count=count).model_dump(mode='json')
+            content=schema(items=list(items), count=count).model_dump(mode='json')
         )
 
     @router.get(
@@ -242,8 +244,8 @@ def get_crud_router(
 
             q.enqueue_at(
                 new_item.scheduled_datetime,
-                getattr(worker, "proceed_game"),
-                new_item.id,
+                worker.proceed_game,
+                game_id=new_item.id,
                 job_id=f"proceed_game_{new_item.id}",
             )
 
@@ -276,14 +278,14 @@ def get_crud_router(
             q.enqueue_at(
                 new_item.scheduled_datetime,
                 getattr(worker, "proceed_jackpot"),
-                new_item.id,
+                jackpot_id=new_item.id,
                 job_id=f"proceed_jackpot_{new_item.id}",
             )
             q.enqueue_at(
                 new_item.fund_start,
-                getattr(worker, "proceed_jackpot_status"),
-                new_item.id,
-                GameStatus.PENDING,
+                getattr(worker, "set_pending_jackpot"),
+                jackpot_id=new_item.id,
+                status=GameStatus.PENDING,
                 job_id=f"proceed_jackpot_status_{new_item.id}",
             )
 
@@ -333,7 +335,7 @@ def get_crud_router(
                 q.enqueue_at(
                     item.scheduled_datetime,
                     getattr(worker, "proceed_jackpot"),
-                    db_item.id,
+                    jackpot_id=db_item.id,
                     job_id=f"jackpot_{db_item.id}",
                 )
 
@@ -345,8 +347,8 @@ def get_crud_router(
                 q.enqueue_at(
                     item.fund_start,
                     getattr(worker, "proceed_jackpot_status"),
-                    db_item.id,
-                    GameStatus.PENDING,
+                    jackpot_id=db_item.id,
+                    status=GameStatus.PENDING,
                     job_id=f"jackpot_status_{db_item.id}",
                 )
 
@@ -391,8 +393,8 @@ def get_crud_router(
 
                 q.enqueue_at(
                     item.scheduled_datetime,
-                    getattr(worker, "proceed_game"),
-                    db_item.id,
+                    worker.proceed_game,
+                    game_id=db_item.id,
                     job_id=f"game_{db_item.id}",
                 )
 

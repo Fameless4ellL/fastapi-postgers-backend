@@ -1,6 +1,3 @@
-
-
-
 from sqlalchemy import create_engine, text
 
 database_url: str = "postgresql+{mode}://postgres:postgres@db/postgres"

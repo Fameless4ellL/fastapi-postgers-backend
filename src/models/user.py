@@ -58,7 +58,11 @@ class User(Base):
 
     created_at: Mapped[datetime.datetime] = Column(DateTime, default=datetime.datetime.now)
     last_session: Mapped[Union[datetime.datetime, None]] = Column(DateTime, nullable=True)
-    updated_at: Mapped[datetime.datetime] = Column(DateTime, default=datetime.datetime.now, onupdate=datetime.datetime.now)
+    updated_at: Mapped[datetime.datetime] = Column(
+        DateTime,
+        default=datetime.datetime.now,
+        onupdate=datetime.datetime.now
+    )
 
 
 class Document(Base):
@@ -68,7 +72,11 @@ class Document(Base):
     user_id: Mapped[int] = Column(Integer, ForeignKey('users.id', ondelete='CASCADE'), nullable=True)
     file: Mapped[FileType] = Column(FileType(storage=FileSystemStorage(path="/app/static/kyc")))
     created_at: Mapped[datetime.datetime] = Column(DateTime, default=datetime.datetime.now)
-    updated_at: Mapped[datetime.datetime] = Column(DateTime, default=datetime.datetime.now, onupdate=datetime.datetime.now)
+    updated_at: Mapped[datetime.datetime] = Column(
+        DateTime,
+        default=datetime.datetime.now,
+        onupdate=datetime.datetime.now
+    )
 
 
 class Kyc(Base):
@@ -86,7 +94,11 @@ class Wallet(Base):
     address: Mapped[str] = Column(String(256), unique=True)
     private_key: Mapped[str] = Column(String(256), unique=True)
     created_at: Mapped[datetime.datetime] = Column(DateTime, default=datetime.datetime.now)
-    updated_at: Mapped[datetime.datetime] = Column(DateTime, default=datetime.datetime.now, onupdate=datetime.datetime.now)
+    updated_at: Mapped[datetime.datetime] = Column(
+        DateTime,
+        default=datetime.datetime.now,
+        onupdate=datetime.datetime.now
+    )
 
 
 class Balance(Base):
@@ -97,7 +109,11 @@ class Balance(Base):
     currency_id: Mapped[int] = Column(Integer, ForeignKey('currencies.id', ondelete="CASCADE"), nullable=True)
     balance: Mapped[decimal.Decimal] = Column(DECIMAL(20, 8), default=0)
     created_at: Mapped[datetime.datetime] = Column(DateTime, default=datetime.datetime.now)
-    updated_at: Mapped[datetime.datetime] = Column(DateTime, default=datetime.datetime.now, onupdate=datetime.datetime.now)
+    updated_at: Mapped[datetime.datetime] = Column(
+        DateTime,
+        default=datetime.datetime.now,
+        onupdate=datetime.datetime.now
+    )
 
     currency = relationship("Currency", uselist=False)
 

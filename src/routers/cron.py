@@ -1,10 +1,11 @@
 import datetime
-from decimal import Decimal
 import traceback
+from decimal import Decimal
 from typing import Annotated
+
 from fastapi import Depends
-from sqlalchemy import select
 from pydantic import BaseModel, ConfigDict
+from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 from src.models.db import get_db
 from src.models.user import BalanceChangeHistory, Wallet, Balance
@@ -114,6 +115,7 @@ async def transfer(
     return {"status": "ok"}
 
 
-@_cron.post("/hourly")
+@_cron.get("/hourly")
 async def hourly():
+    """Часовой отчет по метрикам"""
     q.enqueue(worker.calculate_metrics)

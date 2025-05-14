@@ -16,15 +16,14 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import joinedload
 from web3 import Web3, middleware
 
-import settings
 from settings import email, settings
 from src.globals import aredis, q
 from src.models.db import get_db, get_sync_db
 from src.models.other import Game, GameStatus, GameType, Network, Currency
 from src.models.user import User, Role
+from src.utils import worker
 from src.utils.signature import decode_access_token
 from src.utils.web3 import AWSHTTPProvider
-from src.utils.workers import worker
 
 oauth2_scheme = security.OAuth2PasswordBearer(tokenUrl="/v1/token")
 admin_oauth2_scheme = security.OAuth2PasswordBearer(
@@ -290,8 +289,8 @@ async def generate_game(
 
     q.enqueue_at(
         game.scheduled_datetime,
-        getattr(worker, f"proceed_game"),
-        game.id,
+        worker.proceed_game,
+        game_id=game.id,
         job_id=f"proceed_game_{game.id}",
     )
 
@@ -318,7 +317,7 @@ def send_mail(
     to_email: str,
 ):
     msg = MIMEMultipart()
-    msg["From"] = email._from
+    msg["From"] = email.FROM
     msg["To"] = to_email
     msg["subject"] = subject
     msg.attach(MIMEText(body))
@@ -331,7 +330,7 @@ def send_mail(
 
         text = msg.as_string()
 
-        server.sendmail(email._from, to_email, text)
+        server.sendmail(email.FROM, to_email, text)
 
         server.quit()
     except smtplib.SMTPException:
