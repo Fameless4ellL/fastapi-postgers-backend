@@ -290,7 +290,7 @@ async def generate_game(
     q.enqueue_at(
         game.scheduled_datetime,
         worker.proceed_game,
-        game.id,
+        game_id=game.id,
         job_id=f"proceed_game_{game.id}",
     )
 

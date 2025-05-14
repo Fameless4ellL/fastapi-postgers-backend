@@ -530,6 +530,7 @@ class ReferralUpdate(ReferralCreate):
 
 class ReferralSchema(ReferralBase):
     id: int
+    generated_by: Optional[int] = None
 
 
 class Referrals(BaseModel):
