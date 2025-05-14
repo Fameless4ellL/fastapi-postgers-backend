@@ -13,12 +13,13 @@ from web3 import Web3, exceptions
 from web3.datastructures import AttributeDict
 from eth_abi.codec import ABICodec
 
-from blocker.utils import AWSHTTPProvider
 from redis_ import redis_m
 from aiohttp.client_exceptions import ServerDisconnectedError
 
 from web3._utils.filters import construct_event_filter_params
 from web3._utils.events import get_event_data
+
+from utils import AWSHTTPProvider
 
 logger = logging.getLogger("BLOCKER")
 
