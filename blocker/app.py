@@ -5,7 +5,6 @@ import requests
 import logging
 import time
 
-from src.utils import AWSHTTPProvider
 from abc import ABC, abstractmethod
 
 from typing import Tuple, List, Dict, Any, Iterable
@@ -13,6 +12,8 @@ from typing import Tuple, List, Dict, Any, Iterable
 from web3 import Web3, exceptions
 from web3.datastructures import AttributeDict
 from eth_abi.codec import ABICodec
+
+from blocker.utils import AWSHTTPProvider
 from redis_ import redis_m
 from aiohttp.client_exceptions import ServerDisconnectedError
 
