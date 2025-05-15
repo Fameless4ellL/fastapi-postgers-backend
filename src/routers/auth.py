@@ -55,7 +55,6 @@ async def register(
 
     # get country from phone_number
     country_code = parse(user.phone_number)
-    # country = geocoder.region_code_for_number(country_code)
     phone_number = f"{country_code.country_code}{country_code.national_number}"
 
     user_in_db = await db.execute(
@@ -157,9 +156,15 @@ async def login(
             status_code=400, content={"message": "Phone number or username is required"}
         )
 
+    if not await aredis.exists(f"AUTH:{request.client.host}"):
+        return JSONResponse(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            content={"message": "Please resend sms code"})
+
+    await aredis.delete(f"AUTH:{request.client.host}")
+
     # get country from phone_number
     country_code = parse(user.phone_number)
-    # country = geocoder.region_code_for_number(country_code)
     phone_number = f"{country_code.country_code}{country_code.national_number}"
 
     userdb = await db.execute(
@@ -172,21 +177,6 @@ async def login(
         return JSONResponse(
             status_code=status.HTTP_404_NOT_FOUND, content={"message": "User not found"}
         )
-
-    if not await aredis.exists(f"SMS:{request.client.host}"):
-        return JSONResponse(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            content={"message": "Invalid code"})
-
-    code: bytes = await aredis.get(f"SMS:{request.client.host}")
-
-    if code.decode("utf-8") != user.code:
-        return JSONResponse(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            content={"message": "Invalid code"}
-        )
-
-    await aredis.delete(f"SMS:{request.client.host}")
 
     # if not user or not verify_password(
     #     user.password.get_secret_value(), userdb.password
@@ -307,6 +297,7 @@ async def check_code(
     """
     Check sms code
     """
+    # TODO Непонятно зачем это фронту эта api
     if not await aredis.exists(f"SMS:{request.client.host}"):
         return JSONResponse(
             status_code=status.HTTP_400_BAD_REQUEST,
