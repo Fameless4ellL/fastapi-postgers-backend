@@ -1,3 +1,4 @@
+from decimal import Decimal
 from typing import Annotated, Optional, Union
 from pydantic import BaseModel, Field, AfterValidator, field_validator
 from annotated_types import Len
@@ -119,7 +120,7 @@ class Deposit(BaseModel):
 
 
 class Withdraw(BaseModel):
-    amount: float = 0
+    amount: Decimal = Field(decimal_places=2)
     address: str
 
 

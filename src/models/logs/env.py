@@ -1,9 +1,12 @@
+import os
+import re
 import asyncio
 from logging.config import fileConfig
 
 from sqlalchemy import pool
-from sqlalchemy.engine import Connection
+from sqlalchemy.engine import Connection, URL
 from sqlalchemy.ext.asyncio import async_engine_from_config
+
 
 from alembic import context
 
@@ -27,6 +30,10 @@ target_metadata = LogsBase.metadata
 # can be acquired:
 # my_important_option = config.get_main_option("my_important_option")
 # ... etc.
+url_tokens = {
+    "POSTGRES_USER": os.getenv("POSTGRES_USER", "postgres"),
+    "POSTGRES_PASSWORD": os.getenv("POSTGRES_PASSWORD", "postgres"),
+}
 
 
 def run_migrations_offline() -> None:
@@ -41,7 +48,10 @@ def run_migrations_offline() -> None:
     script output.
 
     """
+
     url = config.get_main_option("sqlalchemy.url")
+    url = re.sub(r"\${(.+?)}", lambda m: url_tokens[m.group(1)], url)
+
     context.configure(
         url=url,
         target_metadata=target_metadata,
@@ -66,8 +76,11 @@ async def run_async_migrations() -> None:
 
     """
 
+    conf = config.get_section(config.config_ini_section, {})
+    conf["sqlalchemy.url"] = re.sub(r"\${(.+?)}", lambda m: url_tokens[m.group(1)], conf["sqlalchemy.url"])
+
     connectable = async_engine_from_config(
-        config.get_section(config.config_ini_section, {}),
+        conf,
         prefix="sqlalchemy.",
         poolclass=pool.NullPool,
     )
