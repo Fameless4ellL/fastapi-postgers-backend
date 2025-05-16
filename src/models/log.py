@@ -93,7 +93,7 @@ class Metric(LogsBase):
         GGR = "ggr"
         FTD = "ftd"
         CPA = "cpa"
-        DAU = "dau"
+        DAU = "active_users"
         AVG_SESSION_TIME = "session_time"
 
     id: Mapped[int] = Column(Integer, primary_key=True, index=True)

@@ -1,10 +1,10 @@
 import dataclasses
 from datetime import timedelta, datetime
-from typing import Annotated, Union
+from typing import Annotated
 
 from fastapi import status, Security, Depends
 from fastapi.responses import JSONResponse
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 from sqlalchemy import select, func
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -36,12 +36,23 @@ class DashboardFilter(DatePicker, Countries):
     period: Period = Period.MONTH
 
 
+class DashboardMetric(BaseModel):
+    FTD: int = 0
+    AVG_SESSION_TIME: dict = {}
+    LTV: int = 0
+    GGR: int = 0
+    TOTAL_SOLD_TICKETS: int = 0
+    DAU: int = 0
+    ARPPU: dict = {}
+    ARPU: dict = {}
+
+
 class Dashboard(BaseModel):
-    metrics: list[dict[Metric.MetricType, Union[dict[datetime, float]], float]]
+    metrics: DashboardMetric = Field(default_factory=DashboardMetric)
 
 
 class UpdateMetricVisibilityRequest(BaseModel):
-    metric: Metric.MetricType
+    metrics: list[Metric.MetricType]
     is_hidden: bool
 
 
@@ -73,13 +84,6 @@ async def dashboard(
             func.date_trunc(item.period.label.trunc, Metric.created).label('period'),
             func.sum(Metric.value).label('total_value')
         )
-        .outerjoin(
-            HiddenMetric,
-            (HiddenMetric.metric_name == Metric.name) & (HiddenMetric.user_id == token.id)
-        )
-        .where(
-            (HiddenMetric.is_hidden.is_(None)) | (HiddenMetric.is_hidden.is_(False))
-        )
         .group_by(Metric.name, 'period')
         .order_by('period')
     )
@@ -100,9 +104,21 @@ async def dashboard(
     metrics = await db.execute(stmt)
     metrics = metrics.fetchall()
 
-    metrics_dict = {}
+    # Check if the user has hidden metrics
+    stmt = (
+        select(HiddenMetric.metric_name)
+        .filter(HiddenMetric.user_id == token.id)
+        .filter(HiddenMetric.is_hidden.is_(True))
+    )
+    hidden_metrics = await db.execute(stmt)
+    hidden_metrics = hidden_metrics.scalars().all()
+    exclude = set(hidden_metrics)
+
+    metrics_dict = DashboardMetric()
     for metric in metrics:
         name, period, value = metric
+
+        metric = getattr(metrics_dict, name.name)
 
         if name in {
             Metric.MetricType.GGR,
@@ -111,16 +127,14 @@ async def dashboard(
             Metric.MetricType.LTV,
             Metric.MetricType.FTD,
         }:
-            metrics_dict.setdefault(name.name, 0.0)
-            metrics_dict[name.name] += float(value)
+            metric += float(value)
         else:
-            metrics_dict.setdefault(name.name, {})
-            metrics_dict[name.name][period.strftime(item.period.label.strftime)] = float(value)
+            metric[period.strftime(item.period.label.strftime)] = float(value)
 
     return JSONResponse(
         status_code=status.HTTP_200_OK,
         content={
-            "metrics": metrics_dict
+            "metrics": metrics_dict.model_dump(mode="json", exclude=exclude),
         }
     )
 
@@ -148,20 +162,21 @@ async def update_metric_visibility(
     hidden_metric = await db.execute(
         select(HiddenMetric).filter(
             HiddenMetric.user_id == token.id,
-            HiddenMetric.metric_name == request.metric
+            HiddenMetric.metric_name.in_(request.metrics),
         )
     )
-    hidden_metric = hidden_metric.scalar()
+    hidden_metric = hidden_metric.scalars().all()
 
-    if hidden_metric:
-        hidden_metric.is_hidden = request.is_hidden
-    else:
-        hidden_metric = HiddenMetric(
-            user_id=token.id,
-            metric_name=request.metric,
-            is_hidden=request.is_hidden
-        )
-        db.add(hidden_metric)
+    for metric in hidden_metric:
+        if metric.hidden_metric:
+            metric.is_hidden = request.is_hidden
+        else:
+            metric = HiddenMetric(
+                user_id=token.id,
+                metric_name=request.metric,
+                is_hidden=request.is_hidden
+            )
+            db.add(metric)
 
     await db.commit()
 

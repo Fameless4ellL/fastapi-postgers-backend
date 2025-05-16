@@ -68,16 +68,17 @@ def calculate_metrics(date: Optional[datetime] = None):
         # общий доход - сумма средств, полученных за период от продаж билетов
         # активный пользователь - пользователь, у которого в течение периода была хотя бы одна сессия в Bingo
         general_income = (
-            db.query(func.sum(Ticket.amount))
+            db.query(func.sum(BalanceChangeHistory.change_amount))
             .filter(
-                Ticket.status == TicketStatus.COMPLETED,
-                Ticket.created_at >= date,
+                BalanceChangeHistory.status == BalanceChangeHistory.Status.SUCCESS,
+                BalanceChangeHistory.change_type == "ticket purchase",
+                BalanceChangeHistory.created_at >= date,
                 User.country == country
             )
-            .join(User, Ticket.user_id == User.id)
+            .join(User, BalanceChangeHistory.user_id == User.id)
             .scalar() or 0
         )
-        arpu = general_income / len(active_users) if len(active_users) > 0 else 0
+        arpu = abs(general_income) / len(active_users) if len(active_users) > 0 else 0
 
         # ARPPU = общий доход / количество платящих пользователей за период
         # платящий пользователь - пользователь, совершивший в течение периода >=1 покупки билета
@@ -91,18 +92,18 @@ def calculate_metrics(date: Optional[datetime] = None):
             .join(User, Ticket.user_id == User.id)
             .scalar()
         )
-        arppu = general_income / paying_users_count if paying_users_count > 0 else 0
+        arppu = abs(general_income) / paying_users_count if paying_users_count > 0 else 0
 
         # GGR = сумма стоимости всех купленных билетов - сумма всех выигрышей за период
         ggr = (
-            db.query(func.sum(Ticket.amount))
+            db.query(func.sum(BalanceChangeHistory.change_amount))
             .filter(
-                Ticket.status == TicketStatus.COMPLETED,
-                Ticket.won.is_(True),
-                Ticket.created_at >= date,
+                BalanceChangeHistory.status == BalanceChangeHistory.Status.SUCCESS,
+                BalanceChangeHistory.change_type == "won",
+                BalanceChangeHistory.created_at >= date,
                 User.country == country
             )
-            .join(User, Ticket.user_id == User.id)
+            .join(User, BalanceChangeHistory.user_id == User.id)
             .scalar() or 0
         )
 
