@@ -120,13 +120,7 @@ async def dashboard(
 
         metric = getattr(metrics_dict, name.name)
 
-        if name in {
-            Metric.MetricType.GGR,
-            Metric.MetricType.DAU,
-            Metric.MetricType.TOTAL_SOLD_TICKETS,
-            Metric.MetricType.LTV,
-            Metric.MetricType.FTD,
-        }:
+        if isinstance(metric, (int,)):
             metric += float(value)
         else:
             metric[period.strftime(item.period.label.strftime)] = float(value)
@@ -176,7 +170,7 @@ async def update_metric_visibility(
                 metric_name=request.metric,
                 is_hidden=request.is_hidden
             )
-            db.add(metric)
+        db.add(metric)
 
     await db.commit()
 
