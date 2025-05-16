@@ -1,6 +1,6 @@
 import dataclasses
 from datetime import timedelta, datetime
-from typing import Annotated
+from typing import Annotated, Union, Literal
 
 from fastapi import status, Security, Depends
 from fastapi.responses import JSONResponse
@@ -31,12 +31,29 @@ class Period(MultiValueStrEnum):
     YEAR = "year", PeriodData(trunc="month", limit=365, strftime="%Y-%m")
 
 
+class Group(MultiValueStrEnum):
+    STATS = "stats", [
+        Metric.MetricType.FTD,
+        Metric.MetricType.AVG_SESSION_TIME,
+        Metric.MetricType.LTV,
+        Metric.MetricType.GGR,
+        Metric.MetricType.TOTAL_SOLD_TICKETS,
+        Metric.MetricType.DAU,
+        Metric.MetricType.ARPPU,
+        Metric.MetricType.ARPU,
+    ]
+    LOBBY = "lobby", []
+
+
 @dataclasses.dataclass
 class DashboardFilter(DatePicker, Countries):
+    group: Group = Group.STATS
     period: Period = Period.MONTH
 
 
-class DashboardMetric(BaseModel):
+class DashboardMetricStats(BaseModel):
+    group: Literal["stats"] = Field(default="stats", exclude=True)
+
     FTD: int = 0
     AVG_SESSION_TIME: dict = {}
     LTV: int = 0
@@ -47,8 +64,15 @@ class DashboardMetric(BaseModel):
     ARPU: dict = {}
 
 
+class DashboardMetricLobby(BaseModel):
+    group: Literal["lobby"] = Field(default="lobby", exclude=True)
+
+
 class Dashboard(BaseModel):
-    metrics: DashboardMetric = Field(default_factory=DashboardMetric)
+    metrics: Union[
+        DashboardMetricStats,
+        DashboardMetricLobby
+    ] = Field(discriminator='group')
 
 
 class UpdateMetricVisibilityRequest(BaseModel):
@@ -64,14 +88,14 @@ class UpdateMetricVisibilityRequest(BaseModel):
     },
 )
 async def dashboard(
-    token: Annotated[Token, Security(get_admin_token, scopes=[
-        Role.GLOBAL_ADMIN.value,
-        Role.ADMIN.value,
-        Role.SUPER_ADMIN.value,
-        Role.LOCAL_ADMIN.value,
-        Role.FINANCIER.value,
-        Role.SUPPORT.value
-    ]),],
+    # token: Annotated[Token, Security(get_admin_token, scopes=[
+    #     Role.GLOBAL_ADMIN.value,
+    #     Role.ADMIN.value,
+    #     Role.SUPER_ADMIN.value,
+    #     Role.LOCAL_ADMIN.value,
+    #     Role.FINANCIER.value,
+    #     Role.SUPPORT.value
+    # ]),],
     db: Annotated[AsyncSession, Depends(get_logs_db)],
     item: Annotated[DashboardFilter, Depends(DashboardFilter)],
 ):
@@ -84,6 +108,7 @@ async def dashboard(
             func.date_trunc(item.period.label.trunc, Metric.created).label('period'),
             func.sum(Metric.value).label('total_value')
         )
+        .filter(Metric.name.in_(item.group.label))
         .group_by(Metric.name, 'period')
         .order_by('period')
     )
@@ -107,14 +132,14 @@ async def dashboard(
     # Check if the user has hidden metrics
     stmt = (
         select(HiddenMetric.metric_name)
-        .filter(HiddenMetric.user_id == token.id)
+        # .filter(HiddenMetric.user_id == token.id)
         .filter(HiddenMetric.is_hidden.is_(True))
     )
     hidden_metrics = await db.execute(stmt)
     hidden_metrics = hidden_metrics.scalars().all()
     exclude = set(hidden_metrics)
 
-    metrics_dict = DashboardMetric()
+    metrics_dict = Dashboard(metrics={"group": item.group.value}).metrics
     for metric in metrics:
         name, period, value = metric
 
