@@ -38,11 +38,16 @@ class Group(MultiValueStrEnum):
         Metric.MetricType.LTV,
         Metric.MetricType.GGR,
         Metric.MetricType.TOTAL_SOLD_TICKETS,
-        Metric.MetricType.DAU,
+        Metric.MetricType.ACTIVE_USERS,
         Metric.MetricType.ARPPU,
         Metric.MetricType.ARPU,
     ]
-    LOBBY = "lobby", []
+    LOBBY = "lobby", [
+        Metric.MetricType.TOTAL_SOLD_TICKETS,
+        Metric.MetricType.ACTIVE_USERS,
+        Metric.MetricType.TICKETS_SOLD,
+        Metric.MetricType.TOTAL_PRIZE_FUNDS,
+    ]
 
 
 @dataclasses.dataclass
@@ -59,13 +64,18 @@ class DashboardMetricStats(BaseModel):
     LTV: int = 0
     GGR: int = 0
     TOTAL_SOLD_TICKETS: int = 0
-    DAU: int = 0
+    ACTIVE_USERS: int = 0
     ARPPU: dict = {}
     ARPU: dict = {}
 
 
 class DashboardMetricLobby(BaseModel):
     group: Literal["lobby"] = Field(default="lobby", exclude=True)
+
+    TOTAL_SOLD_TICKETS: int = 0
+    ACTIVE_USERS: int = 0
+    TICKETS_SOLD: int = 0
+    TOTAL_PRIZE_FUNDS: int = 0
 
 
 class Dashboard(BaseModel):

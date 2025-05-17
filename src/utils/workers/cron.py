@@ -2,7 +2,7 @@ from datetime import timedelta, datetime
 from decimal import Decimal
 from typing import Optional
 
-from sqlalchemy import func, literal_column
+from sqlalchemy import func, literal_column, DECIMAL
 
 from src.models import (
     Ticket,
@@ -14,7 +14,9 @@ from src.models import (
     BalanceChangeHistory,
     get_sync_logs_db,
     UserActionLog,
-    Currency
+    Currency,
+    Game,
+    Jackpot, GameView,
 )
 from src.utils import worker
 from settings import settings
@@ -40,6 +42,45 @@ def calculate_metrics(date: Optional[datetime] = None):
     logs = next(get_sync_logs_db())
 
     regions = db.query(User.country).distinct(User.country).all()
+    currency = db.query(Currency).first()  # TODO change, after adding currencies
+
+    global_games = (
+        db.query(func.count(func.distinct(Game.id)))
+        .filter(
+            Game.created_at >= date,
+            Game.country.is_(None)
+        )
+        .scalar()
+    )
+    global_jackpots = (
+        db.query(func.count(func.distinct(Jackpot.id)))
+        .filter(
+            Jackpot.created_at >= date,
+            Jackpot.country.is_(None)
+        )
+        .scalar()
+    )
+    global_games = sum([global_jackpots + global_games])
+
+    games_prize = (
+            db.query(func.sum(func.cast(Game.prize, DECIMAL)))
+            .filter(
+                Game.kind == GameView.MONETARY,
+                Game.created_at >= date,
+                Game.country.is_(None)
+            )
+            .scalar() or 0
+    )
+    jackpot_prize = (
+            db.query(func.sum(Jackpot.amount))
+            .filter(
+                Game.kind == GameView.MONETARY,
+                Jackpot.created_at >= date,
+                Jackpot.country.is_(None)
+            )
+            .scalar() or 0
+    )
+    global_total_prize_funds = games_prize + jackpot_prize
 
     for region in regions:
         country = region[0]
@@ -153,8 +194,67 @@ def calculate_metrics(date: Optional[datetime] = None):
             .scalar() or Decimal(0)
         )
 
-        # LTV = LTV (Lifetime Value) = ARPU × Средний срок жизни игрока Session Time (Avg)
+        # LTV(Lifetime Value) = ARPU × Средний срок жизни игрока Session Time (Avg)
         ltv = arpu * avg_session_time
+
+        # ALL_GAMES = количество всех игр
+        local_games = (
+            db.query(func.count(func.distinct(Game.id)))
+            .filter(
+                Game.created_at >= date,
+                Game.country == country
+            )
+            .scalar()
+        )
+        jackpot = (
+            db.query(func.count(func.distinct(Jackpot.id)))
+            .filter(
+                Jackpot.created_at >= date,
+                Jackpot.country == country
+            )
+            .scalar()
+        )
+        instabingo = (
+            db.query(func.count(func.distinct(Ticket.instabingo_id)))
+            .filter(
+                Ticket.created_at >= date,
+                User.country == country
+            )
+            .join(User, Ticket.user_id == User.id)
+            .scalar()
+        )
+        games = sum([local_games, jackpot, instabingo])
+
+        # all tickets
+        tickets = (
+            db.query(func.count(Ticket.id))
+            .filter(
+                Ticket.created_at >= date,
+                User.country == country
+            )
+            .join(User, Ticket.user_id == User.id)
+            .scalar()
+        )
+
+        # TOTAL_PRIZE_FUNDS
+        local_games = (
+            db.query(func.sum(func.cast(Game.prize, DECIMAL)))
+            .filter(
+                Game.kind == GameView.MONETARY,
+                Game.created_at >= date,
+                Game.country == country
+            )
+            .scalar() or 0
+        )
+        jackpot = (
+            db.query(func.sum(Jackpot.amount))
+            .filter(
+                Jackpot.created_at >= date,
+                Jackpot.country == country
+            )
+            .scalar() or 0
+        )
+        total_prize_funds = local_games + jackpot
 
         metrics = {
             Metric.MetricType.TOTAL_SOLD_TICKETS: total_sold_tickets,
@@ -162,12 +262,13 @@ def calculate_metrics(date: Optional[datetime] = None):
             Metric.MetricType.ARPPU: arppu,
             Metric.MetricType.GGR: ggr,
             Metric.MetricType.FTD: ftd,
-            Metric.MetricType.DAU: au,
+            Metric.MetricType.ACTIVE_USERS: au,
             Metric.MetricType.AVG_SESSION_TIME: avg_session_time,
-            Metric.MetricType.LTV: ltv
+            Metric.MetricType.LTV: ltv,
+            Metric.MetricType.TICKETS_SOLD: tickets,
+            Metric.MetricType.TOTAL_PRIZE_FUNDS: total_prize_funds,
+            Metric.MetricType.ALL_GAMES: games
         }
-
-        currency = db.query(Currency).first() # TODO change, after adding currencies
 
         for metric_type, value in metrics.items():
             new_stat = Metric(
@@ -178,6 +279,26 @@ def calculate_metrics(date: Optional[datetime] = None):
                 created=date + timedelta(hours=1) if update_today else date,
             )
             logs.add(new_stat)
+
+        # Globals
+        obj = [
+            Metric(
+                name=Metric.MetricType.ALL_GAMES,
+                currency_id=currency.id,
+                value=Decimal(global_games),
+                country=None,
+                created=date + timedelta(hours=1) if update_today else date,
+            ),
+            Metric(
+                name=Metric.MetricType.TOTAL_PRIZE_FUNDS,
+                currency_id=currency.id,
+                value=Decimal(global_total_prize_funds),
+                country=None,
+                created=date + timedelta(hours=1) if update_today else date,
+            )
+        ]
+        logs.add_all(obj)
+
         logs.commit()
 
 
