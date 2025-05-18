@@ -115,7 +115,7 @@ async def dashboard(
     stmt = (
         select(
             Metric.name,
-            func.date_trunc("month", Metric.created).label('period'),
+            func.date_trunc(item.period.label.trunc, Metric.created).label('period'),
             func.sum(Metric.value).label('total_value')
         )
         .filter(Metric.name.in_(item.group.label))
