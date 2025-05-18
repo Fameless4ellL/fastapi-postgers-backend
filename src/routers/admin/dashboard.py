@@ -118,7 +118,7 @@ async def dashboard(
             func.date_trunc("month", Metric.created).label('period'),
             func.sum(Metric.value).label('total_value')
         )
-        # .filter(Metric.name.in_(item.group.label))
+        .filter(Metric.name.in_(item.group.label))
         .group_by(Metric.name, 'period')
         .order_by('period')
     )
@@ -136,7 +136,7 @@ async def dashboard(
             Metric.created >= datetime.now() - timedelta(days=item.period.label.limit),
         )
 
-    metrics = db.execute(stmt)
+    metrics = await db.execute(stmt)
     metrics = metrics.fetchall()
 
     # Check if the user has hidden metrics
@@ -145,24 +145,26 @@ async def dashboard(
         # .filter(HiddenMetric.user_id == token.id)
         .filter(HiddenMetric.is_hidden.is_(True))
     )
-    hidden_metrics = db.execute(stmt)
+    hidden_metrics = await db.execute(stmt)
     hidden_metrics = hidden_metrics.scalars().all()
     exclude = set(hidden_metrics)
 
-    metrics_dict = Dashboard(metrics={"group": item.group.value}).model_dump()
+    metrics_dict = Dashboard(metrics={"group": item.group.value}).metrics.model_dump(exclude=exclude)
+    metrics_dict["group"] = item.group.value
     for metric in metrics:
         name, period, value = metric
 
-        if isinstance(metric, (int,)):
+        if name.name in exclude:
+            continue
+
+        if isinstance(metrics_dict[name.name], (int, float)):
             metrics_dict[name.name] += float(value)
         else:
-            metric[name.name][period.strftime(item.period.label.strftime)] = float(value)
+            metrics_dict[name.name][period.strftime(item.period.label.strftime)] = float(value)
 
     return JSONResponse(
         status_code=status.HTTP_200_OK,
-        content={
-            "metrics": Dashboard(metrics=metrics_dict).model_dump(mode="json", exclude=exclude),
-        }
+        content=Dashboard(metrics=metrics_dict).model_dump(mode="json"),
     )
 
 
