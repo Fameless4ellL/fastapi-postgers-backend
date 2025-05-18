@@ -192,7 +192,7 @@ def calculate_metrics(date: Optional[datetime] = None):
         )
 
         # LTV(Lifetime Value) = ARPU × Средний срок жизни игрока Session Time (Avg)
-        ltv = arpu * avg_session_time
+        ltv = arpu * float(avg_session_time)
 
         # ALL_GAMES = количество всех игр
         local_games = (
@@ -267,15 +267,19 @@ def calculate_metrics(date: Optional[datetime] = None):
             Metric.MetricType.ALL_GAMES: games
         }
 
+        obj = []
         for metric_type, value in metrics.items():
-            new_stat = Metric(
-                name=metric_type,
-                currency_id=currency.id,
-                value=Decimal(value),
-                country=country,
-                created=date + timedelta(hours=1) if update_today else date,
+            obj.append(
+                Metric(
+                    name=metric_type,
+                    currency_id=currency.id,
+                    value=Decimal(value),
+                    country=country,
+                    created=date + timedelta(hours=1) if update_today else date,
+                )
             )
-            logs.add(new_stat)
+        logs.add_all(obj)
+        logs.commit()
 
     # Globals
     obj = [

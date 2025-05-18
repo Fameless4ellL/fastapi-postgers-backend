@@ -59,12 +59,12 @@ class DashboardFilter(DatePicker, Countries):
 class DashboardMetricStats(BaseModel):
     group: Literal["stats"] = Field(default="stats", exclude=True)
 
-    FTD: int = 0
+    FTD: float = 0
     AVG_SESSION_TIME: dict = {}
-    LTV: int = 0
-    GGR: int = 0
-    TOTAL_SOLD_TICKETS: int = 0
-    ACTIVE_USERS: int = 0
+    LTV: float = 0
+    GGR: float = 0
+    TOTAL_SOLD_TICKETS: float = 0
+    ACTIVE_USERS: float = 0
     ARPPU: dict = {}
     ARPU: dict = {}
 
@@ -72,10 +72,10 @@ class DashboardMetricStats(BaseModel):
 class DashboardMetricLobby(BaseModel):
     group: Literal["lobby"] = Field(default="lobby", exclude=True)
 
-    TOTAL_SOLD_TICKETS: int = 0
-    ACTIVE_USERS: int = 0
-    TICKETS_SOLD: int = 0
-    TOTAL_PRIZE_FUNDS: int = 0
+    TOTAL_SOLD_TICKETS: float = 0
+    ACTIVE_USERS: float = 0
+    TICKETS_SOLD: float = 0
+    TOTAL_PRIZE_FUNDS: float = 0
 
 
 class Dashboard(BaseModel):
