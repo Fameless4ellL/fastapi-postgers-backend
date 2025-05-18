@@ -98,14 +98,14 @@ class UpdateMetricVisibilityRequest(BaseModel):
     },
 )
 async def dashboard(
-    # token: Annotated[Token, Security(get_admin_token, scopes=[
-    #     Role.GLOBAL_ADMIN.value,
-    #     Role.ADMIN.value,
-    #     Role.SUPER_ADMIN.value,
-    #     Role.LOCAL_ADMIN.value,
-    #     Role.FINANCIER.value,
-    #     Role.SUPPORT.value
-    # ]),],
+    token: Annotated[Token, Security(get_admin_token, scopes=[
+        Role.GLOBAL_ADMIN.value,
+        Role.ADMIN.value,
+        Role.SUPER_ADMIN.value,
+        Role.LOCAL_ADMIN.value,
+        Role.FINANCIER.value,
+        Role.SUPPORT.value
+    ]),],
     db: Annotated[AsyncSession, Depends(get_logs_db)],
     item: Annotated[DashboardFilter, Depends(DashboardFilter)],
 ):
@@ -115,10 +115,10 @@ async def dashboard(
     stmt = (
         select(
             Metric.name,
-            func.date_trunc(item.period.label.trunc, Metric.created).label('period'),
+            func.date_trunc("month", Metric.created).label('period'),
             func.sum(Metric.value).label('total_value')
         )
-        .filter(Metric.name.in_(item.group.label))
+        # .filter(Metric.name.in_(item.group.label))
         .group_by(Metric.name, 'period')
         .order_by('period')
     )
@@ -136,7 +136,7 @@ async def dashboard(
             Metric.created >= datetime.now() - timedelta(days=item.period.label.limit),
         )
 
-    metrics = await db.execute(stmt)
+    metrics = db.execute(stmt)
     metrics = metrics.fetchall()
 
     # Check if the user has hidden metrics
@@ -145,25 +145,23 @@ async def dashboard(
         # .filter(HiddenMetric.user_id == token.id)
         .filter(HiddenMetric.is_hidden.is_(True))
     )
-    hidden_metrics = await db.execute(stmt)
+    hidden_metrics = db.execute(stmt)
     hidden_metrics = hidden_metrics.scalars().all()
     exclude = set(hidden_metrics)
 
-    metrics_dict = Dashboard(metrics={"group": item.group.value}).metrics
+    metrics_dict = Dashboard(metrics={"group": item.group.value}).model_dump()
     for metric in metrics:
         name, period, value = metric
 
-        metric = getattr(metrics_dict, name.name)
-
         if isinstance(metric, (int,)):
-            metric += float(value)
+            metrics_dict[name.name] += float(value)
         else:
-            metric[period.strftime(item.period.label.strftime)] = float(value)
+            metric[name.name][period.strftime(item.period.label.strftime)] = float(value)
 
     return JSONResponse(
         status_code=status.HTTP_200_OK,
         content={
-            "metrics": metrics_dict.model_dump(mode="json", exclude=exclude),
+            "metrics": Dashboard(metrics=metrics_dict).model_dump(mode="json", exclude=exclude),
         }
     )
 

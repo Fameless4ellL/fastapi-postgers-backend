@@ -280,26 +280,27 @@ def calculate_metrics(date: Optional[datetime] = None):
             )
             logs.add(new_stat)
 
-        # Globals
-        obj = [
-            Metric(
-                name=Metric.MetricType.ALL_GAMES,
-                currency_id=currency.id,
-                value=Decimal(global_games),
-                country=None,
-                created=date + timedelta(hours=1) if update_today else date,
-            ),
-            Metric(
-                name=Metric.MetricType.TOTAL_PRIZE_FUNDS,
-                currency_id=currency.id,
-                value=Decimal(global_total_prize_funds),
-                country=None,
-                created=date + timedelta(hours=1) if update_today else date,
-            )
-        ]
-        logs.add_all(obj)
+    # Globals
+    obj = [
+        Metric(
+            name=Metric.MetricType.ALL_GAMES,
+            currency_id=currency.id,
+            value=Decimal(global_games),
+            country=None,
+            created=date + timedelta(hours=1) if update_today else date,
+        ),
+        Metric(
+            name=Metric.MetricType.TOTAL_PRIZE_FUNDS,
+            currency_id=currency.id,
+            value=Decimal(global_total_prize_funds),
+            country=None,
+            created=date + timedelta(hours=1) if update_today else date,
+        )
+    ]
+    logs.add_all(obj)
+    logs.commit()
 
-        logs.commit()
+    return True
 
 
 @worker.register
