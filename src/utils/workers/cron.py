@@ -8,7 +8,6 @@ from src.models import (
     Ticket,
     get_sync_db,
     Metric,
-    TicketStatus,
     User,
     Role,
     BalanceChangeHistory,
@@ -86,7 +85,6 @@ def calculate_metrics(date: Optional[datetime] = None):
         country = region[0]
         # Total sold tickets = общее количество проданных за период билетов
         total_sold_tickets = db.query(func.count(Ticket.id)).filter(
-            Ticket.status == TicketStatus.COMPLETED,
             Ticket.created_at >= date,
             User.country == country
         ).join(
@@ -126,7 +124,6 @@ def calculate_metrics(date: Optional[datetime] = None):
         paying_users_count = (
             db.query(func.count(func.distinct(Ticket.user_id)))
             .filter(
-                Ticket.status == TicketStatus.COMPLETED,
                 Ticket.created_at >= date,
                 User.country == country
             )
