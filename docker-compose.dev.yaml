@@ -101,7 +101,7 @@ services:
     depends_on:
       - api
     volumes:
-      - ./cron:/etc/crontabs/rootjnh
+      - ./cron:/etc/crontabs/root
 
   blocker:
     build:
