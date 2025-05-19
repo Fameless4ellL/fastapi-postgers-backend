@@ -386,7 +386,7 @@ async def get_history(
     """
     Получение истории изменения баланса
     """
-    history = db.execute(
+    history = await db.execute(
         select(
             BalanceChangeHistory.id,
             BalanceChangeHistory.change_amount,
