@@ -276,14 +276,6 @@ async def buy_tickets(
             ).model_dump()
         )
 
-    if item.demo and len(item.numbers) > 1:
-        return JSONResponse(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            content=BadResponse(message=(
-                "Demo mode is available only for one ticket"
-            )).model_dump()
-        )
-
     jackpot_id = None
 
     if not item.demo:
