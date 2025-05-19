@@ -441,7 +441,7 @@ async def get_my_games(
     Получение игр пользователя в котором он участвовал
     """
     # TODO refactor
-    model = importlib.import_module("models.other")
+    model = importlib.import_module("src.models.other")
     model = getattr(model, item.model)
 
     # list of games or jackpots by user distinct
