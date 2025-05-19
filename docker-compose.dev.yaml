@@ -96,12 +96,12 @@ services:
     restart: on-failure
 
   cronjobs:
-    restart: unless-stopped
+    restart: always
     image: tigpt/cronjobs
     depends_on:
       - api
     volumes:
-      - ./cron:/etc/crontabs/root
+      - ./cron:/etc/crontabs/rootjnh
 
   blocker:
     build:

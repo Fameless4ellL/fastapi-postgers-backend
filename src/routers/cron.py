@@ -120,5 +120,5 @@ async def hourly():
     """Часовой отчет по метрикам"""
     q.enqueue(
         worker.calculate_metrics,
-        job_id=f"calculate_metrics({datetime.datetime.now().strftime('%Y-%m-%d %H:%M')})"
+        job_id=f"calculate_metrics({datetime.datetime.now().strftime('%Y-%m-%d %H-%M')})"
     )

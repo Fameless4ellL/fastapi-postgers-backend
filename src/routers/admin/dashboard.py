@@ -25,6 +25,7 @@ class PeriodData:
 
 
 class Period(MultiValueStrEnum):
+    HOUR = "hour", PeriodData(trunc="minute", limit=1, strftime="%I:%M")
     DAY = "day", PeriodData(trunc="hour", limit=1, strftime="%I:%M")
     WEEK = "week", PeriodData(trunc="day", limit=7, strftime="%Y-%m-%d")
     MONTH = "month", PeriodData(trunc="day", limit=30, strftime="%Y-%m-%d")
@@ -131,10 +132,23 @@ async def dashboard(
             Metric.created >= item.date_from,
             Metric.created <= item.date_to
         )
-    else:
+    elif item.date_from:
         stmt = stmt.where(
-            Metric.created >= datetime.now() - timedelta(days=item.period.label.limit),
+            Metric.created >= item.date_from,
         )
+    elif item.date_to:
+        stmt = stmt.where(
+            Metric.created <= item.date_to,
+        )
+    else:
+        if item.period.label == Period.HOUR:
+            stmt = stmt.where(
+                Metric.created >= datetime.now() - timedelta(hours=item.period.label.limit),
+            )
+        else:
+            stmt = stmt.where(
+                Metric.created >= datetime.now() - timedelta(days=item.period.label.limit),
+            )
 
     metrics = await db.execute(stmt)
     metrics = metrics.fetchall()
