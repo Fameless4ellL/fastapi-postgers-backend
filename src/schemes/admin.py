@@ -285,7 +285,7 @@ class GameCreate(BaseAdmin):
     price: float = 1.0
     description: Optional[str] = Field("", max_length=500)
     max_win_amount: Optional[float] = 8.0
-    prize: Union[float, str] = 1000
+    prize: Union[str] = "1000"
     country: Optional[CountryAlpha3] = None
     min_ticket_count: int = 1
     scheduled_datetime: Optional[FutureDatetime]
