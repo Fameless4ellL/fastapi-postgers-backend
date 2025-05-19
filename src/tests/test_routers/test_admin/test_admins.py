@@ -132,7 +132,6 @@ class TestAdminPage:
         assert response.status_code == 201
         assert response.json() == "OK"
 
-    @pytest.mark.xfail(reason="This test is expected to fail due to 422")
     async def test_updates_admin_successfully(
         self,
         async_api: AsyncClient,
@@ -149,8 +148,8 @@ class TestAdminPage:
                 None,
                 admin_data
             ),
-            "avatar": file,
-            "documents": file
+            "avatar": file.filename,
+            "documents": file.filename
         }
         response = await async_api.put(
             f"v1/admin/admins/{admin.id}/update",

@@ -299,7 +299,7 @@ async def update_admin(
         item: Annotated[AdminCreate, JsonForm()],
         admin_id: Annotated[int, Path()],
         avatar: Union[str, UploadFile, None] = None,
-        documents: Union[list[UploadFile], None] = None
+        documents: Union[list[str], list[UploadFile], None] = None
 ):
     """
     Update admin
@@ -346,20 +346,22 @@ async def update_admin(
 
         avatar.filename = f"{admin.id}_{avatar.filename}"
         admin.avatar_v1 = avatar
+    if all(
+            isinstance(doc, UploadFile) for doc in documents
+    ):
+        for file in documents:
+            if not file.content_type.startswith("image"):
+                return JSONResponse(
+                    status_code=status.HTTP_400_BAD_REQUEST,
+                    content="Invalid file type"
+                )
 
-    for file in documents:
-        if not file.content_type.startswith("image"):
-            return JSONResponse(
-                status_code=status.HTTP_400_BAD_REQUEST,
-                content="Invalid file type"
+            file.filename = f"{admin.id}_{file.filename}"
+            doc = Document(
+                user_id=admin.id,
+                file=file
             )
-
-        file.filename = f"{admin.id}_{file.filename}"
-        doc = Document(
-            user_id=admin.id,
-            file=file
-        )
-        db.add(doc)
+            db.add(doc)
 
     db.add(admin)
     await db.commit()

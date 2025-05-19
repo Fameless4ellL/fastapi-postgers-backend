@@ -1,6 +1,7 @@
 from datetime import datetime
 
 import pytest
+from sqlalchemy import select, delete
 from httpx import AsyncClient
 from redis.asyncio import Redis
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -88,11 +89,6 @@ async def token(
     assert response.status_code == 200
     assert "access_token" in response.json()
     yield response.json()["access_token"]
-
-
-import pytest
-from sqlalchemy import select, delete
-from sqlalchemy.ext.asyncio import AsyncSession
 
 
 @pytest.fixture

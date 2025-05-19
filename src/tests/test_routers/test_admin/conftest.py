@@ -236,7 +236,10 @@ async def admin_data(db: AsyncSession):
     user = user.scalars().first()
 
     if user:
-        await db.execute(
-            delete(User).where(User.id == user.id)
-        )
-        await db.commit()
+        try:
+            await db.execute(
+                delete(User).where(User.id == user.id)
+            )
+            await db.commit()
+        except Exception as e:
+            print(e)
