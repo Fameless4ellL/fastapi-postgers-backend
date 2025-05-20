@@ -20,7 +20,7 @@ from src.schemes import BadResponse
 from src.schemes import (
     CheckCode,
     SendCode,
-    UserCreate,
+    UserRegister,
     UserLogin,
     AccessToken
 )
@@ -37,7 +37,7 @@ from src.utils.signature import create_access_token, verify_password
 )
 async def register(
     request: Request,
-    user: UserCreate,
+    user: UserRegister,
     db: Annotated[AsyncSession, Depends(get_db)]
 ):
     if not user.phone_number and not user.username:
@@ -156,13 +156,6 @@ async def login(
             status_code=400, content={"message": "Phone number or username is required"}
         )
 
-    if not await aredis.exists(f"AUTH:{request.client.host}"):
-        return JSONResponse(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            content={"message": "Please resend sms code"})
-
-    await aredis.delete(f"AUTH:{request.client.host}")
-
     # get country from phone_number
     country_code = parse(user.phone_number)
     phone_number = f"{country_code.country_code}{country_code.national_number}"
@@ -177,6 +170,21 @@ async def login(
         return JSONResponse(
             status_code=status.HTTP_404_NOT_FOUND, content={"message": "User not found"}
         )
+
+    if not await aredis.exists(f"SMS:{request.client.host}"):
+        return JSONResponse(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            content={"message": "Invalid code"})
+
+    code: bytes = await aredis.get(f"SMS:{request.client.host}")
+
+    if code.decode("utf-8") != user.code:
+        return JSONResponse(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            content={"message": "Invalid code"}
+        )
+
+    await aredis.delete(f"SMS:{request.client.host}")
 
     # if not user or not verify_password(
     #     user.password.get_secret_value(), userdb.password

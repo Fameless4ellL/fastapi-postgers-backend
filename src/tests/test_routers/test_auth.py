@@ -43,20 +43,11 @@ class TestAuth:
         tear_down: None
     ):
         response = await async_api.post(
-            "/v1/check_code",
-            json={
-                "phone_number": user.phone_number,
-                "code": "123456",
-            }
-        )
-
-        assert response.status_code == status.HTTP_200_OK
-
-        response = await async_api.post(
             "/v1/login",
             json={
                 "username": user.username,
                 "phone_number": f"+{user.phone_number}",
+                "code": "123456",
             }
         )
 

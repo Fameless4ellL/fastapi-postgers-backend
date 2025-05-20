@@ -9,13 +9,15 @@ class CheckCode(BaseModel):
     code: str = Field(..., min_length=6, max_length=6, description="SMS code")
 
 
-class UserLogin(BaseModel):
+class UserLogin(CheckCode):
     username: str = Field(default="", exclude=True, deprecated=True)
     phone_number: ModPhoneNumber
     password: Optional[SecretStr] = Field(default="", exclude=True, deprecated=True)
 
 
-class UserCreate(UserLogin):
+class UserRegister(BaseModel):
+    username: str = Field(default="", exclude=True, deprecated=True)
+    phone_number: ModPhoneNumber
     country: CountryAlpha3
     refferal_code: Optional[str] = None
 
