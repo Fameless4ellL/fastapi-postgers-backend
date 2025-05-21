@@ -303,11 +303,11 @@ async def create_admin(
     },
 )
 async def update_admin(
-        db: Annotated[AsyncSession, Depends(get_db)],
-        item: Annotated[AdminCreate, JsonForm()],
-        admin_id: Annotated[int, Path()],
-        avatar: Union[str, UploadFile, None] = None,
-        documents: Union[list[str], list[UploadFile], None] = None
+    db: Annotated[AsyncSession, Depends(get_db)],
+    item: Annotated[AdminCreate, JsonForm()],
+    admin_id: Annotated[int, Path()],
+    avatar: Union[str, UploadFile, None] = None,
+    documents: Union[list[str], list[UploadFile], None] = None
 ):
     """
     Update admin
@@ -322,14 +322,14 @@ async def update_admin(
         )
 
     stmt = select(
-        exists().where(User.id != admin_id).where(
+        exists().where(
             or_(
                 User.phone_number == item.phone_number,
                 User.telegram == item.telegram,
                 User.username == item.username,
                 User.email == item.email
             )
-        )
+        ).where(User.id != admin_id)
     )
 
     ex = await db.execute(stmt)
