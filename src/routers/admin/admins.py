@@ -116,8 +116,8 @@ async def get_admin_list(
             "fullname": f"{a.firstname} {a.lastname}",
             "active": a.active,
             "telegram": a.telegram,
-            "phone_number": a.phone_number if scope == Role.GLOBAL_ADMIN.value else None,
-            "email": a.email if scope == Role.GLOBAL_ADMIN.value else None,
+            "phone_number": a.phone_number if scope != Role.GLOBAL_ADMIN.value else None,
+            "email": a.email if scope != Role.GLOBAL_ADMIN.value else None,
             "role": a.role,
             "country": a.country,
         }
@@ -228,9 +228,19 @@ async def create_admin(
 
     if item.phone_number:
         stmt = stmt.filter(User.phone_number == item.phone_number)
-
+    if item.telegram:
+        stmt = stmt.filter(User.telegram != item.telegram)
     if item.username:
         stmt = stmt.filter(User.username != item.username)
+
+    exists = await db.execute(stmt)
+    exists = exists.scalars().all()
+
+    if exists:
+        return JSONResponse(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            content={"message": "Unique field error"}
+        )
 
     exists = await db.execute(stmt)
     exists = exists.scalars().all()
