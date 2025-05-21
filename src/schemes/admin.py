@@ -718,9 +718,7 @@ class AdminCreate(BaseAdmin):
     @model_serializer
     def ser_model(self):
         # get country from phone_number
-        country_code = parse(self.phone_number)
-        phone_number = f"{country_code.country_code}{country_code.national_number}"
-
+        country_code = parse(f"+{self.phone_number}")
         country = geocoder.region_code_for_number(country_code)
         alpha3 = pycountry.countries.get(alpha_2=country).alpha_3
 
@@ -728,7 +726,7 @@ class AdminCreate(BaseAdmin):
             "firstname": self.firstname,
             "lastname": self.lastname,
             "email": self.email,
-            "phone_number": phone_number,
+            "phone_number": self.phone_number,
             "role": self.role.label,
             "telegram": self.telegram,
             "country": alpha3,

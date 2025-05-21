@@ -3,7 +3,7 @@ from typing import Annotated, Union
 
 from fastapi import Depends, Path, background, status, Security, UploadFile
 from fastapi.responses import JSONResponse
-from sqlalchemy import func, select, or_
+from sqlalchemy import func, select, or_, exists
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from src.globals import aredis
@@ -33,7 +33,6 @@ from src.schemes.admin import (
 )
 from src.schemes import BadResponse, JsonForm
 from settings import settings
-
 
 get_crud_router(
     model=Network,
@@ -224,26 +223,25 @@ async def create_admin(
             content={"message": "You can't create this admin"},
         )
 
-    stmt = select(User)
+    stmt = select(
+        exists().where(
+            or_(
+                User.phone_number == item.phone_number,
+                User.telegram == item.telegram,
+                User.username == item.username,
+                User.email == item.email
+            )
+        )
+    )
 
-    if item.phone_number:
-        stmt = stmt.filter(or_(User.id == item.phone_number))
-    if item.telegram:
-        stmt = stmt.filter(or_(User.telegram != item.telegram))
-    if item.username:
-        stmt = stmt.filter(or_(User.username != item.username))
+    ex = await db.execute(stmt)
+    ex = ex.scalar()
 
-    exists = await db.execute(stmt)
-    exists = exists.scalars().all()
-
-    if exists:
+    if ex:
         return JSONResponse(
             status_code=status.HTTP_400_BAD_REQUEST,
             content={"message": "Unique field error"}
         )
-
-    exists = await db.execute(stmt)
-    exists = exists.scalars().all()
 
     if exists:
         return JSONResponse(
@@ -278,7 +276,7 @@ async def create_admin(
     await db.commit()
 
     code = random.randint(100000, 999999)
-    await aredis.set(f"EMAIL:{new_admin.email}", code, ex=60*15)
+    await aredis.set(f"EMAIL:{new_admin.email}", code, ex=60 * 15)
 
     bg.add_task(
         send_mail,
@@ -323,17 +321,25 @@ async def update_admin(
             content={"message": "Admin not found"},
         )
 
-    stmt = select(User)
+    stmt = select(
+        exists().where(User.id != admin_id).where(
+            or_(
+                User.phone_number == item.phone_number,
+                User.telegram == item.telegram,
+                User.username == item.username,
+                User.email == item.email
+            )
+        )
+    )
 
-    if item.phone_number:
-        stmt = stmt.filter(or_(User.id == item.phone_number))
-    if item.telegram:
-        stmt = stmt.filter(or_(User.telegram != item.telegram))
-    if item.username:
-        stmt = stmt.filter(or_(User.username != item.username))
+    ex = await db.execute(stmt)
+    ex = ex.scalar()
 
-    exists = await db.execute(stmt)
-    exists = exists.scalars().all()
+    if ex:
+        return JSONResponse(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            content={"message": "Unique field error"}
+        )
 
     if exists:
         return JSONResponse(

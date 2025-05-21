@@ -26,10 +26,6 @@ class SendCode(BaseModel):
     phone_number: ModPhoneNumber
 
 
-class LoginType(UserLogin):
-    phone_number: ModPhoneNumber
-
-
 class AccessToken(BaseModel):
     access_token: str
     token_type: str = "bearer"
