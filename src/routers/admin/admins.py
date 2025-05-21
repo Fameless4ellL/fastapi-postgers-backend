@@ -227,11 +227,11 @@ async def create_admin(
     stmt = select(User)
 
     if item.phone_number:
-        stmt = stmt.filter(User.phone_number == item.phone_number)
+        stmt = stmt.filter(or_(User.id == item.phone_number))
     if item.telegram:
-        stmt = stmt.filter(User.telegram != item.telegram)
+        stmt = stmt.filter(or_(User.telegram != item.telegram))
     if item.username:
-        stmt = stmt.filter(User.username != item.username)
+        stmt = stmt.filter(or_(User.username != item.username))
 
     exists = await db.execute(stmt)
     exists = exists.scalars().all()
@@ -326,11 +326,11 @@ async def update_admin(
     stmt = select(User)
 
     if item.phone_number:
-        stmt = stmt.filter(User.phone_number == item.phone_number)
+        stmt = stmt.filter(or_(User.id == item.phone_number))
     if item.telegram:
-        stmt = stmt.filter(User.telegram != item.telegram)
+        stmt = stmt.filter(or_(User.telegram != item.telegram))
     if item.username:
-        stmt = stmt.filter(User.username != item.username)
+        stmt = stmt.filter(or_(User.username != item.username))
 
     exists = await db.execute(stmt)
     exists = exists.scalars().all()
