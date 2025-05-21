@@ -341,12 +341,6 @@ async def update_admin(
             content={"message": "Unique field error"}
         )
 
-    if exists:
-        return JSONResponse(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            content={"message": "Unique field error"}
-        )
-
     for key, value in item.model_dump().items():
         setattr(admin, key, value)
 
