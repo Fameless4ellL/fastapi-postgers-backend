@@ -26,7 +26,7 @@ def yesterday():
 
 
 def hour_left():
-    return (datetime.now() - timedelta(hours=1)).replace(minute=0, second=0, microsecond=0)
+    return datetime.now() - timedelta(minutes=15)
 
 
 @worker.register

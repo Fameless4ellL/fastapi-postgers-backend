@@ -25,8 +25,8 @@ class PeriodData:
 
 
 class Period(MultiValueStrEnum):
-    HOUR = "hour", PeriodData(trunc="minute", limit=1, strftime="%I:%M")
-    DAY = "day", PeriodData(trunc="hour", limit=1, strftime="%I:%M")
+    HOUR = "hour", PeriodData(trunc="minute", limit=1, strftime="%M:%S")
+    DAY = "day", PeriodData(trunc="hour", limit=1, strftime="%H:%M")
     WEEK = "week", PeriodData(trunc="day", limit=7, strftime="%Y-%m-%d")
     MONTH = "month", PeriodData(trunc="day", limit=30, strftime="%Y-%m-%d")
     YEAR = "year", PeriodData(trunc="month", limit=365, strftime="%Y-%m")
@@ -141,7 +141,7 @@ async def dashboard(
             Metric.created <= item.date_to,
         )
     else:
-        if item.period.label == Period.HOUR:
+        if item.period is Period.HOUR:
             stmt = stmt.where(
                 Metric.created >= func.now() - timedelta(hours=item.period.label.limit),
             )
