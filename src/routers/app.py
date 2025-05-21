@@ -17,7 +17,8 @@ from src.models.other import (
     JackpotType,
 )
 from src.routers import public
-from src.utils.dependencies import generate_game, get_user, nth, url_for
+from src.utils.dependencies import generate_game, get_user, nth
+from src.utils.validators import url_for
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import joinedload
 from src.schemes import BadResponse

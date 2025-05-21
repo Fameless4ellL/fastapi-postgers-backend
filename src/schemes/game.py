@@ -8,7 +8,6 @@ from src.models import GameType, GameView
 
 CommaList = Annotated[str, AfterValidator(lambda x: set(x.split(",")))]
 
-
 class TicketMode(str, Enum):
     AUTO = "auto"
     MANUAL = "manual"

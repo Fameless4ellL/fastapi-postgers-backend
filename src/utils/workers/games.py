@@ -129,7 +129,7 @@ def proceed_game(game_id: Optional[int] = None):
     """
     Proceed the game instance and distribute the prize money
     """
-    from src.utils.dependencies import url_for
+    from src.utils.validators import url_for
     db = next(get_sync_db())
 
     if game_id:
@@ -379,7 +379,7 @@ def proceed_jackpot(jackpot_id: Optional[int] = None):
     """
     Proceed the jackpot instance and distribute the prize money
     """
-    from src.utils.dependencies import url_for
+    from src.utils.validators import url_for
     db = next(get_sync_db())
 
     if jackpot_id:

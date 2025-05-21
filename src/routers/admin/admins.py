@@ -2,8 +2,9 @@ import random
 from typing import Annotated, Union
 
 from fastapi import Depends, Path, background, status, Security, UploadFile
+from fastapi.exceptions import RequestValidationError
 from fastapi.responses import JSONResponse
-from sqlalchemy import func, select, or_, exists
+from sqlalchemy import func, select, or_
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from src.globals import aredis
@@ -13,7 +14,8 @@ from src.models.other import Network, Currency
 from src.models.user import User, Role, Document
 from src.routers import admin
 from src.routers.admin import get_crud_router
-from src.utils.dependencies import Token, get_admin_token, send_mail, url_for
+from src.utils.dependencies import Token, get_admin_token, send_mail, is_field_unique
+from src.utils.validators import url_for
 from src.schemes.admin import (
     Admin,
     AdminCreate,
@@ -196,23 +198,24 @@ async def get_admin(
     },
 )
 async def create_admin(
-        db: Annotated[AsyncSession, Depends(get_db)],
-        token: Annotated[Token, Security(
-            get_admin_token,
-            scopes=[
-                Role.SUPER_ADMIN.value,
-                Role.ADMIN.value,
-                Role.GLOBAL_ADMIN.value,
-            ]
-        )],
-        item: Annotated[AdminCreate, JsonForm()],
-        bg: background.BackgroundTasks,
-        avatar: UploadFile,
-        documents: list[UploadFile],
+    db: Annotated[AsyncSession, Depends(get_db)],
+    token: Annotated[Token, Security(
+        get_admin_token,
+        scopes=[
+            Role.SUPER_ADMIN.value,
+            Role.ADMIN.value,
+            Role.GLOBAL_ADMIN.value,
+        ]
+    )],
+    item: Annotated[AdminCreate, JsonForm()],
+    bg: background.BackgroundTasks,
+    avatar: UploadFile,
+    documents: list[UploadFile],
 ):
     """
     Create new admin
     """
+
     scope = next(iter(token.scopes), None)
     if (
             scope == Role.GLOBAL_ADMIN.value
@@ -223,30 +226,29 @@ async def create_admin(
             content={"message": "You can't create this admin"},
         )
 
-    stmt = select(
-        exists().where(
-            or_(
-                User.phone_number == item.phone_number,
-                User.telegram == item.telegram,
-                User.username == item.username,
-                User.email == item.email
-            )
-        )
-    )
+    errors = [
+        await is_field_unique(db, User, field_name=name, field_value=value)
+        for name, value in [
+            ("email", item.email),
+            ("phone_number", item.phone_number),
+            ("telegram", item.telegram)
+        ]
+    ]
 
-    ex = await db.execute(stmt)
-    ex = ex.scalar()
-
-    if ex:
-        return JSONResponse(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            content={"message": "Unique field error"}
-        )
-
-    if exists:
-        return JSONResponse(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            content={"message": "Unique field error"}
+    if not any(errors):
+        raise RequestValidationError(
+            errors=[
+                {
+                    "loc": ["body", field],
+                    "msg": f"{field} is already taken",
+                    "type": "value_error"
+                }
+                for field, error in zip(
+                    ["email", "phone_number", "telegram"],
+                    errors
+                )
+                if not error
+            ]
         )
 
     new_admin = User(**item.model_dump(exclude={"id"}))
@@ -321,24 +323,29 @@ async def update_admin(
             content={"message": "Admin not found"},
         )
 
-    stmt = select(
-        exists().where(
-            or_(
-                User.phone_number == item.phone_number,
-                User.telegram == item.telegram,
-                User.username == item.username,
-                User.email == item.email
-            )
-        ).where(User.id != admin_id)
-    )
+    errors = [
+        is_field_unique(db, User, field_name=name, field_value=value, exclude_id=admin_id)
+        for name, value in [
+            ("email", item.email),
+            ("phone_number", item.phone_number),
+            ("telegram", item.telegram)
+        ]
+    ]
 
-    ex = await db.execute(stmt)
-    ex = ex.scalar()
-
-    if ex:
-        return JSONResponse(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            content={"message": "Unique field error"}
+    if not any(errors):
+        raise RequestValidationError(
+            errors=[
+                {
+                    "loc": ["body", field],
+                    "msg": f"{field} is already taken",
+                    "type": "value_error"
+                }
+                for field, error in zip(
+                    ["email", "phone_number", "telegram"],
+                    errors
+                )
+                if not error
+            ]
         )
 
     for key, value in item.model_dump().items():

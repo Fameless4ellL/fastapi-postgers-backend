@@ -25,7 +25,7 @@ from pydantic_extra_types.country import CountryAlpha3
 from settings import settings
 from src.models.other import GameStatus, GameType, GameView, JackpotType, RepeatType
 from src.models.user import BalanceChangeHistory, Role
-from src.utils.dependencies import get_currency_by_id, get_first_currency, url_for
+from src.utils.validators import get_currency_by_id, get_first_currency, url_for
 from src.schemes.base import Country, Country_by_name, ModPhoneNumber
 from src.utils.datastructure import MultiValueStrEnum
 
@@ -708,7 +708,6 @@ class AdminFilter(Search, Countries):
 class AdminCreate(BaseAdmin):
     firstname: str
     lastname: str
-    username: str
     email: str
     phone_number: ModPhoneNumber
     role: AdminRoles
@@ -760,3 +759,25 @@ class InstaBingoItem(BaseModel):
 class InstaBingoList(BaseModel):
     data: list[InstaBingoItem] = []
     count: int = 0
+
+
+class Operation(BaseModel):
+    id: int
+    user_id: int
+    username: Optional[str] = None
+    country: Country
+    amount: float
+    transaction_type: Optional[str] = None
+    status: Optional[BalanceChangeHistory.Status] = BalanceChangeHistory.Status.PENDING
+    psc: int = 0
+    game_id: Optional[int] = None
+
+
+class Operations(BaseModel):
+    items: list[Operation] = []
+    count: int = 0
+
+
+@dataclass
+class OperationFilter(DatePicker, Countries, Search):
+    status: Optional[list[BalanceChangeHistory.Status]] = Query(None)

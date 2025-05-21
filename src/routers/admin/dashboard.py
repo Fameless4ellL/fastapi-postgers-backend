@@ -99,14 +99,14 @@ class UpdateMetricVisibilityRequest(BaseModel):
     },
 )
 async def dashboard(
-    # token: Annotated[Token, Security(get_admin_token, scopes=[
-    #     Role.GLOBAL_ADMIN.value,
-    #     Role.ADMIN.value,
-    #     Role.SUPER_ADMIN.value,
-    #     Role.LOCAL_ADMIN.value,
-    #     Role.FINANCIER.value,
-    #     Role.SUPPORT.value
-    # ]),],
+    token: Annotated[Token, Security(get_admin_token, scopes=[
+        Role.GLOBAL_ADMIN.value,
+        Role.ADMIN.value,
+        Role.SUPER_ADMIN.value,
+        Role.LOCAL_ADMIN.value,
+        Role.FINANCIER.value,
+        Role.SUPPORT.value
+    ]),],
     db: Annotated[AsyncSession, Depends(get_logs_db)],
     item: Annotated[DashboardFilter, Depends(DashboardFilter)],
 ):
@@ -156,7 +156,7 @@ async def dashboard(
     # Check if the user has hidden metrics
     stmt = (
         select(HiddenMetric.metric_name)
-        # .filter(HiddenMetric.user_id == token.id)
+        .filter(HiddenMetric.user_id == token.id)
         .filter(HiddenMetric.is_hidden.is_(True))
     )
     hidden_metrics = await db.execute(stmt)

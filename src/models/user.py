@@ -126,12 +126,19 @@ class BalanceChangeHistory(Base):
         INSUFFICIENT_FUNDS = "insufficient_funds"
         WEB3_ERROR = "web3_error"
 
+    class GameType(Enum):
+        JACKPOT = "Jackpot"
+        INSTABINGO = "InstaBingo"
+        GAME = "Game"
+
     __tablename__ = "balance_change_history"
 
     id: Mapped[int] = Column(Integer, primary_key=True, index=True)
     user_id: Mapped[int] = Column(Integer, ForeignKey('users.id', ondelete='CASCADE'), nullable=True)
     balance_id: Mapped[int] = Column(Integer, ForeignKey('balance.id', ondelete='CASCADE'), nullable=True)
     currency_id: Mapped[int] = Column(Integer, ForeignKey('currencies.id', ondelete='CASCADE'), nullable=True)
+    game_id: Mapped[int] = Column(Integer, nullable=True, doc="Game ID")
+    game_type: Mapped[GameType] = Column(SQLEnum(GameType), nullable=True, doc="Type of the related game")
     change_amount: Mapped[decimal.Decimal] = Column(DECIMAL(20, 8), default=0)
     change_type: Mapped[str] = Column(String(64), nullable=False)
     previous_balance: Mapped[int] = Column(Integer, nullable=True)

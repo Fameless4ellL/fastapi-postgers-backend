@@ -26,7 +26,8 @@ from src.models.user import (
     BalanceChangeHistory, Document
 )
 from src.routers import public
-from src.utils.dependencies import get_user, get_currency, url_for, get_user_token, worker
+from src.utils.dependencies import get_user, get_currency, get_user_token, worker
+from src.utils.validators import url_for
 from src.schemes import BadResponse, Country, JsonForm
 from src.schemes import (
     MyGames, MyGamesType, Tickets, Withdraw
