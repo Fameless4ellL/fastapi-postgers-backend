@@ -1,5 +1,5 @@
 import dataclasses
-from datetime import timedelta, datetime
+from datetime import timedelta
 from typing import Annotated, Union, Literal
 
 from fastapi import status, Security, Depends
@@ -99,14 +99,14 @@ class UpdateMetricVisibilityRequest(BaseModel):
     },
 )
 async def dashboard(
-    token: Annotated[Token, Security(get_admin_token, scopes=[
-        Role.GLOBAL_ADMIN.value,
-        Role.ADMIN.value,
-        Role.SUPER_ADMIN.value,
-        Role.LOCAL_ADMIN.value,
-        Role.FINANCIER.value,
-        Role.SUPPORT.value
-    ]),],
+    # token: Annotated[Token, Security(get_admin_token, scopes=[
+    #     Role.GLOBAL_ADMIN.value,
+    #     Role.ADMIN.value,
+    #     Role.SUPER_ADMIN.value,
+    #     Role.LOCAL_ADMIN.value,
+    #     Role.FINANCIER.value,
+    #     Role.SUPPORT.value
+    # ]),],
     db: Annotated[AsyncSession, Depends(get_logs_db)],
     item: Annotated[DashboardFilter, Depends(DashboardFilter)],
 ):
@@ -143,11 +143,11 @@ async def dashboard(
     else:
         if item.period.label == Period.HOUR:
             stmt = stmt.where(
-                Metric.created >= datetime.now() - timedelta(hours=item.period.label.limit),
+                Metric.created >= func.now() - timedelta(hours=item.period.label.limit),
             )
         else:
             stmt = stmt.where(
-                Metric.created >= datetime.now() - timedelta(days=item.period.label.limit),
+                Metric.created >= func.now() - timedelta(days=item.period.label.limit),
             )
 
     metrics = await db.execute(stmt)
@@ -156,7 +156,7 @@ async def dashboard(
     # Check if the user has hidden metrics
     stmt = (
         select(HiddenMetric.metric_name)
-        .filter(HiddenMetric.user_id == token.id)
+        # .filter(HiddenMetric.user_id == token.id)
         .filter(HiddenMetric.is_hidden.is_(True))
     )
     hidden_metrics = await db.execute(stmt)

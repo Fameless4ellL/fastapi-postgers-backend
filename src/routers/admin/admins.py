@@ -227,7 +227,7 @@ async def create_admin(
         )
 
     errors = [
-        await is_field_unique(db, User, field_name=name, field_value=value)
+        (name, await is_field_unique(db, User, field_name=name, field_value=value))
         for name, value in [
             ("email", item.email),
             ("phone_number", item.phone_number),
@@ -235,7 +235,7 @@ async def create_admin(
         ]
     ]
 
-    if not any(errors):
+    if not any(error for _, error in errors):
         raise RequestValidationError(
             errors=[
                 {
@@ -243,11 +243,7 @@ async def create_admin(
                     "msg": f"{field} is already taken",
                     "type": "value_error"
                 }
-                for field, error in zip(
-                    ["email", "phone_number", "telegram"],
-                    errors
-                )
-                if not error
+                for field, error in errors
             ]
         )
 
@@ -324,7 +320,7 @@ async def update_admin(
         )
 
     errors = [
-        is_field_unique(db, User, field_name=name, field_value=value, exclude_id=admin_id)
+        (name, await is_field_unique(db, User, field_name=name, field_value=value, exclude_id=admin_id))
         for name, value in [
             ("email", item.email),
             ("phone_number", item.phone_number),
@@ -332,7 +328,7 @@ async def update_admin(
         ]
     ]
 
-    if not any(errors):
+    if not any(error for _, error in errors):
         raise RequestValidationError(
             errors=[
                 {
@@ -340,11 +336,7 @@ async def update_admin(
                     "msg": f"{field} is already taken",
                     "type": "value_error"
                 }
-                for field, error in zip(
-                    ["email", "phone_number", "telegram"],
-                    errors
-                )
-                if not error
+                for field, error in errors
             ]
         )
 
