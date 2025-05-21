@@ -102,6 +102,11 @@ services:
       - api
     volumes:
       - ./cron:/etc/crontabs/root
+    healthcheck:
+      test: ["CMD", "pgrep", "cron"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
 
   blocker:
     build:
