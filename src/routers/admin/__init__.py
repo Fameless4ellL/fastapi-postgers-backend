@@ -450,3 +450,4 @@ from .profile import *
 from .jackpots import *
 from .lobby import *
 from .dashboard import *
+from .finance import *

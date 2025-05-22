@@ -18,13 +18,14 @@ from pydantic import (
     AfterValidator,
     ConfigDict,
     field_validator,
-    EmailStr
+    EmailStr,
+    BeforeValidator
 )
 from pydantic_extra_types.country import CountryAlpha3
 
 from settings import settings
 from src.models.other import GameStatus, GameType, GameView, JackpotType, RepeatType
-from src.models.user import BalanceChangeHistory, Role
+from src.models.user import BalanceChangeHistory, Role, User as DBUser
 from src.utils.validators import get_currency_by_id, get_first_currency, url_for
 from src.schemes.base import Country, Country_by_name, ModPhoneNumber
 from src.utils.datastructure import MultiValueStrEnum
@@ -767,9 +768,13 @@ class Operation(BaseModel):
     country: Country
     amount: float
     transaction_type: Optional[str] = None
-    status: Optional[BalanceChangeHistory.Status] = BalanceChangeHistory.Status.PENDING
-    psc: int = 0
+    status: Annotated[
+        Optional[BalanceChangeHistory.Status],
+        BeforeValidator(lambda v: BalanceChangeHistory.Status[v])
+    ]
+    created_at: Union[datetime, str]
     game_id: Optional[int] = None
+    count: Optional[int] = 1
 
 
 class Operations(BaseModel):
@@ -777,6 +782,20 @@ class Operations(BaseModel):
     count: int = 0
 
 
+class OperationOrder(MultiValueStrEnum):
+    CREATED = "created", BalanceChangeHistory.created_at.asc()
+    CREATED_ = "-created", BalanceChangeHistory.created_at.desc()
+    AMOUNT = "amount", BalanceChangeHistory.change_amount.asc()
+    AMOUNT_ = "-amount", BalanceChangeHistory.change_amount.desc()
+    TYPE = "change_type", BalanceChangeHistory.change_type.asc()
+    TYPE_ = "-change_type", BalanceChangeHistory.change_type.desc()
+    STATUS = "status", BalanceChangeHistory.status.asc()
+    STATUS_ = "-status", BalanceChangeHistory.status.desc()
+    COUNTRY = "country", DBUser.country.asc()
+    COUNTRY_ = "-country", DBUser.country.desc()
+
+
 @dataclass
 class OperationFilter(DatePicker, Countries, Search):
     status: Optional[list[BalanceChangeHistory.Status]] = Query(None)
+    order_by: list[OperationOrder] = Query(default=[OperationOrder.CREATED_])

@@ -23,7 +23,8 @@ from src.models.user import (
     Notification,
     User,
     Wallet,
-    BalanceChangeHistory, Document
+    BalanceChangeHistory,
+    Document
 )
 from src.routers import public
 from src.utils.dependencies import get_user, get_currency, get_user_token, worker

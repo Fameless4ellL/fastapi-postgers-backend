@@ -158,6 +158,7 @@ class BalanceChangeHistory(Base):
     change_type: Mapped[str] = Column(String(64), nullable=False)
     previous_balance: Mapped[int] = Column(Integer, nullable=True)
     status: Mapped[Status] = Column(SQLEnum(Status), default=Status.PENDING)
+    count: Mapped[int] = Column(Integer, nullable=True, default=1)
     proof: Mapped[str] = Column(String(256), nullable=True)
     new_balance: Mapped[decimal.Decimal] = Column(DECIMAL(20, 8), default=0)
     args: Mapped[str] = Column(String, nullable=True, default="{}")

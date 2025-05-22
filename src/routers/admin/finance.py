@@ -1,27 +1,37 @@
+import csv
+from datetime import datetime
+from io import StringIO
 from typing import Annotated
 
-from fastapi import Depends, Path, status, Security
+from fastapi import Depends, status, Security, Path
 from fastapi.responses import JSONResponse
-from sqlalchemy import func, select, or_
+from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
-
+from starlette.responses import StreamingResponse
 
 from src.models.db import get_db
-from src.models.user import User, Role, Document, BalanceChangeHistory
+from src.models.user import User, Role, BalanceChangeHistory
 from src.routers import admin
-from src.utils.dependencies import Token, get_admin_token
-from src.utils.validators import url_for
+from src.utils.dependencies import get_admin_token
 from src.schemes.admin import (
-    Admins,
-    Profile,
     Operations,
-    OperationFilter
+    OperationFilter, Operation,
 )
 from src.schemes import BadResponse
 
 
 @admin.get(
     "/operations",
+    dependencies=[Security(
+        get_admin_token,
+        scopes=[
+            Role.SUPER_ADMIN.value,
+            Role.ADMIN.value,
+            Role.GLOBAL_ADMIN.value,
+            Role.LOCAL_ADMIN.value,
+            Role.FINANCIER.value,
+            Role.SUPPORT.value
+        ])],
     responses={
         400: {"model": BadResponse},
         200: {"model": Operations},
@@ -30,125 +40,138 @@ from src.schemes import BadResponse
 async def get_operation_list(
     db: Annotated[AsyncSession, Depends(get_db)],
     item: Annotated[OperationFilter, Depends(OperationFilter)],
-    token: Annotated[Token, Security(
-        get_admin_token,
-        scopes=[
-            Role.GLOBAL_ADMIN.value,
-            Role.ADMIN.value,
-            Role.SUPER_ADMIN.value,
-            Role.LOCAL_ADMIN.value,
-            Role.FINANCIER.value,
-            Role.SUPPORT.value
-        ]
-    )],
+    export: bool = False,
     offset: int = 0,
     limit: int = 10,
 ):
     """
     Get operations list
     """
-    stmt = select(User).filter(User.role != "user")
-    if item.role:
-        roles = [role.label for role in item.role]
-        stmt = stmt.filter(BalanceChangeHistory.role.in_(roles))
-
-    if item.status:
-        statuss = [_status.label for _status in item.status]
-        stmt = stmt.filter(User.active.in_(statuss))
-
-    if item.countries:
-        stmt = stmt.filter(User.country.in_(item.countries))
+    stmt = (
+        select(
+            func.json_build_object(
+                "id", BalanceChangeHistory.id,
+                "user_id", User.id,
+                "username", User.username,
+                "country", User.country,
+                "amount", BalanceChangeHistory.change_amount,
+                "transaction_type", BalanceChangeHistory.change_type,
+                "status", BalanceChangeHistory.status,
+                "created_at", BalanceChangeHistory.created_at,
+            ).label("items"),
+        )
+        .select_from(BalanceChangeHistory)
+        .join(User, User.id == BalanceChangeHistory.user_id)
+    )
 
     if item.filter:
-        stmt = stmt.filter(
-            or_(
-                User.username.ilike(f"%{item.filter}%"),
-                User.phone_number.ilike(f"%{item.filter}%"),
-            )
-        )
+        stmt = stmt.where(User.username.ilike(f"%{item.filter}%"))
 
-    admins = await db.execute(stmt.offset(offset).limit(limit))
-    admins = admins.scalars().all()
+    if item.status:
+        stmt = stmt.where(BalanceChangeHistory.status.in_(item.status))
 
-    count = await db.execute(stmt.with_only_columns(func.count(User.id)))
+    if item.countries:
+        stmt = stmt.where(User.country.in_(item.countries))
+
+    if item.date_from:
+        stmt = stmt.where(BalanceChangeHistory.created_at >= item.date_from)
+
+    if item.date_to:
+        stmt = stmt.where(BalanceChangeHistory.created_at <= item.date_to)
+
+    count = stmt.with_only_columns(func.count())
+    count = await db.execute(count)
     count = count.scalar()
 
-    scope = next(iter(token.scopes), None)
+    stmt = stmt.order_by(*[i.label for i in item.order_by])
 
-    data = [
-        {
-            "id": a.id,
-            "username": a.username,
-            "fullname": f"{a.firstname} {a.lastname}",
-            "active": a.active,
-            "telegram": a.telegram,
-            "phone_number": a.phone_number if scope != Role.GLOBAL_ADMIN.value else None,
-            "email": a.email if scope != Role.GLOBAL_ADMIN.value else None,
-            "role": a.role,
-            "country": a.country,
-        }
-        for a in admins
-    ]
+    if export:
+        result = await db.execute(stmt)
+        result = result.scalars().all()
+
+        # Генерация имени файла
+        timestamp = datetime.now().strftime("%y%m%d_%H%M%S%f")[:-3]
+        filename = f"Bingo_operations_{timestamp}.csv"
+
+        output = StringIO()
+        writer = csv.writer(output)
+        writer.writerow(["ID", "User ID", "Username", "Country", "Amount", "Transaction Type", "Status", "Created At"])
+        for row in result:
+            writer.writerow([
+                row["id"],
+                row["user_id"],
+                row["username"],
+                row["country"],
+                row["amount"],
+                row["transaction_type"],
+                row["status"],
+                row["created_at"],
+            ])
+        output.seek(0)
+        return StreamingResponse(
+            output,
+            media_type="text/csv",
+            headers={"Content-Disposition": f"attachment; filename={filename}"},
+        )
+
+    stmt = stmt.offset(offset).limit(limit)
+    result = await db.execute(stmt)
+    result = result.scalars().all()
+
     return JSONResponse(
         status_code=status.HTTP_200_OK,
-        content=Admins(admins=data, count=count).model_dump(),
+        content=Operations(items=result, count=count).model_dump(mode="json"),
     )
 
 
 @admin.get(
-    "/admins/{admin_id}",
-    dependencies=[Security(get_admin_token, scopes=[
-        Role.SUPER_ADMIN.value,
-        Role.ADMIN.value,
-    ])],
+    "/operations/{obj_id}",
+    dependencies=[Security(
+        get_admin_token,
+        scopes=[
+            Role.SUPER_ADMIN.value,
+            Role.ADMIN.value,
+            Role.GLOBAL_ADMIN.value,
+            Role.LOCAL_ADMIN.value,
+            Role.FINANCIER.value,
+            Role.SUPPORT.value
+        ])],
     responses={
         400: {"model": BadResponse},
-        200: {"model": Profile},
+        200: {"model": Operation},
     },
 )
-async def get_admin(
-        db: Annotated[AsyncSession, Depends(get_db)],
-        admin_id: Annotated[int, Path()],
+async def get_operation(
+    db: Annotated[AsyncSession, Depends(get_db)],
+    obj_id: Annotated[int, Path(ge=1)],
 ):
     """
-    Get all admins
+    Get operation info
     """
-    stmt = select(User).filter(User.id == admin_id, User.role != "user")
-    user = await db.execute(stmt)
-    user = user.scalar()
-
-    if not user:
-        return JSONResponse(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            content={"message": "Admin not found"},
+    stmt = (
+        select(
+            func.json_build_object(
+                "id", BalanceChangeHistory.id,
+                "user_id", User.id,
+                "username", User.username,
+                "country", User.country,
+                "amount", BalanceChangeHistory.change_amount,
+                "transaction_type", BalanceChangeHistory.change_type,
+                "status", BalanceChangeHistory.status,
+                "game_id", BalanceChangeHistory.game_id,
+                "count", BalanceChangeHistory.count,
+                "created_at", BalanceChangeHistory.created_at
+            ).label("items"),
         )
-
-    docs = await db.execute(
-        select(Document)
-        .where(Document.user_id == user.id)
-        .order_by(Document.created_at.desc())
-        .limit(4)
+        .select_from(BalanceChangeHistory)
+        .join(User, User.id == BalanceChangeHistory.user_id)
+        .where(BalanceChangeHistory.id == obj_id)
     )
-    documents = docs.scalars().all()
-    documents = [
-        url_for("static/kyc", path=doc.file.name)
-        for doc in documents
-    ]
 
-    data = {
-        "id": user.id,
-        "telegram": user.telegram,
-        "fullname": f"{user.firstname} {user.lastname}",
-        "language_code": user.language_code,
-        "phone_number": user.phone_number,
-        "country": user.country,
-        "email": user.email,
-        "role": user.role,
-        "active": user.active,
-        "kyc": user.kyc,
-        "avatar": url_for('static/avatars', filename=user.avatar_v1.name) if user.avatar_v1 else None,
-        "document": documents
-    }
+    result = await db.execute(stmt)
+    result = result.scalars().first()
+
     return JSONResponse(
-        status_code=status.HTTP_200_OK, content=Profile(**data).model_dump()
+        status_code=status.HTTP_200_OK,
+        content=Operation(**result).model_dump(mode="json"),
     )
