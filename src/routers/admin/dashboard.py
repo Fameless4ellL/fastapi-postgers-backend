@@ -225,12 +225,12 @@ async def update_metric_visibility(
         if db_metric:
             db_metric.is_hidden = request.is_hidden
         else:
-            metric = HiddenMetric(
+            new_hidden_metric = HiddenMetric(
                 user_id=token.id,
                 metric_name=metric,
                 is_hidden=request.is_hidden
             )
-        db.add(metric)
+            db.add(new_hidden_metric)
 
     await db.commit()
 
