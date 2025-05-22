@@ -25,7 +25,7 @@ class PeriodData:
 
 
 class Period(MultiValueStrEnum):
-    HOUR = "hour", PeriodData(trunc="minute", limit=1, strftime="H:%M")
+    HOUR = "hour", PeriodData(trunc="hour", limit=1, strftime="%H:%M")
     DAY = "day", PeriodData(trunc="hour", limit=1, strftime="%H:%M")
     WEEK = "week", PeriodData(trunc="day", limit=7, strftime="%Y-%m-%d")
     MONTH = "month", PeriodData(trunc="day", limit=30, strftime="%Y-%m-%d")
@@ -202,16 +202,17 @@ async def update_metric_visibility(
     """
     Update the visibility of a metric for the current user.
     """
-    hidden_metric = await db.execute(
-        select(HiddenMetric).filter(
-            HiddenMetric.user_id == token.id,
-            HiddenMetric.metric_name.in_(request.metrics),
+    for metric in request.metrics:
+        stmt = (
+            select(HiddenMetric)
+            .filter(
+                HiddenMetric.user_id == token.id,
+                HiddenMetric.metric_name == metric,
+            )
         )
-    )
-    hidden_metric = hidden_metric.scalars().all()
+        db_metric = await db.execute(stmt)
 
-    for metric in hidden_metric:
-        if metric.hidden_metric:
+        if db_metric:
             metric.is_hidden = request.is_hidden
         else:
             metric = HiddenMetric(
