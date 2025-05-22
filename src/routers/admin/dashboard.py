@@ -1,6 +1,6 @@
 import dataclasses
 from datetime import timedelta
-from typing import Annotated, Union, Literal
+from typing import Annotated, Union, Literal, Optional
 
 from fastapi import status, Security, Depends
 from fastapi.responses import JSONResponse
@@ -60,23 +60,23 @@ class DashboardFilter(DatePicker, Countries):
 class DashboardMetricStats(BaseModel):
     group: Literal["stats"] = Field(default="stats", exclude=True)
 
-    FTD: float = 0
-    AVG_SESSION_TIME: dict = {}
-    LTV: float = 0
-    GGR: float = 0
-    TOTAL_SOLD_TICKETS: float = 0
-    ACTIVE_USERS: float = 0
-    ARPPU: dict = {}
-    ARPU: dict = {}
+    FTD: Optional[float] = 0
+    AVG_SESSION_TIME: Optional[dict] = {}
+    LTV: Optional[float] = 0
+    GGR: Optional[float] = 0
+    TOTAL_SOLD_TICKETS: Optional[float] = 0
+    ACTIVE_USERS: Optional[float] = 0
+    ARPPU: Optional[dict] = {}
+    ARPU: Optional[dict] = {}
 
 
 class DashboardMetricLobby(BaseModel):
     group: Literal["lobby"] = Field(default="lobby", exclude=True)
 
-    TOTAL_SOLD_TICKETS: float = 0
-    ACTIVE_USERS: float = 0
-    TICKETS_SOLD: float = 0
-    TOTAL_PRIZE_FUNDS: float = 0
+    TOTAL_SOLD_TICKETS: Optional[float] = 0
+    ACTIVE_USERS: Optional[float] = 0
+    TICKETS_SOLD: Optional[float] = 0
+    TOTAL_PRIZE_FUNDS: Optional[float] = 0
 
 
 class Dashboard(BaseModel):
@@ -161,14 +161,15 @@ async def dashboard(
     )
     hidden_metrics = await db.execute(stmt)
     hidden_metrics = hidden_metrics.scalars().all()
-    exclude = set(hidden_metrics)
+    exclude = set(metric.name for metric in hidden_metrics)
 
-    metrics_dict = Dashboard(metrics={"group": item.group.value}).metrics.model_dump(exclude=exclude)
+    metrics_dict = Dashboard(metrics={"group": item.group.value}).metrics.model_dump()
     metrics_dict["group"] = item.group.value
     for metric in metrics:
         name, period, value = metric
 
         if name.name in exclude:
+            metrics_dict[name.name] = None
             continue
 
         if isinstance(metrics_dict[name.name], (int, float)):
@@ -178,7 +179,7 @@ async def dashboard(
 
     return JSONResponse(
         status_code=status.HTTP_200_OK,
-        content=Dashboard(metrics=metrics_dict).model_dump(mode="json"),
+        content=Dashboard(metrics=metrics_dict).model_dump(mode="json", exclude_none=True),
     )
 
 
@@ -211,13 +212,14 @@ async def update_metric_visibility(
             )
         )
         db_metric = await db.execute(stmt)
+        db_metric = db_metric.scalars().first()
 
         if db_metric:
             metric.is_hidden = request.is_hidden
         else:
             metric = HiddenMetric(
                 user_id=token.id,
-                metric_name=request.metric,
+                metric_name=metric,
                 is_hidden=request.is_hidden
             )
         db.add(metric)

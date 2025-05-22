@@ -82,7 +82,6 @@ class UserInfo(User):
     telegram_id: Optional[int] = None
     language_code: Optional[str] = None
     email: Optional[str] = None
-    wallet: Optional[str] = None
     kyc_status: Optional[bool] = None
     document: Optional[list[Optional[str]]] = []
     role: str
