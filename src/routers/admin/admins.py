@@ -162,7 +162,7 @@ async def get_admin(
         select(Document)
         .where(Document.user_id == user.id)
         .order_by(Document.created_at.desc())
-        .limit(4)
+        .limit(5)
     )
     documents = docs.scalars().all()
     documents = [
@@ -234,8 +234,7 @@ async def create_admin(
             ("telegram", item.telegram)
         ]
     ]
-
-    if not any(error for _, error in errors):
+    if not all(error for _, error in errors):
         raise RequestValidationError(
             errors=[
                 {
@@ -244,6 +243,7 @@ async def create_admin(
                     "type": "value_error"
                 }
                 for field, error in errors
+                if error is False
             ]
         )
 
@@ -328,7 +328,7 @@ async def update_admin(
         ]
     ]
 
-    if not any(error for _, error in errors):
+    if not all(error for _, error in errors):
         raise RequestValidationError(
             errors=[
                 {
@@ -337,6 +337,7 @@ async def update_admin(
                     "type": "value_error"
                 }
                 for field, error in errors
+                if error is False
             ]
         )
 
