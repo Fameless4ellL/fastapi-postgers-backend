@@ -15,17 +15,14 @@ class UserLogin(CheckCode):
     password: Optional[SecretStr] = Field(default="", exclude=True, deprecated=True)
 
 
-class UserCreate(UserLogin):
+class UserRegister(BaseModel):
+    username: str = Field(default="", exclude=True, deprecated=True)
+    phone_number: ModPhoneNumber
     country: CountryAlpha3
     refferal_code: Optional[str] = None
-    code: Optional[str] = Field(default="", exclude=True)
 
 
 class SendCode(BaseModel):
-    phone_number: ModPhoneNumber
-
-
-class LoginType(UserLogin):
     phone_number: ModPhoneNumber
 
 

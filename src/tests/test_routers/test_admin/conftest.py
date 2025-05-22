@@ -220,23 +220,25 @@ async def doc(
 @pytest.fixture
 async def admin_data(db: AsyncSession):
     yield (
-        '{"username":"username",'
-        '"firstname":"John",'
+        '{"firstname":"John",'
         '"lastname":"Doe",'
-        '"email":"john.doe@example.com",'
-        '"phone_number":"+77073993521",'
+        '"email":"john.doe@example2.com",'
+        '"phone_number":"+77074993621",'
         '"role":"Super Admin",'
-        '"telegram":"johndoe",'
+        '"telegram":"johndoe1",'
         '"country":"USA"}'
     )
 
     user = await db.execute(
-        select(User).where(User.phone_number == "77073993521")
+        select(User).where(User.phone_number == "77074993621")
     )
     user = user.scalars().first()
 
     if user:
-        await db.execute(
-            delete(User).where(User.id == user.id)
-        )
-        await db.commit()
+        try:
+            await db.execute(
+                delete(User).where(User.id == user.id)
+            )
+            await db.commit()
+        except Exception as e:
+            print(e)

@@ -154,7 +154,7 @@ def transfer(
     amount: float,
     address: str,
     tx: str = ""
-) -> Union[str, bool]:
+) -> tuple[Union[str, bool], str]:
     try:
         if currency.network.symbol.lower() == "tron":
             return transfer_trc20(currency, private_key, amount, address, tx)
@@ -165,7 +165,7 @@ def transfer(
         )
 
         if not w3:
-            return False
+            return False, "Transaction failed"
 
         if tx:
             tx = w3.eth.get_transaction_receipt(tx)
@@ -202,7 +202,7 @@ def transfer_trc20(
     amount: float,
     address: str,
     tx: str = ""
-) -> Union[str, bool]:
+) -> tuple[Union[str, bool], str]:
     try:
         provider = TronHTTPProvider(currency.network.rpc_url)
         client = Tron(provider=provider)

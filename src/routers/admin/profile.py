@@ -12,7 +12,8 @@ from src.schemes import BadResponse
 from src.schemes.admin import (
     Profile,
 )
-from src.utils.dependencies import get_admin, url_for
+from src.utils.dependencies import get_admin
+from src.utils.validators import url_for
 
 
 @admin.get(

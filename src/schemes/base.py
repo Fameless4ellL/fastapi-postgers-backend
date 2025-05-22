@@ -1,5 +1,6 @@
 from typing import Annotated, Optional, Union
 import pycountry
+from phonenumbers import parse
 from pydantic import BaseModel, Field, Json, BeforeValidator, AfterValidator
 from pydantic_extra_types.country import CountryShortName
 from fastapi.params import Form as FormType
@@ -32,5 +33,7 @@ Country_by_name = Annotated[
 ]
 ModPhoneNumber = Annotated[
     PhoneNumber,
-    BeforeValidator(lambda x: f"+{x}" if not x.startswith("+") else x)
+    BeforeValidator(lambda x: f"+{x}" if not x.startswith("+") else x),
+    AfterValidator(lambda x: parse(x)),
+    AfterValidator(lambda x: f"{x.country_code}{x.national_number}")
 ]

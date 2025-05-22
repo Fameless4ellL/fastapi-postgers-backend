@@ -25,7 +25,7 @@ from pydantic_extra_types.country import CountryAlpha3
 from settings import settings
 from src.models.other import GameStatus, GameType, GameView, JackpotType, RepeatType
 from src.models.user import BalanceChangeHistory, Role
-from src.utils.dependencies import get_currency_by_id, get_first_currency, url_for
+from src.utils.validators import get_currency_by_id, get_first_currency, url_for
 from src.schemes.base import Country, Country_by_name, ModPhoneNumber
 from src.utils.datastructure import MultiValueStrEnum
 
@@ -82,7 +82,6 @@ class UserInfo(User):
     telegram_id: Optional[int] = None
     language_code: Optional[str] = None
     email: Optional[str] = None
-    wallet: Optional[str] = None
     kyc_status: Optional[bool] = None
     document: Optional[list[Optional[str]]] = []
     role: str
@@ -161,7 +160,7 @@ class AdminRoles(MultiValueStrEnum):
     GLOBAL_ADMIN = "Global Admin", "global_admin"
     LOCAL_ADMIN = "Local Admin", "local_admin"
     SUPPORT = "Support manager", "support"
-    FINANCE = "Financier", "financier"
+    FINANCIER = "Financier", "financier"
     SMM = "SMM", "smm"
 
 
@@ -317,7 +316,7 @@ class GameCreate(BaseAdmin):
             "price": self.price,
             "description": self.description,
             "max_win_amount": self.max_win_amount,
-            "prize": self.prize,
+            "prize": str(self.prize),
             "country": self.country,
             "min_ticket_count": self.min_ticket_count,
             "scheduled_datetime": scheduled_datetime,
@@ -708,7 +707,6 @@ class AdminFilter(Search, Countries):
 class AdminCreate(BaseAdmin):
     firstname: str
     lastname: str
-    username: str
     email: str
     phone_number: ModPhoneNumber
     role: AdminRoles
@@ -718,9 +716,7 @@ class AdminCreate(BaseAdmin):
     @model_serializer
     def ser_model(self):
         # get country from phone_number
-        country_code = parse(self.phone_number)
-        phone_number = f"{country_code.country_code}{country_code.national_number}"
-
+        country_code = parse(f"+{self.phone_number}")
         country = geocoder.region_code_for_number(country_code)
         alpha3 = pycountry.countries.get(alpha_2=country).alpha_3
 
@@ -728,7 +724,7 @@ class AdminCreate(BaseAdmin):
             "firstname": self.firstname,
             "lastname": self.lastname,
             "email": self.email,
-            "phone_number": phone_number,
+            "phone_number": self.phone_number,
             "role": self.role.label,
             "telegram": self.telegram,
             "country": alpha3,
@@ -762,3 +758,25 @@ class InstaBingoItem(BaseModel):
 class InstaBingoList(BaseModel):
     data: list[InstaBingoItem] = []
     count: int = 0
+
+
+class Operation(BaseModel):
+    id: int
+    user_id: int
+    username: Optional[str] = None
+    country: Country
+    amount: float
+    transaction_type: Optional[str] = None
+    status: Optional[BalanceChangeHistory.Status] = BalanceChangeHistory.Status.PENDING
+    psc: int = 0
+    game_id: Optional[int] = None
+
+
+class Operations(BaseModel):
+    items: list[Operation] = []
+    count: int = 0
+
+
+@dataclass
+class OperationFilter(DatePicker, Countries, Search):
+    status: Optional[list[BalanceChangeHistory.Status]] = Query(None)

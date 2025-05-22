@@ -6,19 +6,19 @@ from datetime import datetime, timedelta
 from email.mime.multipart import MIMEMultipart
 from email.mime.text import MIMEText
 from itertools import islice
-from typing import Annotated, Any
+from typing import Annotated
 
 from aiohttp import client_exceptions
 from fastapi import Depends, HTTPException, status, security, Request
 from httpx import AsyncClient
-from sqlalchemy import select
+from sqlalchemy import select, exists
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import joinedload
 from web3 import Web3, middleware
 
 from settings import email, settings
 from src.globals import aredis, q
-from src.models.db import get_db, get_sync_db
+from src.models.db import get_db
 from src.models.other import Game, GameStatus, GameType, Network, Currency
 from src.models.user import User, Role
 from src.utils import worker
@@ -190,33 +190,6 @@ async def get_ip(request: Request) -> str:
     return request.client.host
 
 
-def get_currency_by_id(
-    currency_id: int
-) -> Currency:
-    db = next(get_sync_db())
-    cur = db.execute(select(Currency).filter(Currency.id == currency_id))
-    cur = cur.scalar()
-
-    if cur is None:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND, detail="Currency not found"
-        )
-
-    return cur.id
-
-
-def get_first_currency() -> Currency:
-    db = next(get_sync_db())
-    cur = db.query(Currency).first()
-
-    if cur is None:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND, detail="Currency not found"
-        )
-
-    return cur.id
-
-
 async def get_w3(
     network: Annotated[Network, Depends(get_network)],
 ) -> Web3:
@@ -302,15 +275,6 @@ def nth(iterable, n, default=None):
     return next(islice(iterable, n, None), default)
 
 
-def url_for(name: str, **path_params: Any) -> str:
-    """
-    Generate a URL for the given endpoint name and path parameters.
-    """
-    return f"{settings.back_url}/{name}/" + "/".join(
-        str(value) for value in path_params.values()
-    )
-
-
 def send_mail(
     subject: str,
     body: str,
@@ -335,3 +299,38 @@ def send_mail(
         server.quit()
     except smtplib.SMTPException:
         traceback.print_exc()
+
+
+async def is_field_unique(
+    db: AsyncSession,
+    table: object,
+    field_name: str,
+    field_value: str,
+    exclude_id: int = None
+) -> bool:
+    """
+    Check if a field value is unique in the table.
+
+    :param db: AsyncSession instance
+    :param table: The SQLAlchemy table to check (e.g., User)
+    :param field_name: The name of the field to check (e.g., 'email')
+    :param field_value: The value of the field to check
+    :param exclude_id: Optional ID to exclude from the check (useful for updates)
+    :return: True if unique, False otherwise
+    """
+    if exclude_id:
+        stmt = select(
+            exists().where(
+                getattr(table, field_name) == field_value,
+                getattr(table, 'id') != exclude_id
+            )
+        )
+    else:
+        stmt = select(
+            exists().where(
+                getattr(table, field_name) == field_value,
+            )
+        )
+
+    result = await db.execute(stmt)
+    return not result.scalar()

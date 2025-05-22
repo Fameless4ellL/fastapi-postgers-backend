@@ -102,6 +102,11 @@ services:
       - api
     volumes:
       - ./cron:/etc/crontabs/root
+    healthcheck:
+      test: ["CMD", "pgrep", "cron"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
 
   blocker:
     build:
@@ -147,6 +152,8 @@ services:
     volumes:
       - ./observability/prometheus/prometheus.yml:/etc/prometheus/prometheus.yml
     restart: on-failure
+    profiles:
+      - observability
 
   grafana:
     image: grafana/grafana:latest
@@ -159,6 +166,8 @@ services:
       - prometheus
       - loki
     restart: on-failure
+    profiles:
+      - observability
 
   loki:
     image: grafana/loki:3.4.3
@@ -170,6 +179,8 @@ services:
       - loki-data:/loki
     command: -config.file=/etc/loki/config.yml
     restart: on-failure
+    profiles:
+      - observability
 
   alloy:
     image: grafana/alloy:latest
@@ -191,6 +202,8 @@ services:
       - prometheus
       - loki
     restart: on-failure
+    profiles:
+      - observability
 
 volumes:
   postgresql-data:

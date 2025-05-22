@@ -1,5 +1,6 @@
 import datetime
 import decimal
+import os
 from enum import Enum
 from typing import Union
 
@@ -46,10 +47,8 @@ class User(Base):
     active: Mapped[bool] = Column(Boolean, default=True)
 
     kyc: Mapped[bool] = Column(Boolean, default=False)
-    document: Mapped[Union[str, None]] = Column(String(256), nullable=True)
 
-    avatar: Mapped[Union[str, None]] = Column(String(256), nullable=True)
-    avatar_v1: Mapped[FileType] = Column(FileType(storage=FileSystemStorage(path="/app/static/avatars")))
+    _avatar_v1: Mapped[FileType] = Column(FileType(storage=FileSystemStorage(path="/app/static/avatars")))
 
     totp: Mapped[str] = Column(String(256), nullable=True, default=TotpFactory.new().to_json())
     verified: Mapped[bool] = Column(Boolean, default=False)
@@ -63,6 +62,22 @@ class User(Base):
         default=datetime.datetime.now,
         onupdate=datetime.datetime.now
     )
+
+    def __str__(self):
+        return f"{self.firstname} {self.lastname} ({self.username})"
+
+    @property
+    def avatar_v1(self):
+        return self._avatar_v1
+
+    @avatar_v1.setter
+    def avatar_v1(self, value):
+        if self._avatar_v1 and os.path.exists(self._avatar_v1.path):
+            os.remove(self._avatar_v1.path)
+
+        # Сохранение нового файла
+        value.filename = f"{self.id}_{value.filename}"
+        self._avatar_v1 = value
 
 
 class Document(Base):
@@ -126,12 +141,19 @@ class BalanceChangeHistory(Base):
         INSUFFICIENT_FUNDS = "insufficient_funds"
         WEB3_ERROR = "web3_error"
 
+    class GameInstanceType(Enum):
+        JACKPOT = "Jackpot"
+        INSTABINGO = "InstaBingo"
+        GAME = "Game"
+
     __tablename__ = "balance_change_history"
 
     id: Mapped[int] = Column(Integer, primary_key=True, index=True)
     user_id: Mapped[int] = Column(Integer, ForeignKey('users.id', ondelete='CASCADE'), nullable=True)
     balance_id: Mapped[int] = Column(Integer, ForeignKey('balance.id', ondelete='CASCADE'), nullable=True)
     currency_id: Mapped[int] = Column(Integer, ForeignKey('currencies.id', ondelete='CASCADE'), nullable=True)
+    game_id: Mapped[int] = Column(Integer, nullable=True, doc="Game ID")
+    game_type: Mapped[GameInstanceType] = Column(SQLEnum(GameInstanceType), nullable=True, doc="Type of the related game")
     change_amount: Mapped[decimal.Decimal] = Column(DECIMAL(20, 8), default=0)
     change_type: Mapped[str] = Column(String(64), nullable=False)
     previous_balance: Mapped[int] = Column(Integer, nullable=True)

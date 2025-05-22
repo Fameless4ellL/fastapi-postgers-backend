@@ -86,15 +86,19 @@ class Metric(LogsBase):
     __tablename__ = 'metrics'
 
     class MetricType(Enum):
+        TICKETS_SOLD = "tickets_sold"
+        """кол-во проданных билетов"""
         TOTAL_SOLD_TICKETS = "total_sold_tickets"
+        TOTAL_PRIZE_FUNDS = "total_prize_funds"
         ARPU = "arpu"
         ARPPU = "arppu"
         LTV = "ltv"
         GGR = "ggr"
         FTD = "ftd"
         CPA = "cpa"
-        DAU = "dau"
+        ACTIVE_USERS = "active_users"
         AVG_SESSION_TIME = "session_time"
+        ALL_GAMES = "all_games"
 
     id: Mapped[int] = Column(Integer, primary_key=True, index=True)
     currency_id: Mapped[Union[int, None]] = Column(Integer, index=True)

@@ -17,6 +17,11 @@ docker compose -f docker-compose.dev.yaml exec api alembic -n {db} revision --au
 docker compose -f docker-compose.dev.yaml exec api  alembic -n {db} upgrade head
 ```
 
+## test
+```bash
+pytest --cov-report html:cov_html --cov-config=.coveragerc --cov=src src/tests/test_routers/test_user.py 
+```
+
 ## utils cli
 ```bash
 docker compose -f docker-compose.dev.yaml exec -T {db} psql -U postgres -d postgres -c "\dt" | awk '{if (NR>3) print $3}' | xargs -I {} docker compose -f docker-compose.dev.yaml exec -T {db} psql -U postgres -d postgres -c "\d {}"

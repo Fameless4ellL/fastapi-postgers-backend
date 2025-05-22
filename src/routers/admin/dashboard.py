@@ -1,10 +1,11 @@
 import dataclasses
-from datetime import timedelta, datetime
-from typing import Annotated, Union
+from datetime import timedelta
+from operator import methodcaller
+from typing import Annotated, Union, Literal, Optional
 
 from fastapi import status, Security, Depends
 from fastapi.responses import JSONResponse
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 from sqlalchemy import select, func
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -22,26 +23,73 @@ class PeriodData:
     trunc: str
     limit: int
     strftime: str
+    func: str
 
 
 class Period(MultiValueStrEnum):
-    DAY = "day", PeriodData(trunc="hour", limit=1, strftime="%I:%M")
-    WEEK = "week", PeriodData(trunc="day", limit=7, strftime="%Y-%m-%d")
-    MONTH = "month", PeriodData(trunc="day", limit=30, strftime="%Y-%m-%d")
-    YEAR = "year", PeriodData(trunc="month", limit=365, strftime="%Y-%m")
+    HOUR = "hour", PeriodData(trunc="hour", limit=1, strftime="%H:%M", func="date_trunc")
+    DAY = "day", PeriodData(trunc="hour", limit=1, strftime="%H:%M", func="date_trunc")
+    WEEK = "week", PeriodData(trunc="day", limit=7, strftime="%Y-%m-%d", func="date_trunc")
+    MONTH = "month", PeriodData(trunc="day", limit=30, strftime="%Y-%m-%d", func="date_trunc")
+    YEAR = "year", PeriodData(trunc="month", limit=365, strftime="%Y-%m", func="date_trunc")
+
+
+class Group(MultiValueStrEnum):
+    STATS = "stats", [
+        Metric.MetricType.FTD,
+        Metric.MetricType.AVG_SESSION_TIME,
+        Metric.MetricType.LTV,
+        Metric.MetricType.GGR,
+        Metric.MetricType.TOTAL_SOLD_TICKETS,
+        Metric.MetricType.ACTIVE_USERS,
+        Metric.MetricType.ARPPU,
+        Metric.MetricType.ARPU,
+    ]
+    LOBBY = "lobby", [
+        Metric.MetricType.TOTAL_SOLD_TICKETS,
+        Metric.MetricType.ACTIVE_USERS,
+        Metric.MetricType.TICKETS_SOLD,
+        Metric.MetricType.TOTAL_PRIZE_FUNDS,
+    ]
 
 
 @dataclasses.dataclass
 class DashboardFilter(DatePicker, Countries):
+    group: Group = Group.STATS
     period: Period = Period.MONTH
 
 
+class DashboardMetricStats(BaseModel):
+    group: Literal["stats"] = Field(default="stats", exclude=True)
+
+    FTD: Optional[float] = 0
+    AVG_SESSION_TIME: Optional[dict] = {}
+    LTV: Optional[float] = 0
+    GGR: Optional[float] = 0
+    TOTAL_SOLD_TICKETS: Optional[float] = 0
+    ACTIVE_USERS: Optional[float] = 0
+    ARPPU: Optional[dict] = {}
+    ARPU: Optional[dict] = {}
+
+
+class DashboardMetricLobby(BaseModel):
+    group: Literal["lobby"] = Field(default="lobby", exclude=True)
+
+    TOTAL_SOLD_TICKETS: Optional[float] = 0
+    ACTIVE_USERS: Optional[float] = 0
+    TICKETS_SOLD: Optional[float] = 0
+    TOTAL_PRIZE_FUNDS: Optional[float] = 0
+
+
 class Dashboard(BaseModel):
-    metrics: list[dict[Metric.MetricType, Union[dict[datetime, float]], float]]
+    metrics: Union[
+        DashboardMetricStats,
+        DashboardMetricLobby
+    ] = Field(discriminator='group')
 
 
 class UpdateMetricVisibilityRequest(BaseModel):
-    metric: Metric.MetricType
+    metrics: list[Metric.MetricType]
     is_hidden: bool
 
 
@@ -67,19 +115,14 @@ async def dashboard(
     """
     Получение информации о метриках
     """
+    fun = methodcaller(item.period.label.func, item.period.label.trunc, Metric.created)
     stmt = (
         select(
             Metric.name,
-            func.date_trunc(item.period.label.trunc, Metric.created).label('period'),
+            fun(func).label('period'),
             func.sum(Metric.value).label('total_value')
         )
-        .outerjoin(
-            HiddenMetric,
-            (HiddenMetric.metric_name == Metric.name) & (HiddenMetric.user_id == token.id)
-        )
-        .where(
-            (HiddenMetric.is_hidden.is_(None)) | (HiddenMetric.is_hidden.is_(False))
-        )
+        .filter(Metric.name.in_(item.group.label))
         .group_by(Metric.name, 'period')
         .order_by('period')
     )
@@ -92,36 +135,59 @@ async def dashboard(
             Metric.created >= item.date_from,
             Metric.created <= item.date_to
         )
-    else:
+    elif item.date_from:
         stmt = stmt.where(
-            Metric.created >= datetime.now() - timedelta(days=item.period.label.limit),
+            Metric.created >= item.date_from,
         )
+    elif item.date_to:
+        stmt = stmt.where(
+            Metric.created <= item.date_to,
+        )
+    else:
+        if item.period is Period.HOUR:
+            stmt = stmt.where(
+                Metric.created >= func.now() - timedelta(hours=item.period.label.limit),
+            )
+        else:
+            stmt = stmt.where(
+                Metric.created >= func.now() - timedelta(days=item.period.label.limit),
+            )
 
     metrics = await db.execute(stmt)
     metrics = metrics.fetchall()
 
-    metrics_dict = {}
+    # Check if the user has hidden metrics
+    stmt = (
+        select(HiddenMetric.metric_name)
+        .filter(HiddenMetric.user_id == token.id)
+        .filter(HiddenMetric.is_hidden.is_(True))
+    )
+    hidden_metrics = await db.execute(stmt)
+    hidden_metrics = hidden_metrics.scalars().all()
+    exclude = set(metric.name for metric in hidden_metrics)
+
+    metrics_dict = Dashboard(metrics={"group": item.group.value}).metrics.model_dump()
+    metrics_dict["group"] = item.group.value
     for metric in metrics:
         name, period, value = metric
 
-        if name in {
-            Metric.MetricType.GGR,
-            Metric.MetricType.DAU,
-            Metric.MetricType.TOTAL_SOLD_TICKETS,
-            Metric.MetricType.LTV,
-            Metric.MetricType.FTD,
-        }:
-            metrics_dict.setdefault(name.name, 0.0)
+        if name.name in exclude:
+            metrics_dict[name.name] = None
+            continue
+
+        if isinstance(metrics_dict[name.name], (int, float)):
             metrics_dict[name.name] += float(value)
         else:
-            metrics_dict.setdefault(name.name, {})
-            metrics_dict[name.name][period.strftime(item.period.label.strftime)] = float(value)
+            period = period.strftime(item.period.label.strftime)
+
+            if metrics_dict[name.name].keys() and item.period is Period.HOUR:
+                period = next(iter(metrics_dict[name.name].keys()))
+
+            metrics_dict[name.name][period] = float(value)
 
     return JSONResponse(
         status_code=status.HTTP_200_OK,
-        content={
-            "metrics": metrics_dict
-        }
+        content=Dashboard(metrics=metrics_dict).model_dump(mode="json", exclude_none=True),
     )
 
 
@@ -145,23 +211,26 @@ async def update_metric_visibility(
     """
     Update the visibility of a metric for the current user.
     """
-    hidden_metric = await db.execute(
-        select(HiddenMetric).filter(
-            HiddenMetric.user_id == token.id,
-            HiddenMetric.metric_name == request.metric
+    for metric in request.metrics:
+        stmt = (
+            select(HiddenMetric)
+            .filter(
+                HiddenMetric.user_id == token.id,
+                HiddenMetric.metric_name == metric,
+            )
         )
-    )
-    hidden_metric = hidden_metric.scalar()
+        db_metric = await db.execute(stmt)
+        db_metric = db_metric.scalars().first()
 
-    if hidden_metric:
-        hidden_metric.is_hidden = request.is_hidden
-    else:
-        hidden_metric = HiddenMetric(
-            user_id=token.id,
-            metric_name=request.metric,
-            is_hidden=request.is_hidden
-        )
-        db.add(hidden_metric)
+        if db_metric:
+            db_metric.is_hidden = request.is_hidden
+        else:
+            new_hidden_metric = HiddenMetric(
+                user_id=token.id,
+                metric_name=metric,
+                is_hidden=request.is_hidden
+            )
+            db.add(new_hidden_metric)
 
     await db.commit()
 

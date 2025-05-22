@@ -17,7 +17,8 @@ from src.models.other import (
     JackpotType,
 )
 from src.routers import public
-from src.utils.dependencies import generate_game, get_user, nth, url_for
+from src.utils.dependencies import generate_game, get_user, nth
+from src.utils.validators import url_for
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import joinedload
 from src.schemes import BadResponse
@@ -274,14 +275,6 @@ async def buy_tickets(
                     f"need {game.limit_by_ticket} per ticket"
                 )
             ).model_dump()
-        )
-
-    if item.demo and len(item.numbers) > 1:
-        return JSONResponse(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            content=BadResponse(message=(
-                "Demo mode is available only for one ticket"
-            )).model_dump()
         )
 
     jackpot_id = None

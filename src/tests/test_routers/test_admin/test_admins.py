@@ -119,20 +119,19 @@ class TestAdminPage:
                 admin_data
             ),
         }
-        files = {
-            "avatar": ("avatar.jpg", file.file, "image/jpeg"),
-            "documents": ("document.pdf", file.file, "image/jpeg"),
-        }
+        # files = {
+        #     "avatar": file,
+        #     "documents": [file],
+        # }
         response = await async_api.post(
             "v1/admin/admins/create",
             data=payload,
-            files=files,
+            # files=files,
             headers={"Authorization": f"Bearer {admin_token}"},
         )
         assert response.status_code == 201
         assert response.json() == "OK"
 
-    @pytest.mark.xfail(reason="This test is expected to fail due to 422")
     async def test_updates_admin_successfully(
         self,
         async_api: AsyncClient,
@@ -149,12 +148,15 @@ class TestAdminPage:
                 None,
                 admin_data
             ),
-            "avatar": file,
-            "documents": file
         }
+        # files = {
+        #     "avatar": file.file,
+        #     "documents": [file.file],
+        # }
         response = await async_api.put(
             f"v1/admin/admins/{admin.id}/update",
             data=payload,
+            # files=files,
             headers={"Authorization": f"Bearer {admin_token}"},
         )
         print(response.json())

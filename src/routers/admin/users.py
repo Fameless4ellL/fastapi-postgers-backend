@@ -23,7 +23,8 @@ from src.schemes.admin import (
     UserGames,
     WalletBase,
 )
-from src.utils.dependencies import Token, get_admin_token, url_for
+from src.utils.dependencies import Token, get_admin_token
+from src.utils.validators import url_for
 
 
 @admin.get(

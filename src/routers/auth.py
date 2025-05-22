@@ -7,7 +7,6 @@ from eth_account.signers.local import LocalAccount
 from fastapi import Depends, Request, status
 from fastapi.responses import JSONResponse
 from fastapi.security import OAuth2PasswordRequestForm
-from phonenumbers import parse
 from sqlalchemy import select, or_
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -20,7 +19,7 @@ from src.schemes import BadResponse
 from src.schemes import (
     CheckCode,
     SendCode,
-    UserCreate,
+    UserRegister,
     UserLogin,
     AccessToken
 )
@@ -37,7 +36,7 @@ from src.utils.signature import create_access_token, verify_password
 )
 async def register(
     request: Request,
-    user: UserCreate,
+    user: UserRegister,
     db: Annotated[AsyncSession, Depends(get_db)]
 ):
     if not user.phone_number and not user.username:
@@ -53,15 +52,9 @@ async def register(
 
     await aredis.delete(f"AUTH:{request.client.host}")
 
-    # get country from phone_number
-    country_code = parse(user.phone_number)
-    # country = geocoder.region_code_for_number(country_code)
-    phone_number = f"{country_code.country_code}{country_code.national_number}"
-
     user_in_db = await db.execute(
-        select(User).filter(
-            or_(User.phone_number == phone_number)
-        )
+        select(User)
+        .filter(User.phone_number == user.phone_number)
     )
     user_in_db = user_in_db.scalar()
 
@@ -76,7 +69,7 @@ async def register(
     # hashed_password = get_password_hash(user.password.get_secret_value())
     if not user_in_db:
         user_in_db = User(
-            phone_number=phone_number,
+            phone_number=user.phone_number,
             # password=hashed_password,
             username=user.username,
             country=user.country,
@@ -157,14 +150,9 @@ async def login(
             status_code=400, content={"message": "Phone number or username is required"}
         )
 
-    # get country from phone_number
-    country_code = parse(user.phone_number)
-    # country = geocoder.region_code_for_number(country_code)
-    phone_number = f"{country_code.country_code}{country_code.national_number}"
-
     userdb = await db.execute(
         select(User).filter(
-            or_(User.phone_number == phone_number, User.username == user.username)
+            or_(User.phone_number == user.phone_number, User.username == user.username)
         )
     )
     userdb = userdb.scalar()
@@ -277,13 +265,8 @@ async def send_code(
 
     await aredis.set(f"SMS:{ip}", code, ex=60)
 
-    # get country from phone_number
-    country_code = parse(item.phone_number)
-    # country = geocoder.region_code_for_number(country_code)
-    phone_number = f"{country_code.country_code}{country_code.national_number}"
-
     user_in_db = await db.execute(
-        select(User).filter(User.phone_number == phone_number)
+        select(User).filter(User.phone_number == item.phone_number)
     )
     user_in_db = user_in_db.scalar()
 
@@ -307,6 +290,7 @@ async def check_code(
     """
     Check sms code
     """
+    # TODO Непонятно зачем это фронту эта api
     if not await aredis.exists(f"SMS:{request.client.host}"):
         return JSONResponse(
             status_code=status.HTTP_400_BAD_REQUEST,

@@ -1,9 +1,11 @@
 from datetime import datetime
 
 import pytest
+from sqlalchemy import select, delete
 from httpx import AsyncClient
 from redis.asyncio import Redis
 from sqlalchemy.ext.asyncio import AsyncSession
+from starlette import status
 
 from src.models.other import Currency, Game, GameType, Network, Ticket, GameView
 from src.models.user import User, Balance
@@ -68,21 +70,25 @@ async def token(
     tear_down: None
 ):
     response = await async_api.post(
+        "/v1/check_code",
+        json={
+            "phone_number": user.phone_number,
+            "code": "123456",
+        }
+    )
+
+    assert response.status_code == status.HTTP_200_OK
+
+    response = await async_api.post(
         "/v1/login",
         json={
             "username": user.username,
             "phone_number": f"+{user.phone_number}",
-            "code": "123456",
         }
     )
     assert response.status_code == 200
     assert "access_token" in response.json()
     yield response.json()["access_token"]
-
-
-import pytest
-from sqlalchemy import select, delete
-from sqlalchemy.ext.asyncio import AsyncSession
 
 
 @pytest.fixture

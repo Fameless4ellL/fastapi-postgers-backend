@@ -2,8 +2,9 @@ import random
 from typing import Annotated, Union
 
 from fastapi import Depends, Path, background, status, Security, UploadFile
+from fastapi.exceptions import RequestValidationError
 from fastapi.responses import JSONResponse
-from sqlalchemy import func, select, or_
+from sqlalchemy import func, select, or_, delete
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from src.globals import aredis
@@ -13,7 +14,8 @@ from src.models.other import Network, Currency
 from src.models.user import User, Role, Document
 from src.routers import admin
 from src.routers.admin import get_crud_router
-from src.utils.dependencies import Token, get_admin_token, send_mail, url_for
+from src.utils.dependencies import Token, get_admin_token, send_mail, is_field_unique
+from src.utils.validators import url_for
 from src.schemes.admin import (
     Admin,
     AdminCreate,
@@ -33,7 +35,6 @@ from src.schemes.admin import (
 )
 from src.schemes import BadResponse, JsonForm
 from settings import settings
-
 
 get_crud_router(
     model=Network,
@@ -65,18 +66,18 @@ get_crud_router(
     },
 )
 async def get_admin_list(
-        db: Annotated[AsyncSession, Depends(get_db)],
-        item: Annotated[AdminFilter, Depends(AdminFilter)],
-        token: Annotated[Token, Security(
-            get_admin_token,
-            scopes=[
-                Role.SUPER_ADMIN.value,
-                Role.ADMIN.value,
-                Role.GLOBAL_ADMIN.value,
-            ]
-        )],
-        offset: int = 0,
-        limit: int = 10,
+    db: Annotated[AsyncSession, Depends(get_db)],
+    item: Annotated[AdminFilter, Depends(AdminFilter)],
+    token: Annotated[Token, Security(
+        get_admin_token,
+        scopes=[
+            Role.SUPER_ADMIN.value,
+            Role.ADMIN.value,
+            Role.GLOBAL_ADMIN.value,
+        ]
+    )],
+    offset: int = 0,
+    limit: int = 10,
 ):
     """
     Get all admins
@@ -116,8 +117,8 @@ async def get_admin_list(
             "fullname": f"{a.firstname} {a.lastname}",
             "active": a.active,
             "telegram": a.telegram,
-            "phone_number": a.phone_number if scope == Role.GLOBAL_ADMIN.value else None,
-            "email": a.email if scope == Role.GLOBAL_ADMIN.value else None,
+            "phone_number": a.phone_number if scope != Role.GLOBAL_ADMIN.value else None,
+            "email": a.email if scope != Role.GLOBAL_ADMIN.value else None,
             "role": a.role,
             "country": a.country,
         }
@@ -161,7 +162,7 @@ async def get_admin(
         select(Document)
         .where(Document.user_id == user.id)
         .order_by(Document.created_at.desc())
-        .limit(4)
+        .limit(5)
     )
     documents = docs.scalars().all()
     documents = [
@@ -180,7 +181,7 @@ async def get_admin(
         "role": user.role,
         "active": user.active,
         "kyc": user.kyc,
-        "avatar": url_for('static/avatars', filename=user.avatar_v1.name) if user.avatar else None,
+        "avatar": url_for('static/avatars', filename=user.avatar_v1.name) if user.avatar_v1 else None,
         "document": documents
     }
     return JSONResponse(
@@ -197,23 +198,24 @@ async def get_admin(
     },
 )
 async def create_admin(
-        db: Annotated[AsyncSession, Depends(get_db)],
-        token: Annotated[Token, Security(
-            get_admin_token,
-            scopes=[
-                Role.SUPER_ADMIN.value,
-                Role.ADMIN.value,
-                Role.GLOBAL_ADMIN.value,
-            ]
-        )],
-        item: Annotated[AdminCreate, JsonForm()],
-        bg: background.BackgroundTasks,
-        avatar: UploadFile,
-        documents: list[UploadFile],
+    db: Annotated[AsyncSession, Depends(get_db)],
+    token: Annotated[Token, Security(
+        get_admin_token,
+        scopes=[
+            Role.SUPER_ADMIN.value,
+            Role.ADMIN.value,
+            Role.GLOBAL_ADMIN.value,
+        ]
+    )],
+    item: Annotated[AdminCreate, JsonForm()],
+    bg: background.BackgroundTasks,
+    avatar: UploadFile,
+    documents: list[UploadFile],
 ):
     """
     Create new admin
     """
+
     scope = next(iter(token.scopes), None)
     if (
             scope == Role.GLOBAL_ADMIN.value
@@ -224,21 +226,25 @@ async def create_admin(
             content={"message": "You can't create this admin"},
         )
 
-    stmt = select(User)
-
-    if item.phone_number:
-        stmt = stmt.filter(User.phone_number == item.phone_number)
-
-    if item.username:
-        stmt = stmt.filter(User.username != item.username)
-
-    exists = await db.execute(stmt)
-    exists = exists.scalars().all()
-
-    if exists:
-        return JSONResponse(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            content={"message": "Unique field error"}
+    errors = [
+        (name, await is_field_unique(db, User, field_name=name, field_value=value))
+        for name, value in [
+            ("email", item.email),
+            ("phone_number", item.phone_number),
+            ("telegram", item.telegram)
+        ]
+    ]
+    if not all(error for _, error in errors):
+        raise RequestValidationError(
+            errors=[
+                {
+                    "loc": ["body", field],
+                    "msg": f"{field} is already taken",
+                    "type": "value_error"
+                }
+                for field, error in errors
+                if error is False
+            ]
         )
 
     new_admin = User(**item.model_dump(exclude={"id"}))
@@ -247,7 +253,6 @@ async def create_admin(
     await db.refresh(new_admin)
 
     if avatar:
-        avatar.filename = f"{new_admin.id}_{avatar.filename}"
         new_admin.avatar_v1 = avatar
 
     for file in documents:
@@ -268,7 +273,7 @@ async def create_admin(
     await db.commit()
 
     code = random.randint(100000, 999999)
-    await aredis.set(f"EMAIL:{new_admin.email}", code, ex=60*15)
+    await aredis.set(f"EMAIL:{new_admin.email}", code, ex=60 * 15)
 
     bg.add_task(
         send_mail,
@@ -295,11 +300,11 @@ async def create_admin(
     },
 )
 async def update_admin(
-        db: Annotated[AsyncSession, Depends(get_db)],
-        item: Annotated[AdminCreate, JsonForm()],
-        admin_id: Annotated[int, Path()],
-        avatar: Union[str, UploadFile, None] = None,
-        documents: Union[list[UploadFile], None] = None
+    db: Annotated[AsyncSession, Depends(get_db)],
+    item: Annotated[AdminCreate, JsonForm()],
+    admin_id: Annotated[int, Path()],
+    avatar: Union[UploadFile, None] = None,
+    documents: Union[list[UploadFile], None] = None
 ):
     """
     Update admin
@@ -313,53 +318,50 @@ async def update_admin(
             content={"message": "Admin not found"},
         )
 
-    stmt = select(User)
+    errors = [
+        (name, await is_field_unique(db, User, field_name=name, field_value=value, exclude_id=admin.id))
+        for name, value in [
+            ("email", item.email),
+            ("phone_number", item.phone_number),
+            ("telegram", item.telegram)
+        ]
+    ]
 
-    if item.phone_number:
-        stmt = stmt.filter(User.phone_number == item.phone_number)
-    if item.telegram:
-        stmt = stmt.filter(User.telegram != item.telegram)
-    if item.username:
-        stmt = stmt.filter(User.username != item.username)
-
-    exists = await db.execute(stmt)
-    exists = exists.scalars().all()
-
-    if exists:
-        return JSONResponse(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            content={"message": "Unique field error"}
+    if not all(error for _, error in errors):
+        raise RequestValidationError(
+            errors=[
+                {
+                    "loc": ["body", field],
+                    "msg": f"{field} is already taken",
+                    "type": "value_error"
+                }
+                for field, error in errors
+                if error is False
+            ]
         )
 
     for key, value in item.model_dump().items():
         setattr(admin, key, value)
 
-    if avatar is None:
-        admin.avatar_v1 = None
-
-    if isinstance(avatar, UploadFile):
-        if not avatar.content_type.startswith("image"):
-            return JSONResponse(
-                status_code=status.HTTP_400_BAD_REQUEST,
-                content="Invalid file type"
-            )
-
-        avatar.filename = f"{admin.id}_{avatar.filename}"
+    if avatar:
         admin.avatar_v1 = avatar
+    if documents:
+        stmt = delete(Document).filter_by(user_id=admin.id)
+        await db.execute(stmt)
 
-    for file in documents:
-        if not file.content_type.startswith("image"):
-            return JSONResponse(
-                status_code=status.HTTP_400_BAD_REQUEST,
-                content="Invalid file type"
+        for file in documents:
+            if not file.content_type.startswith("image"):
+                return JSONResponse(
+                    status_code=status.HTTP_400_BAD_REQUEST,
+                    content="Invalid file type"
+                )
+
+            file.filename = f"{admin.id}_{file.filename}"
+            doc = Document(
+                user_id=admin.id,
+                file=file
             )
-
-        file.filename = f"{admin.id}_{file.filename}"
-        doc = Document(
-            user_id=admin.id,
-            file=file
-        )
-        db.add(doc)
+            db.add(doc)
 
     db.add(admin)
     await db.commit()

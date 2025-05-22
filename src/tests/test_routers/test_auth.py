@@ -21,7 +21,7 @@ class TestAuth:
                 "code": "123456",
             }
         )
-        print(response.json())
+
         assert response.status_code == status.HTTP_200_OK
 
         response = await async_api.post(
@@ -32,7 +32,7 @@ class TestAuth:
                 "phone_number": "+77079898923",
             }
         )
-        print(response.json())
+
         assert response.status_code == status.HTTP_200_OK
         assert "access_token" in response.json()
 
@@ -50,7 +50,7 @@ class TestAuth:
                 "code": "123456",
             }
         )
-        print(response.json())
+
         assert response.status_code == status.HTTP_200_OK
         assert "access_token" in response.json()
 
