@@ -66,18 +66,18 @@ get_crud_router(
     },
 )
 async def get_admin_list(
-        db: Annotated[AsyncSession, Depends(get_db)],
-        item: Annotated[AdminFilter, Depends(AdminFilter)],
-        token: Annotated[Token, Security(
-            get_admin_token,
-            scopes=[
-                Role.SUPER_ADMIN.value,
-                Role.ADMIN.value,
-                Role.GLOBAL_ADMIN.value,
-            ]
-        )],
-        offset: int = 0,
-        limit: int = 10,
+    db: Annotated[AsyncSession, Depends(get_db)],
+    item: Annotated[AdminFilter, Depends(AdminFilter)],
+    token: Annotated[Token, Security(
+        get_admin_token,
+        scopes=[
+            Role.SUPER_ADMIN.value,
+            Role.ADMIN.value,
+            Role.GLOBAL_ADMIN.value,
+        ]
+    )],
+    offset: int = 0,
+    limit: int = 10,
 ):
     """
     Get all admins

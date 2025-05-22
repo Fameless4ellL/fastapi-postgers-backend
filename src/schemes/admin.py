@@ -161,7 +161,7 @@ class AdminRoles(MultiValueStrEnum):
     GLOBAL_ADMIN = "Global Admin", "global_admin"
     LOCAL_ADMIN = "Local Admin", "local_admin"
     SUPPORT = "Support manager", "support"
-    FINANCE = "Financier", "financier"
+    FINANCIER = "Financier", "financier"
     SMM = "SMM", "smm"
 
 
