@@ -72,7 +72,7 @@ class User(Base):
 
     @avatar_v1.setter
     def avatar_v1(self, value):
-        if os.path.exists(self._avatar_v1.path):
+        if self._avatar_v1 and os.path.exists(self._avatar_v1.path):
             os.remove(self._avatar_v1.path)
 
         # Сохранение нового файла
