@@ -4,7 +4,7 @@ from typing import Annotated, Union
 from fastapi import Depends, Path, background, status, Security, UploadFile
 from fastapi.exceptions import RequestValidationError
 from fastapi.responses import JSONResponse
-from sqlalchemy import func, select, or_
+from sqlalchemy import func, select, or_, delete
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from src.globals import aredis
@@ -253,7 +253,6 @@ async def create_admin(
     await db.refresh(new_admin)
 
     if avatar:
-        avatar.filename = f"{new_admin.id}_{avatar.filename}"
         new_admin.avatar_v1 = avatar
 
     for file in documents:
@@ -304,8 +303,8 @@ async def update_admin(
     db: Annotated[AsyncSession, Depends(get_db)],
     item: Annotated[AdminCreate, JsonForm()],
     admin_id: Annotated[int, Path()],
-    avatar: Union[str, UploadFile, None] = None,
-    documents: Union[list[str], list[UploadFile], None] = None
+    avatar: Union[UploadFile, None] = None,
+    documents: Union[list[UploadFile], None] = None
 ):
     """
     Update admin
@@ -344,34 +343,25 @@ async def update_admin(
     for key, value in item.model_dump().items():
         setattr(admin, key, value)
 
-    if avatar is None:
-        admin.avatar_v1 = None
+    if avatar:
+        admin.avatar_v1 = avatar
+    if documents:
+        stmt = delete(Document).filter_by(user_id=admin.id)
+        await db.execute(stmt)
 
-    if isinstance(avatar, UploadFile):
-        if not avatar.content_type.startswith("image"):
+    for file in documents:
+        if not file.content_type.startswith("image"):
             return JSONResponse(
                 status_code=status.HTTP_400_BAD_REQUEST,
                 content="Invalid file type"
             )
 
-        avatar.filename = f"{admin.id}_{avatar.filename}"
-        admin.avatar_v1 = avatar
-    if all(
-            isinstance(doc, UploadFile) for doc in documents
-    ):
-        for file in documents:
-            if not file.content_type.startswith("image"):
-                return JSONResponse(
-                    status_code=status.HTTP_400_BAD_REQUEST,
-                    content="Invalid file type"
-                )
-
-            file.filename = f"{admin.id}_{file.filename}"
-            doc = Document(
-                user_id=admin.id,
-                file=file
-            )
-            db.add(doc)
+        file.filename = f"{admin.id}_{file.filename}"
+        doc = Document(
+            user_id=admin.id,
+            file=file
+        )
+        db.add(doc)
 
     db.add(admin)
     await db.commit()
