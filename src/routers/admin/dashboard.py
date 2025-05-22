@@ -223,7 +223,7 @@ async def update_metric_visibility(
         db_metric = db_metric.scalars().first()
 
         if db_metric:
-            metric.is_hidden = request.is_hidden
+            db_metric.is_hidden = request.is_hidden
         else:
             metric = HiddenMetric(
                 user_id=token.id,
