@@ -318,13 +318,19 @@ async def is_field_unique(
     :param exclude_id: Optional ID to exclude from the check (useful for updates)
     :return: True if unique, False otherwise
     """
-    stmt = select(
-        exists().where(
-            getattr(table, field_name) == field_value
-        )
-    )
     if exclude_id:
-        stmt = stmt.where(getattr(table, 'id') != exclude_id)
+        stmt = select(
+            exists().where(
+                getattr(table, field_name) == field_value,
+                getattr(table, 'id') != exclude_id
+            )
+        )
+    else:
+        stmt = select(
+            exists().where(
+                getattr(table, field_name) == field_value,
+            )
+        )
 
     result = await db.execute(stmt)
     return not result.scalar()

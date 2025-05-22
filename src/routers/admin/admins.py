@@ -319,7 +319,7 @@ async def update_admin(
         )
 
     errors = [
-        (name, await is_field_unique(db, User, field_name=name, field_value=value, exclude_id=admin_id))
+        (name, await is_field_unique(db, User, field_name=name, field_value=value, exclude_id=admin.id))
         for name, value in [
             ("email", item.email),
             ("phone_number", item.phone_number),
