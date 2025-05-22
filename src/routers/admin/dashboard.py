@@ -27,7 +27,7 @@ class PeriodData:
 
 
 class Period(MultiValueStrEnum):
-    HOUR = "hour", PeriodData(trunc="hour", limit=1, strftime="", func="extract")
+    HOUR = "hour", PeriodData(trunc="hour", limit=1, strftime="%H:%M", func="date_trunc")
     DAY = "day", PeriodData(trunc="hour", limit=1, strftime="%H:%M", func="date_trunc")
     WEEK = "week", PeriodData(trunc="day", limit=7, strftime="%Y-%m-%d", func="date_trunc")
     MONTH = "month", PeriodData(trunc="day", limit=30, strftime="%Y-%m-%d", func="date_trunc")
@@ -101,14 +101,14 @@ class UpdateMetricVisibilityRequest(BaseModel):
     },
 )
 async def dashboard(
-    # token: Annotated[Token, Security(get_admin_token, scopes=[
-    #     Role.GLOBAL_ADMIN.value,
-    #     Role.ADMIN.value,
-    #     Role.SUPER_ADMIN.value,
-    #     Role.LOCAL_ADMIN.value,
-    #     Role.FINANCIER.value,
-    #     Role.SUPPORT.value
-    # ]),],
+    token: Annotated[Token, Security(get_admin_token, scopes=[
+        Role.GLOBAL_ADMIN.value,
+        Role.ADMIN.value,
+        Role.SUPER_ADMIN.value,
+        Role.LOCAL_ADMIN.value,
+        Role.FINANCIER.value,
+        Role.SUPPORT.value
+    ]),],
     db: Annotated[AsyncSession, Depends(get_logs_db)],
     item: Annotated[DashboardFilter, Depends(DashboardFilter)],
 ):
@@ -159,7 +159,7 @@ async def dashboard(
     # Check if the user has hidden metrics
     stmt = (
         select(HiddenMetric.metric_name)
-        # .filter(HiddenMetric.user_id == token.id)
+        .filter(HiddenMetric.user_id == token.id)
         .filter(HiddenMetric.is_hidden.is_(True))
     )
     hidden_metrics = await db.execute(stmt)
@@ -178,7 +178,7 @@ async def dashboard(
         if isinstance(metrics_dict[name.name], (int, float)):
             metrics_dict[name.name] += float(value)
         else:
-            period = str(period) if item.period is Period.HOUR else period.strftime(item.period.label.strftime)
+            period = period.strftime(item.period.label.strftime)
 
             if metrics_dict[name.name].keys() and item.period is Period.HOUR:
                 period = next(iter(metrics_dict[name.name].keys()))
