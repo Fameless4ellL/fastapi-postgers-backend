@@ -119,14 +119,14 @@ class TestAdminPage:
                 admin_data
             ),
         }
-        files = {
-            "avatar": ("avatar.jpg", file.file, "image/jpeg"),
-            "documents": ("document.pdf", file.file, "image/jpeg"),
-        }
+        # files = {
+        #     "avatar": file,
+        #     "documents": [file],
+        # }
         response = await async_api.post(
             "v1/admin/admins/create",
             data=payload,
-            files=files,
+            # files=files,
             headers={"Authorization": f"Bearer {admin_token}"},
         )
         assert response.status_code == 201
@@ -148,12 +148,15 @@ class TestAdminPage:
                 None,
                 admin_data
             ),
-            "avatar": file.filename,
-            "documents": file.filename
         }
+        # files = {
+        #     "avatar": file.file,
+        #     "documents": [file.file],
+        # }
         response = await async_api.put(
             f"v1/admin/admins/{admin.id}/update",
             data=payload,
+            # files=files,
             headers={"Authorization": f"Bearer {admin_token}"},
         )
         print(response.json())

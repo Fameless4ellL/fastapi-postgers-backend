@@ -1,5 +1,6 @@
 import dataclasses
 from datetime import timedelta
+from operator import methodcaller
 from typing import Annotated, Union, Literal, Optional
 
 from fastapi import status, Security, Depends
@@ -22,14 +23,15 @@ class PeriodData:
     trunc: str
     limit: int
     strftime: str
+    func: str
 
 
 class Period(MultiValueStrEnum):
-    HOUR = "hour", PeriodData(trunc="hour", limit=1, strftime="%H:%M")
-    DAY = "day", PeriodData(trunc="hour", limit=1, strftime="%H:%M")
-    WEEK = "week", PeriodData(trunc="day", limit=7, strftime="%Y-%m-%d")
-    MONTH = "month", PeriodData(trunc="day", limit=30, strftime="%Y-%m-%d")
-    YEAR = "year", PeriodData(trunc="month", limit=365, strftime="%Y-%m")
+    HOUR = "hour", PeriodData(trunc="hour", limit=1, strftime="", func="extract")
+    DAY = "day", PeriodData(trunc="hour", limit=1, strftime="%H:%M", func="date_trunc")
+    WEEK = "week", PeriodData(trunc="day", limit=7, strftime="%Y-%m-%d", func="date_trunc")
+    MONTH = "month", PeriodData(trunc="day", limit=30, strftime="%Y-%m-%d", func="date_trunc")
+    YEAR = "year", PeriodData(trunc="month", limit=365, strftime="%Y-%m", func="date_trunc")
 
 
 class Group(MultiValueStrEnum):
@@ -99,24 +101,25 @@ class UpdateMetricVisibilityRequest(BaseModel):
     },
 )
 async def dashboard(
-    token: Annotated[Token, Security(get_admin_token, scopes=[
-        Role.GLOBAL_ADMIN.value,
-        Role.ADMIN.value,
-        Role.SUPER_ADMIN.value,
-        Role.LOCAL_ADMIN.value,
-        Role.FINANCIER.value,
-        Role.SUPPORT.value
-    ]),],
+    # token: Annotated[Token, Security(get_admin_token, scopes=[
+    #     Role.GLOBAL_ADMIN.value,
+    #     Role.ADMIN.value,
+    #     Role.SUPER_ADMIN.value,
+    #     Role.LOCAL_ADMIN.value,
+    #     Role.FINANCIER.value,
+    #     Role.SUPPORT.value
+    # ]),],
     db: Annotated[AsyncSession, Depends(get_logs_db)],
     item: Annotated[DashboardFilter, Depends(DashboardFilter)],
 ):
     """
     Получение информации о метриках
     """
+    fun = methodcaller(item.period.label.func, item.period.label.trunc, Metric.created)
     stmt = (
         select(
             Metric.name,
-            func.date_trunc(item.period.label.trunc, Metric.created).label('period'),
+            fun(func).label('period'),
             func.sum(Metric.value).label('total_value')
         )
         .filter(Metric.name.in_(item.group.label))
@@ -156,7 +159,7 @@ async def dashboard(
     # Check if the user has hidden metrics
     stmt = (
         select(HiddenMetric.metric_name)
-        .filter(HiddenMetric.user_id == token.id)
+        # .filter(HiddenMetric.user_id == token.id)
         .filter(HiddenMetric.is_hidden.is_(True))
     )
     hidden_metrics = await db.execute(stmt)
@@ -175,7 +178,12 @@ async def dashboard(
         if isinstance(metrics_dict[name.name], (int, float)):
             metrics_dict[name.name] += float(value)
         else:
-            metrics_dict[name.name][period.strftime(item.period.label.strftime)] = float(value)
+            period = str(period) if item.period is Period.HOUR else period.strftime(item.period.label.strftime)
+
+            if metrics_dict[name.name].keys() and item.period is Period.HOUR:
+                period = next(iter(metrics_dict[name.name].keys()))
+
+            metrics_dict[name.name][period] = float(value)
 
     return JSONResponse(
         status_code=status.HTTP_200_OK,

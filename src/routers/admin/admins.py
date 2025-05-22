@@ -181,7 +181,7 @@ async def get_admin(
         "role": user.role,
         "active": user.active,
         "kyc": user.kyc,
-        "avatar": url_for('static/avatars', filename=user.avatar_v1.name) if user.avatar else None,
+        "avatar": url_for('static/avatars', filename=user.avatar_v1.name) if user.avatar_v1 else None,
         "document": documents
     }
     return JSONResponse(
@@ -349,19 +349,19 @@ async def update_admin(
         stmt = delete(Document).filter_by(user_id=admin.id)
         await db.execute(stmt)
 
-    for file in documents:
-        if not file.content_type.startswith("image"):
-            return JSONResponse(
-                status_code=status.HTTP_400_BAD_REQUEST,
-                content="Invalid file type"
-            )
+        for file in documents:
+            if not file.content_type.startswith("image"):
+                return JSONResponse(
+                    status_code=status.HTTP_400_BAD_REQUEST,
+                    content="Invalid file type"
+                )
 
-        file.filename = f"{admin.id}_{file.filename}"
-        doc = Document(
-            user_id=admin.id,
-            file=file
-        )
-        db.add(doc)
+            file.filename = f"{admin.id}_{file.filename}"
+            doc = Document(
+                user_id=admin.id,
+                file=file
+            )
+            db.add(doc)
 
     db.add(admin)
     await db.commit()
