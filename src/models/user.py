@@ -68,16 +68,16 @@ class User(Base):
 
     @property
     def avatar_v1(self):
-        return self.avatar_v1
+        return self._avatar_v1
 
     @avatar_v1.setter
     def avatar_v1(self, value):
-        if os.path.exists(self.avatar_v1.path):
-            os.remove(self.avatar_v1.path)
+        if os.path.exists(self._avatar_v1.path):
+            os.remove(self._avatar_v1.path)
 
         # Сохранение нового файла
-        self.avatar_v1.filename = f"{self.id}_{value.filename}"
-        self.avatar_v1 = value
+        value.filename = f"{self.id}_{value.filename}"
+        self._avatar_v1 = value
 
 
 class Document(Base):
