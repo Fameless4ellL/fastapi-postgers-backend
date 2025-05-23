@@ -1,6 +1,7 @@
 from httpx import AsyncClient
 
-from src.models.user import User, Document
+from src.models.user import User, Document, Role
+from src.schemes.admin import AdminRoles
 
 
 class TestProfile:
@@ -26,7 +27,7 @@ class TestProfile:
         assert data["telegram"] == admin.telegram
         assert data["language_code"] == admin.language_code
         assert data["email"] == admin.email
-        assert data["role"] == admin.role
+        assert data["role"] == AdminRoles[Role[admin.role].name]
         assert data["phone_number"] == admin.phone_number
         assert data["kyc"] == admin.kyc
         assert data["avatar"] is None

@@ -207,9 +207,12 @@ def get_crud_router(
             game = await db.execute(stmt)
             game = game.scalar()
             if game:
-                return JSONResponse(
-                    status_code=status.HTTP_400_BAD_REQUEST,
-                    content=BadResponse(message=f"{model.__name__} already exists").model_dump()
+                raise RequestValidationError(
+                    errors=[{
+                        "loc": ("body", "country"),
+                        "msg": f"Country {new_item.country} already exists",
+                        "type": "value_error"
+                    }]
                 )
 
         db.add(new_item)
@@ -219,12 +222,6 @@ def get_crud_router(
         if model.__name__ == "Game":
             file = getattr(file, "image", None)
             if file:
-
-                if not file.content_type.startswith("image"):
-                    return JSONResponse(
-                        status_code=status.HTTP_400_BAD_REQUEST,
-                        content="Invalid file type"
-                    )
 
                 directory = "static"
                 os.makedirs(directory, exist_ok=True)
@@ -252,13 +249,6 @@ def get_crud_router(
         if model.__name__ == "Jackpot":
             file = getattr(file, "image", None)
             if file:
-
-                if not file.content_type.startswith("image"):
-                    return JSONResponse(
-                        status_code=status.HTTP_400_BAD_REQUEST,
-                        content="Invalid file type"
-                    )
-
                 directory = "static"
                 os.makedirs(directory, exist_ok=True)
 
@@ -355,12 +345,6 @@ def get_crud_router(
             file = files.image
 
             if file:
-                if not file.content_type.startswith("image"):
-                    return JSONResponse(
-                        status_code=status.HTTP_400_BAD_REQUEST,
-                        content="Invalid file type"
-                    )
-
                 directory = "static"
                 os.makedirs(directory, exist_ok=True)
                 filename, file_extension = os.path.splitext(file.filename)
@@ -401,11 +385,6 @@ def get_crud_router(
             file = files.image
 
             if file:
-                if not file.content_type.startswith("image"):
-                    return JSONResponse(
-                        status_code=status.HTTP_400_BAD_REQUEST,
-                        content="Invalid file type"
-                    )
 
                 directory = "static"
                 os.makedirs(directory, exist_ok=True)

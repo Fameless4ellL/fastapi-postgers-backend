@@ -126,7 +126,7 @@ async def get_admin_list(
     ]
     return JSONResponse(
         status_code=status.HTTP_200_OK,
-        content=Admins(admins=data, count=count).model_dump(),
+        content=Admins(admins=data, count=count).model_dump(mode="json"),
     )
 
 
@@ -257,9 +257,14 @@ async def create_admin(
 
     for file in documents:
         if not file.content_type.startswith("image"):
-            return JSONResponse(
-                status_code=status.HTTP_400_BAD_REQUEST,
-                content="Invalid file type"
+            raise RequestValidationError(
+                errors=[
+                    {
+                        "loc": ["body", "documents"],
+                        "msg": "Invalid file type",
+                        "type": "value_error"
+                    }
+                ]
             )
 
         file.filename = f"{new_admin.id}_{file.filename}"
@@ -351,9 +356,14 @@ async def update_admin(
 
         for file in documents:
             if not file.content_type.startswith("image"):
-                return JSONResponse(
-                    status_code=status.HTTP_400_BAD_REQUEST,
-                    content="Invalid file type"
+                raise RequestValidationError(
+                    errors=[
+                        {
+                            "loc": ["body", "documents"],
+                            "msg": "Invalid file type",
+                            "type": "value_error"
+                        }
+                    ]
                 )
 
             file.filename = f"{admin.id}_{file.filename}"
@@ -376,7 +386,6 @@ async def update_admin(
     tags=[Action.ADMIN_DELETE],
     responses={
         400: {"model": BadResponse},
-        200: {"model": Admin},
     },
 )
 async def delete_admin(

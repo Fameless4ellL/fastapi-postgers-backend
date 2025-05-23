@@ -172,7 +172,12 @@ class Admin(User):
     fullname: str
     active: bool
     telegram: Optional[str] = None
-    role: Annotated[Role, AfterValidator(lambda v: AdminRoles[v.name])]
+    role: Role
+
+    @classmethod
+    @field_validator("role", mode="after")
+    def serialize_role(cls, value: Role) -> str:
+        return AdminRoles[value.name].value
 
 
 class Admins(BaseModel):
@@ -392,6 +397,13 @@ class GameFilter(DatePicker, Search):
 @dataclass
 class GameUpload:
     image: Union[UploadFile, None] = None
+
+    @classmethod
+    @field_validator('image')
+    def validate_image(cls, v: Union[UploadFile, None]) -> Union[UploadFile, None]:
+        if not v.filename.endswith(('.png', '.jpg', '.jpeg')):
+            raise ValueError("Invalid image format")
+        return v
 
 
 class Empty:
