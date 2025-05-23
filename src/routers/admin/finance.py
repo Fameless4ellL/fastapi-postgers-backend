@@ -24,16 +24,16 @@ from src.schemes import BadResponse
 
 @admin.get(
     "/operations",
-    # dependencies=[Security(
-    #     get_admin_token,
-    #     scopes=[
-    #         Role.SUPER_ADMIN.value,
-    #         Role.ADMIN.value,
-    #         Role.GLOBAL_ADMIN.value,
-    #         Role.LOCAL_ADMIN.value,
-    #         Role.FINANCIER.value,
-    #         Role.SUPPORT.value
-    #     ])],
+    dependencies=[Security(
+        get_admin_token,
+        scopes=[
+            Role.SUPER_ADMIN.value,
+            Role.ADMIN.value,
+            Role.GLOBAL_ADMIN.value,
+            Role.LOCAL_ADMIN.value,
+            Role.FINANCIER.value,
+            Role.SUPPORT.value
+        ])],
     responses={
         400: {"model": BadResponse},
         200: {"model": Operations},
