@@ -5,6 +5,7 @@ from typing import Annotated
 
 from fastapi import Depends, status, Security, Path
 from fastapi.responses import JSONResponse
+from pytz.tzinfo import DstTzInfo
 from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 from starlette.responses import StreamingResponse
@@ -12,26 +13,27 @@ from starlette.responses import StreamingResponse
 from src.models.db import get_db
 from src.models.user import User, Role, BalanceChangeHistory
 from src.routers import admin
-from src.utils.dependencies import get_admin_token
+from src.utils.dependencies import get_admin_token, get_timezone
 from src.schemes.admin import (
     Operations,
-    OperationFilter, Operation,
+    OperationFilter,
+    Operation,
 )
 from src.schemes import BadResponse
 
 
 @admin.get(
     "/operations",
-    dependencies=[Security(
-        get_admin_token,
-        scopes=[
-            Role.SUPER_ADMIN.value,
-            Role.ADMIN.value,
-            Role.GLOBAL_ADMIN.value,
-            Role.LOCAL_ADMIN.value,
-            Role.FINANCIER.value,
-            Role.SUPPORT.value
-        ])],
+    # dependencies=[Security(
+    #     get_admin_token,
+    #     scopes=[
+    #         Role.SUPER_ADMIN.value,
+    #         Role.ADMIN.value,
+    #         Role.GLOBAL_ADMIN.value,
+    #         Role.LOCAL_ADMIN.value,
+    #         Role.FINANCIER.value,
+    #         Role.SUPPORT.value
+    #     ])],
     responses={
         400: {"model": BadResponse},
         200: {"model": Operations},
@@ -40,6 +42,7 @@ from src.schemes import BadResponse
 async def get_operation_list(
     db: Annotated[AsyncSession, Depends(get_db)],
     item: Annotated[OperationFilter, Depends(OperationFilter)],
+    timezone: Annotated[DstTzInfo, Depends(get_timezone)],
     export: bool = False,
     offset: int = 0,
     limit: int = 10,
@@ -90,7 +93,7 @@ async def get_operation_list(
         result = result.scalars().all()
 
         # Генерация имени файла
-        timestamp = datetime.now().strftime("%y%m%d_%H%M%S%f")[:-3]
+        timestamp = timezone.localize(datetime.now()).strftime("%y%m%d_%H%M%S%f")[:-3]
         filename = f"Bingo_operations_{timestamp}.csv"
 
         output = StringIO()

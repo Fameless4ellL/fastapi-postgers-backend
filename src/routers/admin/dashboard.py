@@ -6,13 +6,14 @@ from typing import Annotated, Union, Literal, Optional
 from fastapi import status, Security, Depends
 from fastapi.responses import JSONResponse
 from pydantic import BaseModel, Field
+from pytz.tzinfo import DstTzInfo
 from sqlalchemy import select, func
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from src.models import get_logs_db, Metric, HiddenMetric
 from src.models.user import Role
 from src.routers import admin
-from src.utils.dependencies import get_admin_token, Token
+from src.utils.dependencies import get_admin_token, Token, get_timezone
 from src.schemes.admin import DatePicker, Countries
 from src.schemes import BadResponse
 from src.utils.datastructure import MultiValueStrEnum
@@ -109,6 +110,7 @@ async def dashboard(
         Role.FINANCIER.value,
         Role.SUPPORT.value
     ]),],
+    timezone: Annotated[DstTzInfo, Depends(get_timezone)],
     db: Annotated[AsyncSession, Depends(get_logs_db)],
     item: Annotated[DashboardFilter, Depends(DashboardFilter)],
 ):
@@ -178,7 +180,7 @@ async def dashboard(
         if isinstance(metrics_dict[name.name], (int, float)):
             metrics_dict[name.name] += float(value)
         else:
-            period = period.strftime(item.period.label.strftime)
+            period = timezone.localize(period).strftime(item.period.label.strftime)
 
             if metrics_dict[name.name].keys() and item.period is Period.HOUR:
                 period = next(iter(metrics_dict[name.name].keys()))

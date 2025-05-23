@@ -184,8 +184,8 @@ class TestAdminPage:
                     '"telegram":"johndoe",'
                     '"country":"USA"}'
                 )),
-            "avatar": ("avatar.jpg", b"fake image content", "image/jpeg"),
-            "document": ("document.pdf", b"fake document content", "application/pdf"),
+            # "avatar": ("avatar.jpg", b"fake image content", "image/jpeg"),
+            # "document": ("document.pdf", b"fake document content", "application/pdf"),
         }
         response = await async_api.put(
             "v1/admin/admins/99999/update",

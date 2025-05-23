@@ -5,12 +5,16 @@ from dataclasses import dataclass
 from datetime import datetime, timedelta
 from email.mime.multipart import MIMEMultipart
 from email.mime.text import MIMEText
+from functools import lru_cache
 from itertools import islice
 from typing import Annotated
 
+import pytz
+import requests
 from aiohttp import client_exceptions
-from fastapi import Depends, HTTPException, status, security, Request
+from fastapi import Depends, HTTPException, status, security, Request, Header
 from httpx import AsyncClient
+from pytz.tzinfo import DstTzInfo
 from sqlalchemy import select, exists
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import joinedload
@@ -186,8 +190,32 @@ async def http_client(request: Request) -> AsyncClient:
     return request.state.client
 
 
-async def get_ip(request: Request) -> str:
-    return request.client.host
+async def get_ip(
+    request: Request,
+    x_forwarded_for: str = Header(None, include_in_schema=False, alias="X-Forwarded-For"),
+    x_real_ip: str = Header(None, include_in_schema=False, alias="X-Real-IP"),
+) -> str:
+    return x_forwarded_for or x_real_ip or request.client.host
+
+
+@lru_cache(128)
+async def get_timezone(
+    ip: Annotated[str, Depends(get_ip)],
+    client: Annotated[AsyncClient, Depends(http_client)]
+) -> DstTzInfo:
+    """
+    Get timezone by ip
+    """
+    try:
+        response = await client.get(
+            f"http://ip-api.com/json/{ip}?fields=timezone"
+        )
+        response.raise_for_status()
+        data = response.json()
+        return pytz.timezone(data["timezone"])
+    except (requests.RequestException, KeyError):
+        traceback.print_exc()
+        return pytz.timezone("UTC")
 
 
 async def get_w3(
