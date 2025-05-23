@@ -6,18 +6,20 @@ from typing import Annotated
 from fastapi import Depends, status, Security, Path
 from fastapi.responses import JSONResponse
 from pytz.tzinfo import DstTzInfo
-from sqlalchemy import func, select
+from sqlalchemy import func, select, String
 from sqlalchemy.ext.asyncio import AsyncSession
 from starlette.responses import StreamingResponse
 
+from src.models import Currency
 from src.models.db import get_db
+from src.models.limit import Limit
 from src.models.user import User, Role, BalanceChangeHistory
 from src.routers import admin
 from src.utils.dependencies import get_admin_token, get_timezone
 from src.schemes.admin import (
     Operations,
     OperationFilter,
-    Operation,
+    Operation, Limits,
 )
 from src.schemes import BadResponse
 
@@ -177,4 +179,65 @@ async def get_operation(
     return JSONResponse(
         status_code=status.HTTP_200_OK,
         content=Operation(**result).model_dump(mode="json"),
+    )
+
+
+@admin.get(
+    "/limits",
+    dependencies=[Security(
+        get_admin_token,
+        scopes=[
+            Role.SUPER_ADMIN.value,
+            Role.ADMIN.value,
+            Role.GLOBAL_ADMIN.value,
+            Role.LOCAL_ADMIN.value,
+            Role.FINANCIER.value,
+            Role.SUPPORT.value
+        ])],
+    responses={
+        400: {"model": BadResponse},
+        200: {"model": Limits},
+    },
+)
+async def get_limit_list(
+    db: Annotated[AsyncSession, Depends(get_db)],
+    offset: int = 0,
+    limit: int = 10,
+):
+    """
+    Пользователь должен иметь возможность просмотра списка лимитов,
+    чтобы иметь представление об активных лимитах и управлять ими.
+    """
+    stmt = (
+        select(
+            func.json_build_object(
+                "id", Limit.id,
+                "type", func.lower(Limit.type.cast(String)),
+                "value", Limit.value,
+                "currency", Currency.code,
+                "operation_type", func.lower(Limit.operation_type.cast(String)),
+                "period", func.lower(Limit.period.cast(String)),
+                "user_type", Limit.user_type,
+                "status", func.lower(Limit.status.cast(String)),
+                "risk", func.lower(Limit.risk.cast(String)),
+                "created_at", Limit.created_at,
+                "updated_at", Limit.updated_at,
+                "last_edited", Limit.last_edited,
+            )
+        )
+        .select_from(Limit)
+        .join(Currency, Currency.id == Limit.currency_id)
+    )
+    count = stmt.with_only_columns(func.count())
+    count = await db.execute(count)
+    count = count.scalar()
+
+    stmt = stmt.order_by(Limit.status.asc(), Limit.created_at.desc())
+    stmt = stmt.offset(offset).limit(limit)
+    result = await db.execute(stmt)
+    result = result.scalars().all()
+
+    return JSONResponse(
+        status_code=status.HTTP_200_OK,
+        content=Limits(items=result, count=count).model_dump(mode="json"),
     )

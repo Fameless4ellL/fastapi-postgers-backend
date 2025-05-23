@@ -8,7 +8,7 @@ class MultiValueIntEnum(int, Enum):
         obj.label = label
         return obj
 
-    label: str
+    label: int
 
 
 class MultiValueStrEnum(str, Enum):

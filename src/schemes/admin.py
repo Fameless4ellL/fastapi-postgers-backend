@@ -25,6 +25,7 @@ from pydantic import (
 from pydantic_extra_types.country import CountryAlpha3
 
 from settings import settings
+from src.models.limit import LimitType, Period, UserType, LimitStatus, RiskLevel, OperationType
 from src.models.other import GameStatus, GameType, GameView, JackpotType, RepeatType
 from src.models.user import BalanceChangeHistory, Role, User as DBUser
 from src.utils.validators import get_currency_by_id, get_first_currency, url_for
@@ -812,3 +813,23 @@ class OperationOrder(MultiValueStrEnum):
 class OperationFilter(DatePicker, Countries, Search):
     status: Optional[list[BalanceChangeHistory.Status]] = Query(None)
     order_by: list[OperationOrder] = Query(default=[OperationOrder.CREATED_])
+
+
+class LimitBase(BaseModel):
+    id: int
+    type: LimitType
+    value: Decimal
+    currency: Optional[str] = None
+    operation_type: OperationType
+    period: Period
+    user_type: Annotated[UserType, BeforeValidator(lambda v: UserType[v])]
+    status: LimitStatus
+    risk: Optional[RiskLevel] = None
+    created_at: datetime
+    updated_at: datetime
+    last_edited: Optional[int] = None
+
+
+class Limits(BaseModel):
+    items: list[LimitBase] = []
+    count: int = 0
