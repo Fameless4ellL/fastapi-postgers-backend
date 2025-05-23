@@ -195,8 +195,8 @@ async def dashboard(
 
         # calc percentage between active users and all users
         if metrics_dict[Metric.MetricType.ACTIVE_USERS.name]:
-            active_users = metrics_dict[Metric.MetricType.ACTIVE_USERS.name]
-            active_users = {k: v / all_users * 100 for k, v in active_users.items()}
+            active_users: float = metrics_dict[Metric.MetricType.ACTIVE_USERS.name]
+            active_users = active_users / all_users * 100
         else:
             active_users = metrics_dict[Metric.MetricType.ACTIVE_USERS.name]
 
