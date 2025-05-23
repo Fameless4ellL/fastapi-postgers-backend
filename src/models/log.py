@@ -97,7 +97,7 @@ class Metric(LogsBase):
         FTD = "ftd"
         CPA = "cpa"
         ACTIVE_USERS = "active_users"
-        AVG_SESSION_TIME = "session_time"
+        AVG_SESSION_TIME = "avg_session_time"
         ALL_GAMES = "all_games"
 
     id: Mapped[int] = Column(Integer, primary_key=True, index=True)
