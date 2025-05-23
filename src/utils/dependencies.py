@@ -5,7 +5,6 @@ from dataclasses import dataclass
 from datetime import datetime, timedelta
 from email.mime.multipart import MIMEMultipart
 from email.mime.text import MIMEText
-from functools import lru_cache
 from itertools import islice
 from typing import Annotated
 
@@ -198,7 +197,6 @@ async def get_ip(
     return x_forwarded_for or x_real_ip or request.client.host
 
 
-@lru_cache(128)
 async def get_timezone(
     ip: Annotated[str, Depends(get_ip)],
     client: Annotated[AsyncClient, Depends(http_client)]
@@ -206,16 +204,23 @@ async def get_timezone(
     """
     Get timezone by ip
     """
+    cached = await aredis.get(f"TZ:{ip}")
+    if cached:
+        return pytz.timezone(cached.decode("utf-8"))
+
     try:
         response = await client.get(
             f"http://ip-api.com/json/{ip}?fields=timezone"
         )
         response.raise_for_status()
         data = response.json()
-        return pytz.timezone(data["timezone"])
+        result = data["timezone"]
     except (requests.RequestException, KeyError):
         traceback.print_exc()
-        return pytz.timezone("UTC")
+        result = "UTC"
+
+    await aredis.set(f"TZ:{ip}", result, ex=60*5)
+    return pytz.timezone(result)
 
 
 async def get_w3(

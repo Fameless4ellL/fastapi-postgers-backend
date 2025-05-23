@@ -10,7 +10,7 @@ from pytz.tzinfo import DstTzInfo
 from sqlalchemy import select, func
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from src.models import get_logs_db, Metric, HiddenMetric
+from src.models import get_logs_db, Metric, HiddenMetric, get_db, User
 from src.models.user import Role
 from src.routers import admin
 from src.utils.dependencies import get_admin_token, Token, get_timezone
@@ -111,6 +111,7 @@ async def dashboard(
         Role.SUPPORT.value
     ]),],
     timezone: Annotated[DstTzInfo, Depends(get_timezone)],
+    _db: Annotated[AsyncSession, Depends(get_db)],
     db: Annotated[AsyncSession, Depends(get_logs_db)],
     item: Annotated[DashboardFilter, Depends(DashboardFilter)],
 ):
@@ -186,6 +187,20 @@ async def dashboard(
                 period = next(iter(metrics_dict[name.name].keys()))
 
             metrics_dict[name.name][period] = float(value)
+
+    if Metric.MetricType.ACTIVE_USERS in item.group.label:
+        all_users = select(func.count(User.id))
+        all_users = await _db.execute(all_users)
+        all_users = all_users.scalar()
+
+        # calc percentage between active users and all users
+        if metrics_dict[Metric.MetricType.ACTIVE_USERS.name]:
+            active_users = metrics_dict[Metric.MetricType.ACTIVE_USERS.name]
+            active_users = {k: v / all_users * 100 for k, v in active_users.items()}
+        else:
+            active_users = metrics_dict[Metric.MetricType.ACTIVE_USERS.name]
+
+        metrics_dict[Metric.MetricType.ACTIVE_USERS.name] = active_users
 
     return JSONResponse(
         status_code=status.HTTP_200_OK,
