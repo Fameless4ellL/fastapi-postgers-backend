@@ -3,7 +3,7 @@ import random
 from typing import Annotated, Optional
 from fastapi import Depends, Path, status
 from fastapi.responses import JSONResponse
-from sqlalchemy import func, select, exists
+from sqlalchemy import func, select
 from src.models.db import get_db
 from src.models.log import Action
 from src.models.user import Balance, BalanceChangeHistory, User, Wallet
@@ -371,22 +371,6 @@ async def buy_tickets(
         )
         db.add(balance_change)
         await db.commit()
-    else:
-        # if user already has a demo ticket on this game, use exists()
-        ticket = await db.execute(
-            select(exists().where(
-                Ticket.user_id == user.id,
-                Ticket.demo.is_(True),
-                Ticket.game_id == game_id
-            ))
-        )
-        if ticket.scalar():
-            return JSONResponse(
-                status_code=status.HTTP_400_BAD_REQUEST,
-                content=BadResponse(
-                    message="Demo ticket already exists"
-                ).model_dump()
-            )
 
     # create ticket
     tickets = [

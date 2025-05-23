@@ -1,5 +1,6 @@
 from dataclasses import dataclass
 from datetime import datetime, date
+from decimal import Decimal
 from secrets import token_urlsafe
 from typing import Optional, Annotated, Any, Union
 
@@ -282,9 +283,9 @@ class GameCreate(BaseAdmin):
     kind: GameView
     currency_id: Annotated[int, AfterValidator(get_currency_by_id)]
     category: Category
-    price: float = 1.0
+    price: Decimal = Field(default=1, gt=0, lt=10**7, fail_fast=True, decimal_places=2, max_digits=7)
     description: Optional[str] = Field("", max_length=500)
-    max_win_amount: Optional[float] = 8.0
+    max_win_amount: Optional[Decimal] = Field(default=8, gt=0, lt=10**7, fail_fast=True, decimal_places=2, max_digits=11)
     prize: Union[float, str] = 1000
     country: Optional[CountryAlpha3] = None
     min_ticket_count: int = 1
