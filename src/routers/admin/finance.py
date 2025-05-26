@@ -15,11 +15,11 @@ from src.models.db import get_db
 from src.models.limit import Limit
 from src.models.user import User, Role, BalanceChangeHistory
 from src.routers import admin
-from src.utils.dependencies import get_admin_token, get_timezone
+from src.utils.dependencies import get_admin_token, get_timezone, Token
 from src.schemes.admin import (
     Operations,
     OperationFilter,
-    Operation, Limits,
+    Operation, Limits, LimitBase, LimitCreate,
 )
 from src.schemes import BadResponse
 
@@ -220,6 +220,7 @@ async def get_limit_list(
                 "user_type", Limit.user_type,
                 "status", func.lower(Limit.status.cast(String)),
                 "risk", func.lower(Limit.risk.cast(String)),
+                "is_deleted", Limit.is_deleted,
                 "created_at", Limit.created_at,
                 "updated_at", Limit.updated_at,
                 "last_edited", Limit.last_edited,
@@ -240,4 +241,188 @@ async def get_limit_list(
     return JSONResponse(
         status_code=status.HTTP_200_OK,
         content=Limits(items=result, count=count).model_dump(mode="json"),
+    )
+
+
+@admin.get(
+    "/limits/{obj_id}",
+    dependencies=[Security(
+        get_admin_token,
+        scopes=[
+            Role.SUPER_ADMIN.value,
+            Role.ADMIN.value,
+            Role.GLOBAL_ADMIN.value,
+            Role.LOCAL_ADMIN.value,
+            Role.FINANCIER.value,
+            Role.SUPPORT.value
+        ])],
+    responses={
+        400: {"model": BadResponse},
+        200: {"model": LimitBase},
+    },
+)
+async def get_limit(
+    db: Annotated[AsyncSession, Depends(get_db)],
+    obj_id: Annotated[int, Path(ge=1)],
+):
+    stmt = (
+        select(
+            func.json_build_object(
+                "id", Limit.id,
+                "type", func.lower(Limit.type.cast(String)),
+                "value", Limit.value,
+                "currency", Currency.code,
+                "operation_type", func.lower(Limit.operation_type.cast(String)),
+                "period", func.lower(Limit.period.cast(String)),
+                "user_type", Limit.user_type,
+                "status", func.lower(Limit.status.cast(String)),
+                "risk", func.lower(Limit.risk.cast(String)),
+                "created_at", Limit.created_at,
+                "is_deleted", Limit.is_deleted,
+                "updated_at", Limit.updated_at,
+                "last_edited", Limit.last_edited,
+            )
+        )
+        .select_from(Limit)
+        .join(Currency, Currency.id == Limit.currency_id)
+        .where(Limit.id == obj_id)
+    )
+    result = await db.execute(stmt)
+    result = result.scalars().first()
+
+    return JSONResponse(
+        status_code=status.HTTP_200_OK,
+        content=LimitBase(**result).model_dump(mode="json"),
+    )
+
+
+@admin.post(
+    "/limit",
+    responses={
+        400: {"model": BadResponse},
+        200: {"model": LimitBase},
+    },
+)
+async def create_limit(
+    db: Annotated[AsyncSession, Depends(get_db)],
+    token: Annotated[Token, Security(get_admin_token, scopes=[
+        Role.GLOBAL_ADMIN.value,
+        Role.ADMIN.value,
+        Role.SUPER_ADMIN.value,
+        Role.LOCAL_ADMIN.value,
+        Role.FINANCIER.value,
+        Role.SUPPORT.value
+    ]),],
+    item: LimitCreate
+):
+
+    currency = await db.execute(select(Currency))
+    currency = currency.scalars().first()
+
+    limit = Limit(**item.model_dump())
+    limit.currency_id = currency.id
+    limit.last_edited = token.id
+
+    db.add(limit)
+    await db.commit()
+
+    return JSONResponse(
+        status_code=status.HTTP_201_CREATED,
+        content="Limit created successfully",
+    )
+
+
+@admin.put(
+    "/limits/{obj_id}",
+    responses={
+        400: {"model": BadResponse},
+        200: {"model": LimitBase},
+    },
+)
+async def update_limit(
+    token: Annotated[Token, Security(get_admin_token, scopes=[
+        Role.GLOBAL_ADMIN.value,
+        Role.ADMIN.value,
+        Role.SUPER_ADMIN.value,
+        Role.LOCAL_ADMIN.value,
+        Role.FINANCIER.value,
+        Role.SUPPORT.value
+    ]),],
+    db: Annotated[AsyncSession, Depends(get_db)],
+    obj_id: Annotated[int, Path(ge=1)],
+    item: LimitCreate
+):
+    stmt = (
+        select(Limit)
+        .where(Limit.id == obj_id)
+    )
+    result = await db.execute(stmt)
+    result = result.scalars().first()
+
+    if not result:
+        return JSONResponse(
+            status_code=status.HTTP_404_NOT_FOUND,
+            content={"message": "Limit not found"},
+        )
+
+    for attr, value in item.model_dump().items():
+        setattr(result, attr, value)
+
+    result.last_edited = token.id
+
+    db.add(result)
+    await db.commit()
+
+    return JSONResponse(
+        status_code=status.HTTP_201_CREATED,
+        content="Limit updated successfully",
+    )
+
+
+@admin.delete(
+    "/limits/{obj_id}",
+    responses={
+        400: {"model": BadResponse},
+        200: {"model": LimitBase},
+    },
+)
+async def delete_limit(
+    token: Annotated[Token, Security(get_admin_token, scopes=[
+        Role.GLOBAL_ADMIN.value,
+        Role.ADMIN.value,
+        Role.SUPER_ADMIN.value,
+        Role.LOCAL_ADMIN.value,
+        Role.FINANCIER.value,
+        Role.SUPPORT.value
+    ]),],
+    db: Annotated[AsyncSession, Depends(get_db)],
+    obj_id: Annotated[int, Path(ge=1)],
+):
+    stmt = (
+        select(Limit)
+        .where(Limit.id == obj_id)
+    )
+    result = await db.execute(stmt)
+    result = result.scalars().first()
+
+    if not result:
+        return JSONResponse(
+            status_code=status.HTTP_404_NOT_FOUND,
+            content={"message": "Limit not found"},
+        )
+
+    if result.is_deleted:
+        return JSONResponse(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            content={"message": "Cannot delete deleted item"},
+        )
+
+    result.is_deleted = True
+    result.last_edited = token.id
+    db.add(result)
+    await db.commit()
+
+    return JSONResponse(
+        status_code=status.HTTP_201_CREATED,
+        content="Limit updated successfully",
     )

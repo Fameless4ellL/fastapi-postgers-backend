@@ -6,7 +6,7 @@ from sqlalchemy import (
     Enum as SqlEnum,
     DECIMAL,
     DateTime,
-    ForeignKey,
+    ForeignKey, Boolean,
 )
 from sqlalchemy.orm import relationship, Mapped
 import datetime
@@ -77,5 +77,6 @@ class Limit(Base):
         doc="Date of the last limit update"
     )
     last_edited: Mapped[int] = Column(Integer, ForeignKey('users.id'), nullable=True, doc="ID of the user who made the last changes")
+    is_deleted: Mapped[bool] = Column(Boolean, default=False, doc="Is the limit deleted?")
 
     last_editor = relationship("User", uselist=False, doc="User who made the last changes")

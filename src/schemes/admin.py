@@ -817,6 +817,7 @@ class LimitBase(BaseModel):
     user_type: Annotated[UserType, BeforeValidator(lambda v: UserType[v])]
     status: LimitStatus
     risk: Optional[RiskLevel] = None
+    is_deleted: Optional[bool] = False
     created_at: datetime
     updated_at: datetime
     last_edited: Optional[int] = None
@@ -825,3 +826,20 @@ class LimitBase(BaseModel):
 class Limits(BaseModel):
     items: list[LimitBase] = []
     count: int = 0
+
+
+class LimitCreate(BaseModel):
+    type: LimitType
+    value: Decimal
+    operation_type: OperationType
+    period: Period
+    user_type: UserType
+    status: LimitStatus
+    risk: RiskLevel
+
+
+class LimitUpdate(LimitCreate):
+    pass
+
+
+
