@@ -2,7 +2,7 @@ from dataclasses import dataclass
 from datetime import datetime, date
 from decimal import Decimal
 from secrets import token_urlsafe
-from typing import Optional, Annotated, Any, Union
+from typing import Optional, Annotated, Union
 
 import pycountry
 import pytz
@@ -12,7 +12,6 @@ from pydantic import (
     BaseModel,
     Field,
     SecretStr,
-    WrapSerializer,
     computed_field,
     FutureDatetime,
     model_serializer,
@@ -28,16 +27,9 @@ from settings import settings
 from src.models.limit import LimitType, Period, UserType, LimitStatus, RiskLevel, OperationType
 from src.models.other import GameStatus, GameType, GameView, JackpotType, RepeatType
 from src.models.user import BalanceChangeHistory, Role, User as DBUser
-from src.utils.validators import get_currency_by_id, get_first_currency, url_for
-from src.schemes.base import Country, Country_by_name, ModPhoneNumber
+from src.utils.validators import get_currency_by_id, get_first_currency
+from src.schemes.base import Country, Country_by_name, ModPhoneNumber, Image
 from src.utils.datastructure import MultiValueStrEnum
-
-
-def get_image(value: Any, handler, info) -> str:
-    return url_for("static", filename=value)
-
-
-Image = Annotated[str, WrapSerializer(get_image)]
 
 
 class Category(MultiValueStrEnum):

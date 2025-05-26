@@ -1,5 +1,6 @@
 import importlib
 import json
+from datetime import datetime
 from decimal import Decimal
 from typing import Annotated, List
 
@@ -16,7 +17,7 @@ from tronpy.keys import to_base58check_address
 from src.globals import aredis, q
 from src.models.db import get_db
 from src.models.log import Action
-from src.models.other import Currency, GameStatus, Ticket
+from src.models.other import Currency, GameStatus, Ticket, InstaBingo, Jackpot, Game
 from src.models.user import (
     Balance,
     Kyc,
@@ -434,7 +435,7 @@ async def get_history(
 )
 async def get_my_games(
     db: Annotated[AsyncSession, Depends(get_db)],
-    user: Annotated[User, Depends(get_user)],
+    # user: Annotated[User, Depends(get_user)],
     item: MyGamesType,
     skip: int = 0,
     limit: int = 10,
@@ -446,96 +447,115 @@ async def get_my_games(
     model = importlib.import_module("src.models.other")
     model = getattr(model, item.model)
 
-    # list of games or jackpots by user distinct
-    stmt = select(model).join(Ticket).options(
-        joinedload(model.currency)
-    ).filter(
-        Ticket.user_id == user.id
-    )
+    if item.model == "InstaBingo":
+        stmt = (
+            select(
+                func.json_build_object(
+                    "id", Ticket.id,
+                    "price", InstaBingo.price,
+                    "won", Ticket.won,
+                    "currency", Currency.code,
+                    "total_amount", func.sum(Ticket.amount).label("total_amount"),
+                    "created", Ticket.created_at,
+                    "endtime", Ticket.created_at
+                ))
+            .select_from(InstaBingo)
+            .join(Currency, Currency.id == InstaBingo.currency_id)
+            .join(Ticket, Ticket.instabingo_id == InstaBingo.id)
+            .group_by(
+                Ticket.id,
+                InstaBingo.price,
+                Ticket.won,
+                Currency.code,
+                Ticket.created_at
+            )
+            .order_by(Ticket.created_at.desc())
+        )
+    elif item.model == "Jackpot":
+        stmt = (
+            select(
+                func.json_build_object(
+                    "id", Ticket.id,
+                    "currency", Currency.code,
+                    "name", Jackpot.name,
+                    "image", Jackpot.image,
+                    "status", Jackpot.status,
+                    "prize", Jackpot.amount,
+                    "endtime", Jackpot.scheduled_datetime,
+                    "created", Jackpot.created_at,
+                ))
+            .select_from(Jackpot)
+            .join(Currency, Currency.id == Jackpot.currency_id)
+            .join(Ticket, Ticket.jackpot_id == Jackpot.id)
+            .group_by(
+                Ticket.id,
+                Ticket.won,
+                Currency.code,
+                Ticket.created_at,
+                Jackpot.name,
+                Jackpot.image,
+                Jackpot.status,
+                Jackpot.amount,
+                Jackpot.scheduled_datetime,
+                Jackpot.created_at
+            )
+            .order_by(Ticket.created_at.desc())
+        )
+    else:
+        stmt = (
+            select(
+                func.json_build_object(
+                    "id", Ticket.id,
+                    "currency", Currency.code,
+                    "name", Game.name,
+                    "image", Game.image,
+                    "status", Game.status,
+                    "price", Game.price,
+                    "max_limit_grid", Game.max_limit_grid,
+                    "prize", Game.prize,
+                    "endtime", Game.scheduled_datetime,
+                    "created", Game.created_at,
+                ))
+            .select_from(Game)
+            .join(Currency, Currency.id == Game.currency_id)
+            .join(Ticket, Ticket.game_id == Game.id)
+            .group_by(
+                Ticket.id,
+                Game.name,
+                Game.image,
+                Game.status,
+                Game.price,
+                Game.max_limit_grid,
+                Game.prize,
+                Game.scheduled_datetime,
+                Game.created_at,
+                Ticket.won,
+                Currency.code,
+                Ticket.created_at
+            )
+            .order_by(Ticket.created_at.desc())
+        )
 
+    count = stmt.with_only_columns(func.count(model.id))
+    count = await db.execute(count)
+    count = count.scalar() or 0
+
+    stmt = stmt.order_by(Ticket.created_at.desc())
     items = await db.execute(stmt.offset(skip).limit(limit))
     items = items.scalars().fetchall()
 
-    data = []
     for i in items:
-        # Calculate the sum of Ticket.amount for the chosen game
-        sum_stmt = select(
-            Ticket.won,
-            func.sum(Ticket.amount).label("total_amount")
-        ).filter(
-            Ticket.user_id == user.id,
-            Ticket.won.is_(True),
-        ).group_by(
-            Ticket.won
-        )
-        if item.model == "Game":
-            sum_stmt = sum_stmt.filter(Ticket.game_id == i.id)
-
-        elif item.model == "Jackpot":
-            sum_stmt = sum_stmt.filter(Ticket.jackpot_id == i.id)
-
-        elif item.model == "InstaBingo":
-            sum_stmt = sum_stmt.filter(Ticket.instabingo_id == i.id)
-
-        sum_result = await db.execute(sum_stmt)
-        ticket = sum_result.first()
-        if not ticket:
-            ticket = {
-                "won": False,
-                "total_amount": 0
-            }
-        else:
-            ticket = {
-                "won": ticket.won,
-                "total_amount": float(ticket.total_amount)
-            }
+        # from '2025-05-26T18:17:00.253332' to timestamp
         if item.model == "InstaBingo":
-            data.append({
-                "id": i.id,
-                "currency": i.currency.code if i.currency else None,
-                "status": GameStatus.COMPLETED.value,
-                "name": "InstaBingo",
-                "price": i.price,
-                "created": i.created_at.timestamp(),
-                "endtime": i.created_at.timestamp()
-            } | ticket)
-        elif item.model == "Jackpot":
-            amount = getattr(i, "amount", '0') or '0'
-            data.append({
-                "id": i.id,
-                "currency": i.currency.code if i.currency else None,
-                "name": i.name,
-                "image": url_for("static", path=i.image),
-                "status": i.status.value if i.status else "None",
-                "price": getattr(i, "price", 0),
-                "max_limit_grid": getattr(i, "max_limit_grid", 0),
-                "prize": float(amount) if str(amount).isnumeric() else amount,
-                "endtime": i.scheduled_datetime.timestamp(),
-                "created": i.created_at.timestamp(),
-            } | ticket)
-        else:
-            data.append({
-                "id": i.id,
-                "currency": i.currency.code if i.currency else None,
-                "name": i.name,
-                "image": url_for("static", path=i.image),
-                "status": i.status.value if i.status else "None",
-                "price": getattr(i, "price", 0),
-                "max_limit_grid": getattr(i, "max_limit_grid", 0),
-                "prize": float(i.prize) if i.prize.isnumeric() else i.prize,
-                "endtime": i.scheduled_datetime.timestamp(),
-                "created": i.created_at.timestamp(),
-            } | ticket)
+            i["status"] = GameStatus.COMPLETED.name
+            i["name"] = "InstaBingo"
 
-    stmt = select(func.count(model.id)).join(Ticket).filter(
-        Ticket.user_id == user.id
-    )
-    count_result = await db.execute(stmt)
-    count = count_result.scalar()
+        i["endtime"] = datetime.fromisoformat(i["endtime"]).timestamp()
+        i["created"] = datetime.fromisoformat(i["created"]).timestamp()
 
     return JSONResponse(
         status_code=status.HTTP_200_OK,
-        content=MyGames(games=data, count=count).model_dump()
+        content=MyGames(games=items, count=count).model_dump()
     )
 
 

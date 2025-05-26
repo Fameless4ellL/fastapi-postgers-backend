@@ -34,14 +34,14 @@ from src.utils.rng import get_random
     },
 )
 async def get_instabingo(
-    user: Annotated[User, Depends(get_user)],
+    # user: Annotated[User, Depends(get_user)],
     db: Annotated[Session, Depends(get_sync_db)],
 ):
     """
     Получение нужной информации для игры в инстабинго
     """
     game = db.query(InstaBingo).filter(
-        InstaBingo.country == user.country
+        # InstaBingo.country == user.country
     ).first()
 
     if not game:
