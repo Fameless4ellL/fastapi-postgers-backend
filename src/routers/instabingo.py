@@ -45,10 +45,28 @@ async def get_instabingo(
     ).first()
 
     if not game:
-        return JSONResponse(
-            status_code=status.HTTP_200_OK,
-            content=InstaBingoInfo().model_dump(mode="json")
-        )
+        game = db.query(InstaBingo).filter(
+            InstaBingo.country.is_(None),
+        ).first()
+
+        if game is None:
+            currency = db.query(Currency).first()
+            if not currency:
+                return JSONResponse(
+                    status_code=status.HTTP_400_BAD_REQUEST,
+                    content=BadResponse(message="Currency not found").model_dump()
+                )
+
+            game = InstaBingo(
+                currency_id=currency.id,
+                country=None
+            )
+            db.add(game)
+            db.commit()
+
+            game = db.query(InstaBingo).filter(
+                InstaBingo.country.is_(None),
+            ).first()
 
     data = {
         "id": game.id,
@@ -290,7 +308,7 @@ async def buy_tickets(
             user_id=user.id,
             currency_id=game.currency_id,
             balance_id=user_balance.id,
-            change_amount=-total_price,
+            change_amount=total_price,
             game_id=game.id,
             game_type=BalanceChangeHistory.GameInstanceType.INSTABINGO,
             count=len(item.numbers),
