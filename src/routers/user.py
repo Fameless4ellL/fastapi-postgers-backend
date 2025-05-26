@@ -545,13 +545,17 @@ async def get_my_games(
     items = items.scalars().fetchall()
 
     for i in items:
-        # from '2025-05-26T18:17:00.253332' to timestamp
         if item.model == "InstaBingo":
             i["status"] = GameStatus.COMPLETED.name
             i["name"] = "InstaBingo"
-
-        i["endtime"] = datetime.fromisoformat(i["endtime"]).timestamp()
-        i["created"] = datetime.fromisoformat(i["created"]).timestamp()
+        try:
+            i["endtime"] = datetime.fromisoformat(i["endtime"]).timestamp()
+            i["created"] = datetime.fromisoformat(i["created"]).timestamp()
+        except ValueError:
+            i["endtime"] = datetime.strptime( i["endtime"], "%Y-%m-%dT%H:%M:%S.%f").timestamp()
+            i["created"] = datetime.strptime(i["created"], "%Y-%m-%dT%H:%M:%S.%f").timestamp()
+        except Exception:
+            pass
 
     return JSONResponse(
         status_code=status.HTTP_200_OK,

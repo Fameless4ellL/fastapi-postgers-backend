@@ -110,6 +110,8 @@ class MyGame(Game):
     image: Optional[Image] = None
     max_limit_grid: Optional[int] = None
     total_amount: float = 0
+    endtime: Union[float, str]
+    created: Union[float, str]
 
 
 class MyGames(BaseModel):
