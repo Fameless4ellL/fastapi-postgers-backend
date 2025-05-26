@@ -260,17 +260,17 @@ async def buy_tickets(
             )
 
     if not won:
-        user_balance.balance -= total_price
+        user_balance.balance -= game.price
         balance_change = BalanceChangeHistory(
             user_id=user.id,
             currency_id=game.currency_id,
             balance_id=user_balance.id,
-            change_amount=-total_price,
+            change_amount=-game.price,
             change_type="ticket purchase",
             game_id=game.id,
             game_type=BalanceChangeHistory.GameInstanceType.INSTABINGO,
             count=len(item.numbers),
-            previous_balance=user_balance.balance + total_price,
+            previous_balance=user_balance.balance + game.price,
             status=BalanceChangeHistory.Status.PENDING,
             args=json.dumps({"address": settings.address}),
             new_balance=user_balance.balance,

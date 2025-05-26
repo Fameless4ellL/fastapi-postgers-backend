@@ -1,9 +1,11 @@
+import random
 from datetime import timedelta, datetime
 from decimal import Decimal
 from typing import Optional
 
 from sqlalchemy import func, literal_column, DECIMAL
 
+from settings import settings
 from src.models import (
     Ticket,
     get_sync_db,
@@ -15,10 +17,10 @@ from src.models import (
     UserActionLog,
     Currency,
     Game,
-    Jackpot, GameView,
+    Jackpot,
+    GameView,
 )
 from src.utils import worker
-from settings import settings
 
 
 def yesterday():
@@ -305,20 +307,32 @@ def calculate_metrics(date: Optional[datetime] = None):
 
 
 @worker.register
-def recalculate_metrics():
+def update_metrics_randomly():
     if not settings.debug:
-        return
+        return "Metrics update is only allowed in debug mode."
 
-    db = next(get_sync_db())
+    _db = next(get_sync_db())
+    currency = _db.query(Currency).first()
 
-    user = db.query(User).order_by(User.created_at).with_entities(User.created_at).first()
+    db = next(get_sync_logs_db())
+    metrics_to_update = [
+        Metric.MetricType.ARPU,
+        Metric.MetricType.ARPPU,
+        Metric.MetricType.AVG_SESSION_TIME,
+    ]
 
-    if not user:
-        return
-
-    now = datetime.now()
-    for i in range(0, (now - user.created_at).days + 1):
-        date = (user.created_at + timedelta(days=i)).replace(hour=0, minute=0, second=0, microsecond=0)
-        for j in range(0, 24):
-            date = date + timedelta(hours=j)
-            calculate_metrics(date)
+    start_date = datetime.now() - timedelta(days=365)
+    for day in range(1, 366):
+        date = start_date + timedelta(days=day)
+        for metric_name in metrics_to_update:
+            random_value = Decimal(random.uniform(0, 100))
+            metric = Metric(
+                name=metric_name,
+                currency_id=currency.id,
+                value=random_value,
+                country=None,
+                created=date,
+            )
+            db.add(metric)
+    db.commit()
+    print("Metrics updated successfully.")
