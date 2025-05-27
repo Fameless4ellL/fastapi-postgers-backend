@@ -354,7 +354,7 @@ async def get_countries(
         if q:
             countries = pycountry.countries.search_fuzzy(q)
         else:
-            countries = pycountry.countries
+            countries = sorted(pycountry.countries, key=lambda x: x.name)
     except LookupError:
         return JSONResponse(
             status_code=status.HTTP_200_OK,
