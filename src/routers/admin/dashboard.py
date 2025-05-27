@@ -178,6 +178,9 @@ async def dashboard(
             metrics_dict[name.name] = None
             continue
 
+        if item.period is not Period.HOUR and len(metrics_dict[name.name].keys()):
+            continue
+
         if isinstance(metrics_dict[name.name], (int, float)):
             metrics_dict[name.name] += float(value)
         else:
