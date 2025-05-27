@@ -347,6 +347,7 @@ class GameSchema(BaseAdmin):
     has_tickets: bool = False
     game_type: GameType
     status: GameStatus
+    scheduled_datetime: Optional[datetime] = None
     repeat: Optional[bool] = False
     repeat_days: Optional[list[int]] = []
     numbers: Optional[list[Union[int, list[int]]]] = []
