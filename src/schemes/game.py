@@ -34,7 +34,7 @@ class Game(BaseModel):
     image: Optional[str] = None
     currency: Optional[str] = None
     status: str
-    price: float
+    price: Optional[float] = None
     prize: Union[float, str] = None
     max_limit_grid: int
     endtime: float
