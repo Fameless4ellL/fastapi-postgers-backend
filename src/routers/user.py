@@ -1,6 +1,5 @@
 import importlib
 import json
-from datetime import datetime
 from decimal import Decimal
 from typing import Annotated, List
 
@@ -12,6 +11,7 @@ from fastapi.responses import JSONResponse
 from sqlalchemy import func, select, update, exists
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import joinedload
+from sqlalchemy.sql import sqltypes
 from tronpy.keys import to_base58check_address
 
 from src.globals import aredis, q
@@ -28,7 +28,7 @@ from src.models.user import (
     Document
 )
 from src.routers import public
-from src.utils.dependencies import get_user, get_currency, get_user_token, worker
+from src.utils.dependencies import get_user, get_currency, get_user_token, worker, transaction_atomic
 from src.utils.validators import url_for
 from src.schemes import BadResponse, Country, JsonForm
 from src.schemes import (
@@ -200,43 +200,43 @@ async def withdraw(
             content="Wallet not found"
         )
 
-    balance_result = await db.execute(
-        select(Balance)
-        .with_for_update()
-        .filter(
-            Balance.user_id == user.id,
-            Balance.currency_id == currency.id
+    async with db.begin():
+        balance_result = await db.execute(
+            select(Balance)
+            .with_for_update()
+            .filter(
+                Balance.user_id == user.id,
+                Balance.currency_id == currency.id
+            )
         )
-    )
-    balance = balance_result.scalar()
-    if not balance:
-        balance = Balance(user_id=user.id)
+        balance = balance_result.scalar()
+        if not balance:
+            balance = Balance(user_id=user.id)
+            db.add(balance)
+
+        if balance.balance < item.amount:
+            return JSONResponse(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                content="Insufficient funds"
+            )
+
+        history = BalanceChangeHistory(
+            user_id=user.id,
+            balance_id=balance.id,
+            currency_id=currency.id,
+            change_amount=item.amount,
+            change_type="withdraw",
+            status=BalanceChangeHistory.Status.PENDING,
+            previous_balance=balance.balance,
+            new_balance=balance.balance - Decimal(item.amount),
+            args=json.dumps({"address": item.address})
+        )
+
+        db.add(history)
+        balance.balance = history.new_balance
         db.add(balance)
 
-    if balance.balance < item.amount:
-        return JSONResponse(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            content="Insufficient funds"
-        )
-
-    history = BalanceChangeHistory(
-        user_id=user.id,
-        balance_id=balance.id,
-        currency_id=currency.id,
-        change_amount=item.amount,
-        change_type="withdraw",
-        status=BalanceChangeHistory.Status.PENDING,
-        previous_balance=balance.balance,
-        new_balance=balance.balance - Decimal(item.amount),
-        args=json.dumps({"address": item.address})
-    )
-
-    db.add(history)
-
-    balance.balance = history.new_balance
-    db.add(balance)
-
-    await db.commit()
+        await db.commit()
 
     q.enqueue(
         worker.withdraw,
@@ -254,7 +254,7 @@ async def withdraw(
 )
 async def upload_kyc(
     user: Annotated[User, Depends(get_user)],
-    db: Annotated[AsyncSession, Depends(get_db)],
+    db: Annotated[AsyncSession, Depends(transaction_atomic)],
     item: Annotated[KYC, JsonForm()],
     files: List[UploadFile],
     avatar: Annotated[UploadFile, File(include_in_schema=False)] = None
@@ -459,7 +459,6 @@ async def get_my_games(
     """
     Получение игр пользователя в котором он участвовал
     """
-    # TODO refactor
     model = importlib.import_module("src.models.other")
     model = getattr(model, item.model)
 
@@ -472,8 +471,10 @@ async def get_my_games(
                     "won", Ticket.won,
                     "currency", Currency.code,
                     "total_amount", func.sum(Ticket.amount).label("total_amount"),
-                    "created", Ticket.created_at,
-                    "endtime", Ticket.created_at
+                    "created", func.cast(Ticket.created_at, sqltypes.TIMESTAMP),
+                    "endtime", func.cast(Ticket.created_at, sqltypes.TIMESTAMP),
+                    "status", func.cast(GameStatus.COMPLETED.name, sqltypes.VARCHAR(50)),
+                    "name", func.cast("InstaBingo", sqltypes.VARCHAR(50)),
                 ))
             .select_from(InstaBingo)
             .join(Currency, Currency.id == InstaBingo.currency_id)
@@ -497,8 +498,8 @@ async def get_my_games(
                     "image", Jackpot.image,
                     "status", Jackpot.status,
                     "prize", Jackpot.amount,
-                    "endtime", Jackpot.scheduled_datetime,
-                    "created", Jackpot.created_at,
+                    "endtime", func.cast(Jackpot.scheduled_datetime, sqltypes.TIMESTAMP),
+                    "created", func.cast(Jackpot.created_at, sqltypes.TIMESTAMP)
                 ))
             .select_from(Jackpot)
             .join(Currency, Currency.id == Jackpot.currency_id)
@@ -529,8 +530,8 @@ async def get_my_games(
                     "price", Game.price,
                     "max_limit_grid", Game.max_limit_grid,
                     "prize", Game.prize,
-                    "endtime", Game.scheduled_datetime,
-                    "created", Game.created_at,
+                    "endtime", func.cast(Game.scheduled_datetime, sqltypes.TIMESTAMP),
+                    "created", func.cast(Game.created_at, sqltypes.TIMESTAMP)
                 ))
             .select_from(Game)
             .join(Currency, Currency.id == Game.currency_id)
@@ -559,19 +560,6 @@ async def get_my_games(
     stmt = stmt.order_by(Ticket.created_at.desc())
     items = await db.execute(stmt.offset(skip).limit(limit))
     items = items.scalars().fetchall()
-
-    for i in items:
-        if item.model == "InstaBingo":
-            i["status"] = GameStatus.COMPLETED.name
-            i["name"] = "InstaBingo"
-        try:
-            i["endtime"] = datetime.fromisoformat(i["endtime"]).timestamp()
-            i["created"] = datetime.fromisoformat(i["created"]).timestamp()
-        except ValueError:
-            i["endtime"] = datetime.strptime( i["endtime"], "%Y-%m-%dT%H:%M:%S.%f").timestamp()
-            i["created"] = datetime.strptime(i["created"], "%Y-%m-%dT%H:%M:%S.%f").timestamp()
-        except Exception:
-            pass
 
     return JSONResponse(
         status_code=status.HTTP_200_OK,
@@ -629,7 +617,7 @@ async def get_notifications(
     responses={400: {"model": BadResponse}, 200: {"model": Notifications}}
 )
 async def set_settings(
-    db: Annotated[AsyncSession, Depends(get_db)],
+    db: Annotated[AsyncSession, Depends(transaction_atomic)],
     user: Annotated[User, Depends(get_user)],
     item: Usersettings,
 ):
