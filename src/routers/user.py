@@ -471,8 +471,8 @@ async def get_my_games(
                     "won", Ticket.won,
                     "currency", Currency.code,
                     "total_amount", func.sum(Ticket.amount).label("total_amount"),
-                    "created", func.cast(Ticket.created_at, sqltypes.TIMESTAMP),
-                    "endtime", func.cast(Ticket.created_at, sqltypes.TIMESTAMP),
+                    "created", func.date_part('epoch', Ticket.created_at),
+                    "endtime", func.date_part('epoch', Ticket.created_at),
                     "status", func.cast(GameStatus.COMPLETED.name, sqltypes.VARCHAR(50)),
                     "name", func.cast("InstaBingo", sqltypes.VARCHAR(50)),
                 ))
@@ -498,8 +498,8 @@ async def get_my_games(
                     "image", Jackpot.image,
                     "status", Jackpot.status,
                     "prize", Jackpot.amount,
-                    "endtime", func.cast(Jackpot.scheduled_datetime, sqltypes.TIMESTAMP),
-                    "created", func.cast(Jackpot.created_at, sqltypes.TIMESTAMP)
+                    "endtime", func.date_part('epoch', Jackpot.scheduled_datetime),
+                    "created", func.date_part('epoch', Jackpot.created_at),
                 ))
             .select_from(Jackpot)
             .join(Currency, Currency.id == Jackpot.currency_id)
@@ -530,8 +530,8 @@ async def get_my_games(
                     "price", Game.price,
                     "max_limit_grid", Game.max_limit_grid,
                     "prize", Game.prize,
-                    "endtime", func.cast(Game.scheduled_datetime, sqltypes.TIMESTAMP),
-                    "created", func.cast(Game.created_at, sqltypes.TIMESTAMP)
+                    "endtime", func.date_part('epoch', Game.scheduled_datetime),
+                    "created", func.date_part('epoch', Game.created_at),
                 ))
             .select_from(Game)
             .join(Currency, Currency.id == Game.currency_id)
@@ -553,7 +553,7 @@ async def get_my_games(
             .order_by(Ticket.created_at.desc())
         )
 
-    count = stmt.with_only_columns(func.count(model.id))
+    count = stmt.with_only_columns(func.count())
     count = await db.execute(count)
     count = count.scalar() or 0
 
