@@ -6,18 +6,17 @@ from typing import Annotated, List
 import pycountry
 from eth_account import Account
 from eth_account.signers.local import LocalAccount
-from fastapi import Depends, Query, status, UploadFile, File
+from fastapi import Depends, Query, status, UploadFile, File, HTTPException
 from fastapi.responses import JSONResponse
 from sqlalchemy import func, select, update, exists
 from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy.orm import joinedload
 from sqlalchemy.sql import sqltypes
 from tronpy.keys import to_base58check_address
 
 from src.globals import aredis, q
 from src.models.db import get_db
 from src.models.log import Action
-from src.models.other import Currency, GameStatus, Ticket, InstaBingo, Jackpot, Game
+from src.models.other import Currency, GameStatus, Ticket, InstaBingo, Jackpot, Game, Network
 from src.models.user import (
     Balance,
     Kyc,
@@ -28,13 +27,13 @@ from src.models.user import (
     Document
 )
 from src.routers import public
-from src.utils.dependencies import get_user, get_currency, get_user_token, worker, transaction_atomic
+from src.utils.dependencies import get_user, get_currency, get_user_token, worker, transaction_atomic, Token
 from src.utils.validators import url_for
-from src.schemes import BadResponse, Country, JsonForm
+from src.schemes import BadResponse, Country, JsonForm, UserBalanceList
 from src.schemes import (
     MyGames, MyGamesType, Tickets, Withdraw
 )
-from src.schemes import KYC, Notifications, Profile, UserBalance, Usersettings, Transactions
+from src.schemes import KYC, Notifications, Profile, Usersettings, Transactions
 
 
 @public.get(
@@ -122,7 +121,7 @@ async def profile(
 @public.get(
     "/balance",
     tags=["user"],
-    responses={400: {"model": BadResponse}, 200: {"model": List[UserBalance]}}
+    responses={400: {"model": BadResponse}, 200: {"model": UserBalanceList}}
 )
 async def balance(
     user: Annotated[User, Depends(get_user)],
@@ -132,39 +131,29 @@ async def balance(
     Получение balance пользователя
     """
 
-    balancies = await db.execute(
-        select(Balance).options(
-            joinedload(Balance.currency).joinedload(Currency.network)
+    data = (
+        select(
+            func.json_build_object(
+                "id", Balance.id,
+                "balance", Balance.balance,
+                "currency", Currency.code,
+                "network", Network.symbol
+            )
         )
+        .select_from(Balance)
+        .join(Currency, Balance.currency_id == Currency.id)
+        .join(Network, Currency.network_id == Network.id)
         .filter(Balance.user_id == user.id)
     )
-    balance = balancies.scalars().all()
+    data = await db.execute(data)
+    data = data.scalars().all()
 
-    if not balance:
-        currencies = await db.execute(select(Currency))
-        for currency in currencies.scalars().all():
-            bal = Balance(
-                user_id=user.id,
-                currency_id=currency.id,
-            )
-            db.add(bal)
-        await db.commit()
-
-        balancies = await db.execute(
-            select(Balance).options(
-                joinedload(Balance.currency).joinedload(Currency.network)
-            )
-            .filter(Balance.user_id == user.id)
-        )
-        balance = balancies.scalars().all()
+    if not data:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="No balances found")
 
     return JSONResponse(
         status_code=status.HTTP_200_OK,
-        content=[UserBalance(
-            network=b.currency.network.symbol,
-            currency=b.currency.code,
-            balance=float(b.balance)
-        ).model_dump() for b in balance]
+        content=UserBalanceList(items=data).model_dump(mode='json')
     )
 
 
@@ -253,7 +242,7 @@ async def withdraw(
     responses={400: {"model": BadResponse}, 200: {"model": str}}
 )
 async def upload_kyc(
-    user: Annotated[User, Depends(get_user)],
+    token: Annotated[Token, Depends(get_user_token)],
     db: Annotated[AsyncSession, Depends(transaction_atomic)],
     item: Annotated[KYC, JsonForm()],
     files: List[UploadFile],
@@ -262,6 +251,13 @@ async def upload_kyc(
     """
     Загрузка документа
     """
+    user = select(User).with_for_update().filter(User.id == token.id)
+    user = await db.execute(user)
+    user = user.scalar()
+
+    if not user:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="User not found")
+
     user.firstname = item.first_name
     user.lastname = item.last_name
     user.patronomic = item.patronomic
@@ -598,6 +594,19 @@ async def get_notifications(
     """
     Получение уведомлений для пользователя
     """
+    # stmt = (
+    #     select(
+    #         func.json_build_object(
+    #             "id", Notification.id,
+    #             "head", Notification.head,
+    #             "body", Notification.body,
+    #             "args", Notification.args,
+    #             "created", func.date_part('epoch', Notification.created_at)
+    #         )
+    #     )
+    # )
+    # notifications = await db.execute(stmt.offset(skip).limit(limit))
+    # notifications = notifications.scalars().all()
 
     stmt = select(Notification).filter(Notification.user_id == user.id)
     notifications = await db.execute(stmt.offset(skip).limit(limit))
@@ -636,19 +645,22 @@ async def get_notifications(
 )
 async def set_settings(
     db: Annotated[AsyncSession, Depends(transaction_atomic)],
-    user: Annotated[User, Depends(get_user)],
+    token: Annotated[Token, Depends(get_user_token)],
     item: Usersettings,
 ):
     """
     Изменение настроек пользователя
     """
+    user = select(User).with_for_update().filter(User.id == token.id)
+    user = await db.execute(user)
+    user = user.scalar()
+
+    if not user:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="User not found")
 
     user.language_code = item.locale
     user.country = item.country
     db.add(user)
     await db.commit()
 
-    return JSONResponse(
-        status_code=status.HTTP_200_OK,
-        content="OK"
-    )
+    return "OK"

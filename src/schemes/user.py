@@ -10,9 +10,14 @@ from src.models import BalanceChangeHistory
 
 
 class UserBalance(BaseModel):
+    id: int
     network: str
     currency: str
     balance: float
+
+
+class UserBalanceList(BaseModel):
+    items: list[UserBalance] = []
 
 
 class KYC(BaseModel):
