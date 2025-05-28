@@ -361,11 +361,27 @@ async def get_countries(
             content=[]
         )
 
+    excluded_alpha_3 = {
+        "ATA",
+        "GRL",
+        "HKG",
+        "PRI",
+        "TWN",
+        "GIB",
+        "BMU",
+        "FLK",
+        "VAT",
+        "ESH",
+        "PSE",
+    }
     data = [{
         "alpha_3": country.alpha_3,
         "name": country.name,
         "flag": country.flag
-    } for country in countries]
+    }
+        for country in countries
+        if country.alpha_3 not in excluded_alpha_3
+    ]
 
     return JSONResponse(
         status_code=status.HTTP_200_OK,
