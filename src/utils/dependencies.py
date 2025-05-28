@@ -367,3 +367,11 @@ async def is_field_unique(
 
     result = await db.execute(stmt)
     return not result.scalar()
+
+
+async def transaction_atomic(db: Annotated[AsyncSession, Depends(get_db)]):
+    """
+    Context manager for handling transactions in an async session.
+    """
+    async with db.begin():
+        yield db
