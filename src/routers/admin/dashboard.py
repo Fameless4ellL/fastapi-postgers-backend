@@ -178,7 +178,11 @@ async def dashboard(
             metrics_dict[name.name] = None
             continue
 
-        if item.period is not Period.HOUR and len(metrics_dict[name.name].keys()) == item.period.label.limit:
+        if (
+            item.period is not Period.HOUR
+            and not isinstance(metrics_dict[name.name], (int, float))
+            and len(metrics_dict[name.name].keys()) == item.period.label.limit
+        ):
             continue
 
         if isinstance(metrics_dict[name.name], (int, float)):
