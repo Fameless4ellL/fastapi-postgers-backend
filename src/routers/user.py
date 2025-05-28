@@ -451,7 +451,7 @@ async def get_history(
 )
 async def get_my_games(
     db: Annotated[AsyncSession, Depends(get_db)],
-    # user: Annotated[User, Depends(get_user)],
+    user: Annotated[User, Depends(get_user)],
     item: MyGamesType,
     skip: int = 0,
     limit: int = 10,
@@ -479,6 +479,7 @@ async def get_my_games(
             .select_from(InstaBingo)
             .join(Currency, Currency.id == InstaBingo.currency_id)
             .join(Ticket, Ticket.instabingo_id == InstaBingo.id)
+            .filter(Ticket.user_id == user.id)
             .group_by(
                 Ticket.id,
                 InstaBingo.price,
@@ -488,6 +489,12 @@ async def get_my_games(
             )
             .order_by(Ticket.created_at.desc())
         )
+
+        count = select(func.count(Ticket.id)).filter(
+            Ticket.instabingo_id == InstaBingo.id,
+            Ticket.user_id == user.id
+        )
+
     elif item.model == "Jackpot":
         stmt = (
             select(
@@ -504,6 +511,7 @@ async def get_my_games(
             .select_from(Jackpot)
             .join(Currency, Currency.id == Jackpot.currency_id)
             .join(Ticket, Ticket.jackpot_id == Jackpot.id)
+            .filter(Ticket.user_id == user.id)
             .group_by(
                 Ticket.id,
                 Ticket.won,
@@ -518,6 +526,12 @@ async def get_my_games(
             )
             .order_by(Ticket.created_at.desc())
         )
+
+        count = select(func.count(Ticket.id)).filter(
+            Ticket.jackpot_id == Jackpot.id,
+            Ticket.user_id == user.id
+        )
+
     else:
         stmt = (
             select(
@@ -536,6 +550,7 @@ async def get_my_games(
             .select_from(Game)
             .join(Currency, Currency.id == Game.currency_id)
             .join(Ticket, Ticket.game_id == Game.id)
+            .filter(Ticket.user_id == user.id)
             .group_by(
                 Ticket.id,
                 Game.name,
@@ -552,12 +567,15 @@ async def get_my_games(
             )
             .order_by(Ticket.created_at.desc())
         )
+        # count Ticket id
+        count = select(func.count(Ticket.id)).filter(
+            Ticket.game_id == Game.id,
+            Ticket.user_id == user.id
+        )
 
-    count = stmt.with_only_columns(func.count())
     count = await db.execute(count)
     count = count.scalar() or 0
 
-    stmt = stmt.order_by(Ticket.created_at.desc())
     items = await db.execute(stmt.offset(skip).limit(limit))
     items = items.scalars().fetchall()
 
