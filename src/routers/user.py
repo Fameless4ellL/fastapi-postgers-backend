@@ -487,7 +487,7 @@ async def get_my_games(
                 Currency.code,
                 Ticket.created_at
             )
-            .order_by(Ticket.created_at.desc())
+            .order_by(Ticket.created_at.asc())
         )
 
         count = select(func.count(Ticket.id)).filter(
@@ -524,7 +524,7 @@ async def get_my_games(
                 Jackpot.scheduled_datetime,
                 Jackpot.created_at
             )
-            .order_by(Ticket.created_at.desc())
+            .order_by(Ticket.created_at.asc())
         )
 
         count = select(func.count(Ticket.id)).filter(
@@ -565,7 +565,7 @@ async def get_my_games(
                 Currency.code,
                 Ticket.created_at
             )
-            .order_by(Ticket.created_at.desc())
+            .order_by(Ticket.created_at.asc())
         )
         # count Ticket id
         count = select(func.count(Ticket.id)).filter(
