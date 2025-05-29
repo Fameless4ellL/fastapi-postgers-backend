@@ -55,6 +55,8 @@ class User(Base):
 
     referral_id: Mapped[Union[str, None]] = Column(Integer, ForeignKey('referral_links.id'), nullable=True)
 
+    is_blocked: Mapped[bool] = Column(Boolean, default=False)
+
     created_at: Mapped[datetime.datetime] = Column(DateTime, default=datetime.datetime.now)
     last_session: Mapped[Union[datetime.datetime, None]] = Column(DateTime, nullable=True)
     updated_at: Mapped[datetime.datetime] = Column(
@@ -137,6 +139,7 @@ class BalanceChangeHistory(Base):
     class Status(Enum):
         PENDING = "pending"
         SUCCESS = "success"
+        BLOCKED = "blocked"
         CANCELED = "canceled"
         INSUFFICIENT_FUNDS = "insufficient_funds"
         WEB3_ERROR = "web3_error"
