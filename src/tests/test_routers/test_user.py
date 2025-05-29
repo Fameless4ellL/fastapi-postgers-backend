@@ -97,7 +97,6 @@ class TestUser:
             "/v1/balance",
             headers={"Authorization": f"Bearer {token}"}
         )
-        print(response.json())
         assert response.status_code == status.HTTP_200_OK
 
         items = response.json()['items']

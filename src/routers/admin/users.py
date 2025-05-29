@@ -63,6 +63,7 @@ async def get_users(
     if query:
         stmt = stmt.filter(
             or_(
+                User.id.ilike(f"%{query}%"),
                 User.username.ilike(f"%{query}%"),
                 User.phone_number.ilike(f"%{query}%"),
             )

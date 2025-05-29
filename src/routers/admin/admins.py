@@ -97,6 +97,9 @@ async def get_admin_list(
     if item.filter:
         stmt = stmt.filter(
             or_(
+                User.id.ilike(f"%{item.filter}%"),
+                User.firstname.ilike(f"%{item.filter}%"),
+                User.lastname.ilike(f"%{item.filter}%"),
                 User.username.ilike(f"%{item.filter}%"),
                 User.phone_number.ilike(f"%{item.filter}%"),
             )

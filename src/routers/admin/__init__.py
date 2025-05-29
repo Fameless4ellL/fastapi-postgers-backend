@@ -76,7 +76,12 @@ def get_crud_router(
                 stmt = stmt.filter(model.kind.in_(filters.kind))
 
             if filters.filter:
-                stmt = stmt.filter(model.name.ilike(f"%{filters.filter}%"))
+                stmt = stmt.filter(
+                    or_(
+                        model.id.ilike(f"%{filters.filter}%"),
+                        model.name.ilike(f"%{filters.filter}%"),
+                    )
+                )
 
             if filters.date_from:
                 stmt = stmt.filter(model.created_at >= filters.date_from)
@@ -96,6 +101,7 @@ def get_crud_router(
             if filters.filter:
                 stmt = stmt.filter(
                     or_(
+                        model.id.ilike(f"%{filters.filter}%"),
                         model.name.ilike(f"%{filters.filter}%"),
                         model.comment.ilike(f"%{filters.filter}%"),
                     )
@@ -104,7 +110,12 @@ def get_crud_router(
         if model.__name__ == "Jackpot":
 
             if filters.filter:
-                stmt = stmt.filter(model.name.ilike(f"%{filters.filter}%"))
+                stmt = stmt.filter(
+                    or_(
+                        model.id.ilike(f"%{filters.filter}%"),
+                        model.name.ilike(f"%{filters.filter}%"),
+                    )
+                )
 
             if filters.date_from:
                 stmt = stmt.filter(model.created_at >= filters.date_from)
