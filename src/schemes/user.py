@@ -7,6 +7,7 @@ from pydantic_extra_types.country import CountryAlpha3
 from pydantic_extra_types.language_code import LanguageAlpha2
 
 from src.models import BalanceChangeHistory
+from src.utils.validators import url_for
 
 
 class UserBalance(BaseModel):
@@ -36,8 +37,17 @@ class Address(BaseModel):
     evm: str
 
 
+class Docs(BaseModel):
+    id: Optional[int] = None
+    file: Annotated[
+        Optional[str],
+        AfterValidator(lambda x: url_for("static/kyc", path=x) if x is not None else None)
+    ] = None
+    created_at: Optional[float] = None
+
+
 class KYCProfile(KYC):
-    document: Optional[str] = None
+    documents: Optional[list[Docs]] = None
 
 
 class Profile(BaseModel):
@@ -46,7 +56,7 @@ class Profile(BaseModel):
     kyc_approved: bool = False
     balance: float
     address: Address
-    locale: str
+    locale: str = "en"
     notifications: bool = False
     country: Annotated[
         str,

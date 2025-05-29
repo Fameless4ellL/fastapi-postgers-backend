@@ -5,6 +5,8 @@ from fastapi_storages import FileSystemStorage
 
 
 class FileType(_FileType):
+    cache_ok = True
+
     def __init__(
         self,
         storage=FileSystemStorage(path='/tmp'),

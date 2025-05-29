@@ -8,7 +8,7 @@ from eth_account import Account
 from eth_account.signers.local import LocalAccount
 from fastapi import Depends, Query, status, UploadFile, File, HTTPException
 from fastapi.responses import JSONResponse
-from sqlalchemy import func, select, update, exists
+from sqlalchemy import func, select, update, delete
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.sql import sqltypes
 from tronpy.keys import to_base58check_address
@@ -28,7 +28,6 @@ from src.models.user import (
 )
 from src.routers import public
 from src.utils.dependencies import get_user, get_currency, get_user_token, worker, transaction_atomic, Token
-from src.utils.validators import url_for
 from src.schemes import BadResponse, Country, JsonForm, UserBalanceList
 from src.schemes import (
     MyGames, MyGamesType, Tickets, Withdraw
@@ -51,20 +50,59 @@ async def profile(
     """
     Получение информации о пользователе
     """
-
-    # sum balances
-    balances = await db.execute(
-        select(func.sum(Balance.balance))
-        .filter(Balance.user_id == user.id)
+    profile = (
+        select(
+            func.json_build_object(
+                "id", User.id,
+                "username", User.username,
+                "firstname", User.firstname,
+                "lastname", User.lastname,
+                "patronomic", User.patronomic,
+                "language_code", User.language_code,
+                "kyc_approved", User.kyc,
+                "country", User.country,
+                "telegram", User.telegram,
+                "phone_number", User.phone_number,
+                "notifications", func.exists(
+                    select(Notification.id)
+                    .filter(
+                        Notification.user_id == User.id,
+                        Notification.read.is_(False)
+                    ).scalar_subquery()
+                ),
+                "address", Wallet.address,
+                "balance", Balance.balance,
+                "documents", func.array_agg(
+                    func.json_build_object(
+                        "id", Document.id,
+                        "file", Document.file,
+                        "created_at", func.date_part('epoch', Document.created_at)
+                    )
+                )
+            )
+        )
+        .select_from(User)
+        .join(Balance, Balance.user_id == User.id, isouter=True)
+        .join(Wallet, Wallet.user_id == User.id, isouter=True)
+        .join(Document, Document.user_id == User.id, isouter=True)
+        .filter(User.id == user.id)
+        .group_by(
+            User.id,
+            User.username,
+            User.firstname,
+            User.lastname,
+            User.language_code,
+            User.country,
+            User.telegram,
+            User.phone_number,
+            Wallet.address,
+            Balance.balance
+        )
     )
-    balance = float(balances.scalar() or 0)
+    profile = await db.execute(profile)
+    profile = profile.scalar()
 
-    wallet_result = await db.execute(
-        select(Wallet)
-        .filter(Wallet.user_id == user.id)
-    )
-    wallet = wallet_result.scalar()
-    if not wallet:
+    if not profile["address"]:
         acc: LocalAccount = Account.create()
 
         wallet = Wallet(
@@ -77,44 +115,29 @@ async def profile(
 
         await aredis.sadd("BLOCKER:WALLETS", wallet.address)
 
-    data = None
-    document = await db.execute(
-        select(Document)
-        .filter(Document.user_id == user.id)
-        .order_by(Document.created_at.desc())
-    )
-    document = document.scalar()
+        profile["address"] = wallet.address
 
-    if document:
-        data = {
-            "first_name": user.firstname,
-            "patronomic": user.patronomic,
-            "last_name": user.lastname,
-            "document": url_for("static/kyc", path=document.file.name),
-        }
+    kyc = {}
+    if profile["documents"]:
+        kyc = {"kyc":{
+            "first_name": profile['firstname'],
+            "patronomic": profile['patronomic'],
+            "last_name": profile['lastname'],
+            "documents": profile['documents'],
+        }}
 
-    notifications = await db.execute(
-        select(exists().where(
-            Notification.user_id == user.id,
-            Notification.read.is_(False)
-        ))
+    profile["address"] = {
+        "base58": to_base58check_address(profile["address"]),
+        "evm": profile["address"],
+    }
+    data = Profile(
+        **profile,
+        **kyc,
     )
-    notifications = notifications.scalar()
 
     return JSONResponse(
         status_code=status.HTTP_200_OK,
-        content=Profile(
-            balance=balance,
-            kyc=data,
-            locale=user.language_code or "EN",
-            address={
-                "base58": to_base58check_address(wallet.address),
-                "evm": wallet.address,
-            },
-            notifications=notifications,
-            country=user.country or "USA",
-            username=user.username
-        ).model_dump()
+        content=data.model_dump()
     )
 
 
@@ -267,6 +290,11 @@ async def upload_kyc(
         user.avatar_v1 = avatar
 
     db.add(user)
+
+    if files:
+        await db.execute(
+            delete(Document).where(Document.user_id == user.id)
+        )
 
     for file in files:
         if not file.content_type.startswith("image"):
