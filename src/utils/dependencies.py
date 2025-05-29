@@ -1,3 +1,4 @@
+import logging
 import smtplib
 import traceback
 import uuid
@@ -27,6 +28,16 @@ from src.models.user import User, Role
 from src.utils import worker
 from src.utils.signature import decode_access_token
 from src.utils.web3 import AWSHTTPProvider
+
+logging.basicConfig(
+    level=logging.INFO,
+    format="%(asctime)s - %(levelname)s - %(message)s",
+    handlers=[
+        logging.StreamHandler()
+    ]
+)
+logger = logging.getLogger(__name__)
+
 
 oauth2_scheme = security.OAuth2PasswordBearer(tokenUrl="/v1/token")
 admin_oauth2_scheme = security.OAuth2PasswordBearer(
@@ -320,17 +331,21 @@ def send_mail(
     msg.attach(MIMEText(body))
 
     try:
+        logger.info(f"Connecting to SMTP server: {email.host}:{email.port}")
         server = smtplib.SMTP(email.host, email.port)
         server.starttls()
 
+        logger.info("Logging in to SMTP server")
         server.login(email.login, email.password)
 
         text = msg.as_string()
-
+        logger.info(f"Sending email to {to_email}")
         server.sendmail(email.FROM, to_email, text)
 
         server.quit()
-    except smtplib.SMTPException:
+        logger.info("Email sent successfully")
+    except smtplib.SMTPException as e:
+        logger.error(f"Failed to send email: {e}")
         traceback.print_exc()
 
 

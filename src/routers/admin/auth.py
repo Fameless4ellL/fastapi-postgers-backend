@@ -145,7 +145,7 @@ async def set_reset_password(
         user.email,
     )
 
-    return JSONResponse(status_code=status.HTTP_200_OK, content="OK")
+    return JSONResponse(status_code=status.HTTP_200_OK, content="OK", background=bg)
 
 
 @admin.post(
