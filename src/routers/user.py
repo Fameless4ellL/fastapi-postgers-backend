@@ -212,43 +212,42 @@ async def withdraw(
             content="Wallet not found"
         )
 
-    async with db.begin():
-        balance_result = await db.execute(
-            select(Balance)
-            .with_for_update()
-            .filter(
-                Balance.user_id == user.id,
-                Balance.currency_id == currency.id
-            )
+    balance_result = await db.execute(
+        select(Balance)
+        .filter(
+            Balance.user_id == user.id,
+            Balance.currency_id == currency.id
         )
-        balance = balance_result.scalar()
-        if not balance:
-            balance = Balance(user_id=user.id)
-            db.add(balance)
-
-        if balance.balance < item.amount:
-            return JSONResponse(
-                status_code=status.HTTP_400_BAD_REQUEST,
-                content="Insufficient funds"
-            )
-
-        history = BalanceChangeHistory(
-            user_id=user.id,
-            balance_id=balance.id,
-            currency_id=currency.id,
-            change_amount=item.amount,
-            change_type="withdraw",
-            status=BalanceChangeHistory.Status.PENDING,
-            previous_balance=balance.balance,
-            new_balance=balance.balance - Decimal(item.amount),
-            args=json.dumps({"address": item.address})
-        )
-
-        db.add(history)
-        balance.balance = history.new_balance
+        .with_for_update()
+    )
+    balance = balance_result.scalar()
+    if not balance:
+        balance = Balance(user_id=user.id)
         db.add(balance)
 
-        await db.commit()
+    if balance.balance < item.amount:
+        return JSONResponse(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            content="Insufficient funds"
+        )
+
+    history = BalanceChangeHistory(
+        user_id=user.id,
+        balance_id=balance.id,
+        currency_id=currency.id,
+        change_amount=item.amount,
+        change_type="withdraw",
+        status=BalanceChangeHistory.Status.PENDING,
+        previous_balance=balance.balance,
+        new_balance=balance.balance - Decimal(item.amount),
+        args=json.dumps({"address": item.address})
+    )
+
+    db.add(history)
+    balance.balance = history.new_balance
+    db.add(balance)
+
+    await db.commit()
 
     q.enqueue(
         worker.withdraw,
