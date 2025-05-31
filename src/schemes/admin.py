@@ -288,7 +288,6 @@ class GameCreate(BaseAdmin):
     country: Optional[CountryAlpha3] = None
     min_ticket_count: int = 1
     scheduled_datetime: Optional[FutureDatetime]
-    repeat: Optional[bool] = False
     repeat_days: Optional[list[int]] = []
 
     @model_serializer
@@ -321,7 +320,7 @@ class GameCreate(BaseAdmin):
             "min_ticket_count": self.min_ticket_count,
             "scheduled_datetime": scheduled_datetime,
             "zone": zone,
-            "repeat": self.repeat,
+            "repeat": bool(len(self.repeat_days)),
             "repeat_days": self.repeat_days,
         }
 
