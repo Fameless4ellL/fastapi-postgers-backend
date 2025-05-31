@@ -16,7 +16,7 @@ async def get_random(x: int = 1, y: int = 90) -> Optional[int]:
             params={"x": x, "y": y},
             timeout=5
         )
-    except Exception as e:
+    except requests.exceptions.RequestException as e:
         print(f"Error: {e}")
         return None
 

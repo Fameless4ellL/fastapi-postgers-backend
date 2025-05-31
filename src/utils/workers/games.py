@@ -25,6 +25,7 @@ from ..rng import get_random_sync as get_random
 
 
 logger = logging.getLogger(__name__)
+logger.setLevel(logging.INFO)
 
 
 @worker.register
@@ -180,7 +181,6 @@ def proceed_game(game_id: Optional[int] = None):
             # TODO вернуть деньги пользователям
             continue
 
-        num_winning_combinations = 1
         if game.kind == GameView.MONETARY:
             # Рассчитываем призовой фонд
             ticket_price = float(game.price or 1)
@@ -215,12 +215,21 @@ def proceed_game(game_id: Optional[int] = None):
         logger.info(
             f"Generating winning combinations for game {game.id} - {game.name}"
         )
-        while len(drawn_numbers) < num_winning_combinations:
-            winners = winners | get_winners(
-                game,
-                tickets,
-                drawn_numbers,
-            )
+        if game.kind == GameView.MONETARY:
+            while len(drawn_numbers) < num_winning_combinations:
+                winners = winners | get_winners(
+                    game,
+                    tickets,
+                    drawn_numbers,
+                )
+        else:
+            while len(drawn_numbers) < game.limit_by_ticket:
+                winners = winners | get_winners(
+                    game,
+                    tickets,
+                    drawn_numbers,
+                )
+
         logger.info(
             f"Generated {len(drawn_numbers)} winning combinations for game {game.id} - {game.name}"
         )
