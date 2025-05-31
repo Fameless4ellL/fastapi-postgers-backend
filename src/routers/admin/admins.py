@@ -4,7 +4,7 @@ from typing import Annotated, Union
 from fastapi import Depends, Path, background, status, Security, UploadFile
 from fastapi.exceptions import RequestValidationError
 from fastapi.responses import JSONResponse
-from sqlalchemy import func, select, or_, delete
+from sqlalchemy import func, select, or_, delete, String
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from src.globals import aredis
@@ -97,7 +97,7 @@ async def get_admin_list(
     if item.filter:
         stmt = stmt.filter(
             or_(
-                User.id.ilike(f"%{item.filter}%"),
+                func.cast(User.id, String).ilike(f"%{item.filter}%"),
                 User.firstname.ilike(f"%{item.filter}%"),
                 User.lastname.ilike(f"%{item.filter}%"),
                 User.username.ilike(f"%{item.filter}%"),

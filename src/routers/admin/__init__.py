@@ -3,7 +3,7 @@ from typing import Type, List, Annotated
 from fastapi import APIRouter, Depends, Path, status, Security, Query
 from fastapi.responses import JSONResponse
 from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy import select, func, or_, exists
+from sqlalchemy import select, func, or_, exists, String
 from src.models.log import Action
 from src.models.other import Game, Ticket
 
@@ -78,7 +78,7 @@ def get_crud_router(
             if filters.filter:
                 stmt = stmt.filter(
                     or_(
-                        model.id.ilike(f"%{filters.filter}%"),
+                        func.cast(model.id, String).ilike(f"%{filters.filter}%"),
                         model.name.ilike(f"%{filters.filter}%"),
                     )
                 )
@@ -101,7 +101,7 @@ def get_crud_router(
             if filters.filter:
                 stmt = stmt.filter(
                     or_(
-                        model.id.ilike(f"%{filters.filter}%"),
+                        func.cast(model.id, String).ilike(f"%{filters.filter}%"),
                         model.name.ilike(f"%{filters.filter}%"),
                         model.comment.ilike(f"%{filters.filter}%"),
                     )
@@ -112,7 +112,7 @@ def get_crud_router(
             if filters.filter:
                 stmt = stmt.filter(
                     or_(
-                        model.id.ilike(f"%{filters.filter}%"),
+                        func.cast(model.id, String).ilike(f"%{filters.filter}%"),
                         model.name.ilike(f"%{filters.filter}%"),
                     )
                 )

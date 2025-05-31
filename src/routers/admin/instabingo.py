@@ -2,7 +2,7 @@ from typing import Annotated
 
 from fastapi import Depends, Path, status, Security
 from fastapi.responses import JSONResponse
-from sqlalchemy import select, func, or_
+from sqlalchemy import select, func, or_, String
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import Session
 
@@ -159,9 +159,9 @@ async def get_instabingo_tickets_list(
     if item.filter:
         stmt = stmt.filter(
             or_(
-                Ticket.id.ilike(f"%{item.filter}%"),
+                func.cast(Ticket.id, String).ilike(f"%{item.filter}%"),
                 User.username.ilike(f"%{item.filter}%"),
-                User.id.ilike(f"%{item.filter}%"),
+                func.cast(User.id, String).ilike(f"%{item.filter}%"),
             )
         )
 
