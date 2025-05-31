@@ -22,8 +22,8 @@ class UserBalanceList(BaseModel):
 
 
 class KYC(BaseModel):
-    first_name: str
-    last_name: str
+    first_name: Optional[str] = None
+    last_name: Optional[str] = None
     patronomic: Optional[str] = None
 
 
@@ -54,7 +54,7 @@ class Profile(BaseModel):
     username: Optional[str]
     kyc: Optional[KYCProfile] = None
     kyc_approved: bool = False
-    balance: float
+    balance: Optional[float] = 0
     address: Address
     locale: str = "en"
     notifications: bool = False
