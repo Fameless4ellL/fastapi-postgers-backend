@@ -701,8 +701,8 @@ class ReferralUsersList(BaseModel):
 
 
 class AdminStatus(MultiValueStrEnum):
-    ACTIVE = "Active", False
-    INACTIVE = "Removed", True
+    ACTIVE = "Active", True
+    INACTIVE = "Removed", False
 
 
 @dataclass

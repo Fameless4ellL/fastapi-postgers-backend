@@ -461,7 +461,7 @@ def proceed_jackpot(jackpot_id: Optional[int] = None):
         winning_number = ""
 
         while len(remaining_tickets) > 1:
-            digit = get_random(0, 9)  # Выпавшее число может быть от 0 до 9
+            digit = get_random(1, 9)  # Выпавшее число может быть от 0 до 9
             new_winning_number = winning_number + str(digit)
 
             # Filter tickets based on the current sequence of digits
