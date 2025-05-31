@@ -280,7 +280,7 @@ async def get_generated_numbers(
     """
     Get generated numbers
     """
-    stmt = select(Number).filter(Number.ticket_id == game_id)
+    stmt = select(Number).filter(Number.ticket_id == game_id).order_by(Number.id.desc())
     numbers = await db.execute(stmt)
     numbers = numbers.scalars().all()
 

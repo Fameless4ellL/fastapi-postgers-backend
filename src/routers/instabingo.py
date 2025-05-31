@@ -241,7 +241,7 @@ async def buy_tickets(
 
     win_numbers = []
     generated_numbers = set()
-    while len(generated_numbers) < 40:
+    while len(generated_numbers) < 41:
         start_date = datetime.datetime.now()
         number = await get_random(1, 90)
 
