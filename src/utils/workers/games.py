@@ -64,7 +64,7 @@ def generate_game(
     )
 
     game_inst = Game(
-        name=f"game #{str(game.id)}",
+        name=f"{game.name} #{str(game.id)}",
         status=GameStatus.PENDING,
         scheduled_datetime=scheduled_datetime,
         **{
@@ -377,8 +377,8 @@ def generate_jackpot(
     fund_end = scheduled_datetime - timedelta(days=1)
 
     jackpot_inst = Jackpot(
-        name=f"Jackpot #{str(jackpot.id + 1)}",
-        status=GameStatus.PENDING,
+        name=f"{jackpot.name} #{str(jackpot.id + 1)}",
+        status=GameStatus.ACTIVE,
         scheduled_datetime=scheduled_datetime,
         fund_start=fund_start,
         fund_end=fund_end,
@@ -396,6 +396,12 @@ def generate_jackpot(
     db.commit()
     db.refresh(jackpot_inst)
 
+    q.enqueue_at(
+        fund_end,
+        set_pending_jackpot,
+        jackpot_id=jackpot_inst.id,
+        status=GameStatus.PENDING,
+    )
     q.enqueue_at(
         scheduled_datetime,
         proceed_jackpot,
