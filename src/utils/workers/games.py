@@ -2,7 +2,6 @@ import json
 import logging
 from datetime import datetime, timedelta
 from decimal import Decimal
-from functools import partial
 from typing import Optional
 
 from sqlalchemy import func
@@ -181,6 +180,7 @@ def proceed_game(game_id: Optional[int] = None):
             # TODO вернуть деньги пользователям
             continue
 
+        num_winning_combinations = 1
         if game.kind == GameView.MONETARY:
             # Рассчитываем призовой фонд
             ticket_price = float(game.price or 1)
@@ -211,22 +211,11 @@ def proceed_game(game_id: Optional[int] = None):
         winners = set()
         drawn_numbers = []
 
-        if game.kind == GameView.MONETARY:
-            cond = partial(
-                lambda x: len(x) < game.num_winning_combinations,
-                drawn_numbers
-            )
-        else:
-            cond = partial(
-                lambda x: len(x) < game.limit_by_ticket,
-                drawn_numbers
-            )
-
         # Генерация  выигрышной комбинации до game.limit_by_ticket
         logger.info(
             f"Generating winning combinations for game {game.id} - {game.name}"
         )
-        while cond():
+        while len(drawn_numbers) < num_winning_combinations:
             winners = winners | get_winners(
                 game,
                 tickets,
