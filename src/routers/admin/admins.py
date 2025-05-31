@@ -286,8 +286,11 @@ async def create_admin(
     bg.add_task(
         send_mail,
         "New Admin",
-        f"New admin {new_admin.username} has been created. your code is {code}",
-        f" {settings.web_app_url}/registration/{code}"
+        (
+            f"New admin {new_admin.username} has been created. your code is {code}",
+            f" {settings.web_app_url}/registration/{code}"
+        ),
+        new_admin.email,
     )
 
     return JSONResponse(

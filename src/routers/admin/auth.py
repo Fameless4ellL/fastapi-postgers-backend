@@ -372,7 +372,7 @@ async def verify_link(
 
     email = await aredis.get(f"EMAIL:{item.code}")
     await aredis.set(f"IP:EMAIL:{ip}", email.decode('utf-8'), ex=60 * 10)
-    # await aredis.delete(f"EMAIL:{item.code}")
+    await aredis.delete(f"EMAIL:{item.code}")
 
     return JSONResponse(
         status_code=status.HTTP_200_OK,
