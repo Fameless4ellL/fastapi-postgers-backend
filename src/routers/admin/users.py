@@ -4,7 +4,7 @@ from eth_account import Account
 from eth_account.signers.local import LocalAccount
 from fastapi import Depends, Path, Query, status, Security
 from fastapi.responses import JSONResponse
-from sqlalchemy import and_, func, select, or_
+from sqlalchemy import and_, func, select, or_, String
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from src.globals import aredis
@@ -63,7 +63,7 @@ async def get_users(
     if query:
         stmt = stmt.filter(
             or_(
-                User.id.ilike(f"%{query}%"),
+                func.cast(User.id, String).ilike(f"%{query}%"),
                 User.username.ilike(f"%{query}%"),
                 User.phone_number.ilike(f"%{query}%"),
             )
