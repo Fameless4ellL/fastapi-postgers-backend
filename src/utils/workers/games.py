@@ -1,6 +1,8 @@
 import json
+import logging
 from datetime import datetime, timedelta
 from decimal import Decimal
+from functools import partial
 from typing import Optional
 
 from sqlalchemy import func
@@ -21,6 +23,9 @@ from src.models.user import Balance, BalanceChangeHistory
 from src.models.user import Notification
 from src.utils import worker
 from ..rng import get_random_sync as get_random
+
+
+logger = logging.getLogger(__name__)
 
 
 @worker.register
@@ -146,12 +151,15 @@ def proceed_game(game_id: Optional[int] = None):
         if not game:
             continue
 
+        logger.info(f"Proceeding game {game.id} - {game.name}")
+
         game.status = GameStatus.ACTIVE
         db.add(game)
         db.commit()
 
         start_date = datetime.now()
         game.event_start = start_date
+        logger.info(f"Game {game.id} started at {start_date}")
 
         # Получаем билеты
         tickets = db.query(Ticket).filter(
@@ -159,9 +167,16 @@ def proceed_game(game_id: Optional[int] = None):
         ).all()
 
         if not tickets or len(tickets) < game.min_ticket_count:
+
+            logger.warning(
+                f"Game {game.id} - {game.name} has no tickets or not enough tickets"
+            )
             game.status = GameStatus.CANCELLED
             db.add(game)
             db.commit()
+
+            if game.repeat:
+                generate_game(game.id)
 
             # TODO вернуть деньги пользователям
             continue
@@ -197,17 +212,29 @@ def proceed_game(game_id: Optional[int] = None):
         drawn_numbers = []
 
         if game.kind == GameView.MONETARY:
-            cond = len(drawn_numbers) < num_winning_combinations
+            cond = partial(
+                lambda x: len(x) < game.num_winning_combinations,
+                drawn_numbers
+            )
         else:
-            cond = len(drawn_numbers) < game.limit_by_ticket
+            cond = partial(
+                lambda x: len(x) < game.limit_by_ticket,
+                drawn_numbers
+            )
 
         # Генерация  выигрышной комбинации до game.limit_by_ticket
-        while cond:
+        logger.info(
+            f"Generating winning combinations for game {game.id} - {game.name}"
+        )
+        while cond():
             winners = winners | get_winners(
                 game,
                 tickets,
                 drawn_numbers,
             )
+        logger.info(
+            f"Generated {len(drawn_numbers)} winning combinations for game {game.id} - {game.name}"
+        )
 
         tickets = [
             ticket
@@ -266,6 +293,9 @@ def proceed_game(game_id: Optional[int] = None):
                     db.commit()
                     db.refresh(balance_change)
 
+                    logger.info(
+                        f"User {_ticket.user_id} won {_ticket.amount} {game.currency.code} in game {game.id}"
+                    )
                     worker.deposit(
                         history_id=balance_change.id,
                         change_type=balance_change.change_type
@@ -306,11 +336,13 @@ def proceed_game(game_id: Optional[int] = None):
 
         end_date = datetime.now()
         game.event_end = end_date
+        logger.info(f"Game {game.id} ended at {end_date}")
 
         game.status = GameStatus.COMPLETED
         db.add(game)
 
         if game.repeat:
+            logger.info(f"Generating new game instance for {game.id} - {game.name}")
             generate_game(game.id)
 
     db.commit()
