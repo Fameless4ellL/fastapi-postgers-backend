@@ -1,4 +1,6 @@
 import csv
+import json
+from contextlib import suppress
 from datetime import datetime
 from io import StringIO
 from typing import Annotated
@@ -6,15 +8,19 @@ from typing import Annotated
 from fastapi import Depends, status, Security, Path
 from fastapi.responses import JSONResponse
 from pytz.tzinfo import DstTzInfo
+from rq.exceptions import InvalidJobOperation
 from sqlalchemy import func, select, String
 from sqlalchemy.ext.asyncio import AsyncSession
 from starlette.responses import StreamingResponse
 
+from settings import settings
+from src.globals import q
 from src.models import Currency
 from src.models.db import get_db
 from src.models.limit import Limit
-from src.models.user import User, Role, BalanceChangeHistory
+from src.models.user import User, Role, BalanceChangeHistory, Balance
 from src.routers import admin
+from src.utils import worker
 from src.utils.dependencies import get_admin_token, get_timezone, Token
 from src.schemes.admin import (
     Operations,
@@ -425,4 +431,236 @@ async def delete_limit(
     return JSONResponse(
         status_code=status.HTTP_201_CREATED,
         content="Limit updated successfully",
+    )
+
+
+@admin.post(
+    "/operation/block/user/{obj_id}",
+    responses={
+        400: {"model": BadResponse},
+        200: {"model": dict},
+    },
+)
+async def block_user(
+    db: Annotated[AsyncSession, Depends(get_db)],
+    obj_id: Annotated[int, Path(ge=1)],
+    penalty_amount: float,
+):
+    """
+    Block a user based on suspicious operations.
+    """
+    # Fetch user and wallet details
+    user_stmt = select(User).where(User.id == obj_id)
+    user = await db.execute(user_stmt)
+    user = user.scalars().first()
+
+    if not user:
+        return JSONResponse(
+            status_code=status.HTTP_404_NOT_FOUND,
+            content={"message": "User not found"},
+        )
+
+    if user.is_blocked:
+        return JSONResponse(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            content={"message": "User is already blocked"},
+        )
+
+    balance_stmt = select(Balance).where(Balance.user_id == obj_id)
+    balance = await db.execute(balance_stmt)
+    balance = balance.scalars().first()
+
+    if not balance:
+        return JSONResponse(
+            status_code=status.HTTP_404_NOT_FOUND,
+            content={"message": "Balance not found"},
+        )
+
+    currency = await db.execute(
+        select(Currency)
+    )
+    currency = currency.scalars().first()
+
+    operations_stmt = (
+        select(BalanceChangeHistory)
+        .where(
+            BalanceChangeHistory.user_id == obj_id,
+            BalanceChangeHistory.status == BalanceChangeHistory.Status.PENDING
+        )
+    )
+    operations = await db.execute(operations_stmt)
+    operations = operations.scalars().all()
+
+    total_operation_amount = 0
+    for op in operations:
+        job = q.fetch_job(f"{op.change_type}_{op.id}")
+
+        if job and job.is_finished:
+            # If the job is finished, we can skip this operation
+            continue
+
+        with suppress(InvalidJobOperation):
+            job.cancel()
+
+        op.status = BalanceChangeHistory.Status.BLOCKED
+        total_operation_amount += op.change_amount
+        db.add(op)
+
+    if total_operation_amount >= penalty_amount:
+        # если сумма операции больше либо равна сумме установленного штрафа,
+        # то формирует операцию типа Штраф "penalty",
+        # вычитая сумму штрафа из суммы транзакции(ий),
+        # ставших причиной блокировки.
+
+        penalty = total_operation_amount - penalty_amount
+        total_operation_amount -= penalty
+
+        previous_balance = balance.balance
+        balance.balance -= penalty
+
+        balance_change_history = BalanceChangeHistory(
+            user_id=obj_id,
+            balance_id=balance.id,
+            currency_id=currency.id,
+            change_amount=-penalty,
+            change_type="penalty",
+            previous_balance=previous_balance,
+            status=BalanceChangeHistory.Status.PENDING,
+            new_balance=balance.balance,
+            args=json.dumps({"address": settings.address})
+        )
+        db.add(balance_change_history)
+        await db.commit()
+        await db.refresh(balance_change_history)
+
+        q.enqueue(
+            worker.withdraw,
+            history_id=balance_change_history.id,
+        )
+
+    elif balance.balance >= penalty_amount:
+        # если сумма операции меньше суммы штрафа,
+        # но баланс кошелька больше либо равен сумме штрафа,
+        # то формирует операцию типа Штраф "penalty",
+        # вычитая сумму штрафа из суммы транзакции(ий),
+        # ставших причиной блокировки.
+
+        penalty = penalty_amount
+        previous_balance = balance.balance
+        balance.balance -= penalty
+        balance_change_history = BalanceChangeHistory(
+            user_id=obj_id,
+            balance_id=balance.id,
+            currency_id=currency.id,
+            change_amount=-penalty,
+            change_type="penalty",
+            previous_balance=previous_balance,
+            status=BalanceChangeHistory.Status.PENDING,
+            new_balance=balance.balance,
+            args=json.dumps({"address": settings.address})
+        )
+        db.add(balance_change_history)
+        await db.commit()
+        await db.refresh(balance_change_history)
+
+        q.enqueue(
+            worker.withdraw,
+            history_id=balance_change_history.id,
+        )
+
+    if total_operation_amount > 0:
+        # If there are remaining funds after penalty deduction,
+        # transfer them to the user's wallet.
+        first_deposit = await db.execute(
+            select(BalanceChangeHistory)
+            .where(
+                BalanceChangeHistory.user_id == obj_id,
+                BalanceChangeHistory.change_type == "deposit",
+                BalanceChangeHistory.status == BalanceChangeHistory.Status.SUCCESS
+            )
+            .order_by(BalanceChangeHistory.created_at.asc())
+        )
+        first_deposit = first_deposit.scalars().first()
+
+        if first_deposit:
+            args = json.loads(first_deposit.args or "{}")
+            address = args.get("address", None)
+
+            if address:
+                # Create a new withdraw operation
+                deposit = BalanceChangeHistory(
+                    user_id=obj_id,
+                    balance_id=balance.id,
+                    currency_id=currency.id,
+                    change_amount=-total_operation_amount,
+                    change_type="withdraw",
+                    previous_balance=balance.balance,
+                    status=BalanceChangeHistory.Status.PENDING,
+                    new_balance=balance.balance,
+                    args=json.dumps({"address": address})
+                )
+                db.add(deposit)
+
+                q.enqueue(
+                    worker.withdraw,
+                    history_id=deposit.id,
+                )
+
+    user.is_blocked = True
+    db.add(user)
+    db.add(balance)
+
+    await db.commit()
+
+    return JSONResponse(
+        status_code=status.HTTP_200_OK,
+        content={"message": "User blocked successfully"},
+    )
+
+
+@admin.post(
+    "/operation/block/{obj_id}",
+    responses={
+        400: {"model": BadResponse},
+        200: {"model": dict},
+    },
+)
+async def block_operation(
+    db: Annotated[AsyncSession, Depends(get_db)],
+    obj_id: Annotated[int, Path(ge=1)],
+):
+    stmt = (
+        select(BalanceChangeHistory)
+        .where(
+            BalanceChangeHistory.id == obj_id,
+            BalanceChangeHistory.status == BalanceChangeHistory.Status.PENDING
+        )
+    )
+    op = await db.execute(stmt)
+    op = op.scalars().first()
+
+    if not op:
+        return JSONResponse(
+            status_code=status.HTTP_404_NOT_FOUND,
+            content={"message": "PENDING Operation not found"},
+        )
+
+    job = q.fetch_job(f"{op.change_type}_{op.id}")
+
+    if job.is_finished:
+        return JSONResponse(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            content={"message": "Operation already finished"},
+        )
+
+    with suppress(InvalidJobOperation):
+        job.cancel()
+
+    op.status = BalanceChangeHistory.Status.BLOCKED
+    db.add(op)
+    await db.commit()
+
+    return JSONResponse(
+        status_code=status.HTTP_200_OK,
+        content={"message": "Operation blocked successfully"},
     )

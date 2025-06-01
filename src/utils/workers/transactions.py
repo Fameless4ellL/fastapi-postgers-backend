@@ -207,7 +207,7 @@ def withdraw(
 
     args = json.loads(balance_change_history.args or "{}")
     args.setdefault('web3', [])
-    address = args.get("address")
+    address = args.get("address", None)
 
     if not address:
         args['error'] = "Missing address"
