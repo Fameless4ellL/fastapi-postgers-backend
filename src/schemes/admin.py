@@ -775,7 +775,7 @@ class UserTicketWinner(BaseModel):
 
 
 class Winners(BaseModel):
-    items: list[UserTickets] = []
+    items: list[UserTicketWinner] = []
     count: int = 0
 
 
