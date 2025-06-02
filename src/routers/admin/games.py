@@ -2,7 +2,7 @@ from typing import Annotated, Literal
 
 from fastapi import Depends, Path, status, Security
 from fastapi.responses import JSONResponse
-from sqlalchemy import select, func, orm, exists
+from sqlalchemy import select, func, orm, exists, Text
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from src.globals import q
@@ -243,8 +243,8 @@ async def get_participants(
 )
 async def get_participant_tickets(
     db: Annotated[AsyncSession, Depends(get_db)],
-    game_id: Annotated[int, Path()],
-    user_id: Annotated[int, Path()],
+    game_id: Annotated[int, Path(ge=0)],
+    user_id: Annotated[int, Path(ge=0)],
     offset: int = 0,
     limit: int = 10,
 ):
@@ -297,7 +297,7 @@ async def get_participant_tickets(
     },
 )
 async def get_winners(
-    db: Annotated[orm.Session, Depends(get_sync_db)],
+    db: Annotated[AsyncSession, Depends(get_db)],
     game_id: Annotated[int, Path()],
     offset: int = 0,
     limit: int = 10,
@@ -305,51 +305,56 @@ async def get_winners(
     """
     get winners by game_id
     """
-    tickets = db.query(
-        Ticket.id,
-        Ticket.number,
-        Ticket.user_id,
-        Ticket.status,
-        func.sum(Ticket.amount).label("amount"),
-        Ticket.created_at,
-        User.username,
-        Game.prize,
-    ).join(
-        User, Ticket.user_id == User.id
-    ).join(
-        Game, Ticket.game_id == Game.id
-    ).filter(
-        Ticket.game_id == game_id,
-        Ticket.won.is_(True)
-    ).group_by(
-        Ticket.id,
-        Ticket.user_id,
-        Ticket.created_at,
-        User.username,
-        Game.prize
-    ).offset(offset).limit(limit)
-    tickets = tickets.all()
+    tickets = (
+        select(
+            func.json_build_object(
+                "id", Ticket.id,
+                "user_id", Ticket.user_id,
+                "numbers", Ticket.number,
+                "status", func.coalesce(func.lower(Ticket.status.cast(Text)), func.lower(Ticket.status.cast(Text))),
+                "amount", func.sum(Ticket.amount),
+                "created_at", Ticket.created_at,
+                "user", User.username,
+                "prize", Game.prize
+            )
+        )
+        .select_from(Ticket)
+        .join(User, Ticket.user_id == User.id)
+        .join(Game, Ticket.game_id == Game.id)
+        .filter(
+            Ticket.game_id == game_id,
+            Ticket.won.is_(True)
+        )
+        .group_by(
+            Ticket.id,
+            Ticket.user_id,
+            Ticket.number,
+            Ticket.status,
+            Ticket.created_at,
+            User.username,
+            Game.prize
+        )
+    )
 
-    data = [{
-        "id": ticket.id,
-        "user_id": ticket.user_id,
-        "numbers": ticket.number,
-        "user": ticket.user.username,
-        "status": ticket.status if not ticket.status else TicketStatus.COMPLETED,
-        "amount": float(ticket.amount),
-        "date": ticket.created_at.strftime("%Y-%m-%d %H:%M:%S")
-    } for ticket in tickets]
+    count = (
+        select(func.count(Ticket.id))
+        .select_from(Ticket)
+        .join(Game, Ticket.game_id == Game.id)
+        .filter(
+            Ticket.game_id == game_id,
+            Ticket.won.is_(True)
+        )
+    )
 
-    count = db.query(
-        func.count(Ticket.id)
-    ).filter(
-        Ticket.game_id == game_id,
-        Ticket.won.is_(True)
-    ).scalar() or 0
+    count = await db.execute(count)
+    count = count.scalar()
+
+    tickets = await db.execute(tickets.offset(offset).limit(limit))
+    tickets = tickets.scalars().all()
 
     return JSONResponse(
         status_code=status.HTTP_200_OK,
-        content={"count": count, "items": data}
+        content={"count": count, "items": tickets}
     )
 
 

@@ -25,7 +25,7 @@ from pydantic_extra_types.country import CountryAlpha3
 
 from settings import settings
 from src.models.limit import LimitType, Period, UserType, LimitStatus, RiskLevel, OperationType
-from src.models.other import GameStatus, GameType, GameView, JackpotType, RepeatType
+from src.models.other import GameStatus, GameType, GameView, JackpotType, RepeatType, TicketStatus
 from src.models.user import BalanceChangeHistory, Role, User as DBUser
 from src.utils.validators import get_currency_by_id, get_first_currency
 from src.schemes.base import Country, Country_by_name, ModPhoneNumber, Image
@@ -418,7 +418,7 @@ class Participant(BaseModel):
 class ParticipantTickets(BaseModel):
     id: int
     user_id: int
-    user: Optional[str]
+    user: Optional[str] = None
     tickets: list[int] = Field(default_factory=list, description="List of ticket numbers purchased by the user")
     number: str
     date: str
@@ -767,8 +767,10 @@ class UserTicketWinner(BaseModel):
     id: int
     user_id: int
     user: Optional[str] = None
-    status: str
+    numbers: str
+    status: Annotated[TicketStatus, BeforeValidator(lambda v: TicketStatus[v])]
     amount: float
+    prize: str
     date: str
 
 

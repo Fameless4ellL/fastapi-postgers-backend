@@ -8,7 +8,7 @@ from sqlalchemy import delete, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from src.globals import aredis
-from src.models import InstaBingo, Currency
+from src.models import InstaBingo, Currency, Ticket
 from src.models.user import Role, User, Kyc, ReferralLink, Document
 from src.utils import create_access_token, ACCESS_TOKEN_EXPIRE_MINUTES
 
@@ -23,6 +23,32 @@ async def admin(
     user.role = Role.SUPER_ADMIN.value
     await db.commit()
     yield user
+
+
+@pytest.fixture
+async def ticket_winner(
+    db: AsyncSession,
+    ticket: Ticket
+):
+    """
+    Создание победителя билета.
+    """
+    ticket.won = True
+    ticket.amount = 1000
+
+    db.add(ticket)
+    await db.commit()
+    await db.refresh(ticket)
+
+    yield ticket
+
+    try:
+        await db.execute(
+            delete(Ticket).where(Ticket.id == ticket.id)
+        )
+        await db.commit()
+    except Exception as e:
+        print(e)
 
 
 @pytest.fixture

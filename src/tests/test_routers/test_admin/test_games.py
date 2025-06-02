@@ -157,7 +157,7 @@ class TestGames:
         async_api: AsyncClient,
         admin_token: str,
         game: Game,
-        ticket: Ticket
+        ticket_winner: Ticket
     ):
         response = await async_api.get(
             f"/v1/admin/games/{game.id}/winners",
@@ -166,6 +166,17 @@ class TestGames:
             }
         )
         assert response.status_code == 200
+
+        data = response.json()
+        assert "items" in data.keys()
+        assert "count" in data.keys()
+
+        assert data["count"] == 1
+        assert data["items"][0]["id"] == ticket_winner.id
+        assert data["items"][0]["user_id"] == ticket_winner.user_id
+        assert data["items"][0]["numbers"] == ticket_winner.number
+        assert data["items"][0]["amount"] == ticket_winner.amount
+        assert data["items"][0]["status"] == ticket_winner.status.value
 
     async def test_set_ticket_status(
         self,
