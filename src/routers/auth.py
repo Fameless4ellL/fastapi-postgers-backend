@@ -50,8 +50,6 @@ async def register(
             status_code=status.HTTP_400_BAD_REQUEST,
             content={"message": "Please resend sms code"})
 
-    await aredis.delete(f"AUTH:{request.client.host}")
-
     user_in_db = await db.execute(
         select(User)
         .filter(or_(
@@ -123,6 +121,7 @@ async def register(
     }
 
     access_token = create_access_token(data=data)
+    await aredis.delete(f"AUTH:{request.client.host}")
 
     # await aredis.set(
     #     f"TOKEN:USERS:{user_in_db.id}",
