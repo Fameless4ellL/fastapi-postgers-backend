@@ -691,3 +691,18 @@ async def set_settings(
     await db.commit()
 
     return "OK"
+
+
+@public.post(
+    "/logout", tags=["user", Action.LOGOUT],
+    responses={400: {"model": BadResponse}, 200: {"model": Notifications}}
+)
+async def logout(
+    token: Annotated[Token, Depends(get_user_token)],
+):
+    """
+    Удаление токена из дб
+    """
+    await aredis.delete(f"TOKEN:USERS:{token.id}")
+
+    return "OK"

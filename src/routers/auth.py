@@ -23,7 +23,7 @@ from src.schemes import (
     UserLogin,
     AccessToken
 )
-from src.utils.signature import create_access_token, verify_password
+from src.utils.signature import create_access_token, verify_password, ACCESS_TOKEN_EXPIRE_MINUTES
 
 
 @public.post(
@@ -123,11 +123,11 @@ async def register(
     access_token = create_access_token(data=data)
     await aredis.delete(f"AUTH:{request.client.host}")
 
-    # await aredis.set(
-    #     f"TOKEN:USERS:{user_in_db.id}",
-    #     access_token,
-    #     ex=ACCESS_TOKEN_EXPIRE_MINUTES
-    # )
+    await aredis.set(
+        f"TOKEN:USERS:{user_in_db.id}",
+        access_token,
+        ex=ACCESS_TOKEN_EXPIRE_MINUTES
+    )
 
     return JSONResponse(
         status_code=200, content={"access_token": access_token, "token_type": "bearer"}
@@ -193,11 +193,11 @@ async def login(
 
     access_token = create_access_token(data=data)
 
-    # await aredis.set(
-    #     f"TOKEN:USERS:{userdb.id}",
-    #     access_token,
-    #     ex=ACCESS_TOKEN_EXPIRE_MINUTES
-    # )
+    await aredis.set(
+        f"TOKEN:USERS:{userdb.id}",
+        access_token,
+        ex=ACCESS_TOKEN_EXPIRE_MINUTES
+    )
 
     return JSONResponse(
         status_code=200, content={"access_token": access_token, "token_type": "bearer"}

@@ -81,13 +81,13 @@ async def get_user_token(
     if payload is None:
         raise invalid_token
 
-    # if not await aredis.exists(f"TOKEN:USERS:{_token.id}"):
-    #     raise invalid_token
+    if not await aredis.exists(f"TOKEN:USERS:{_token.id}"):
+        raise invalid_token
 
-    # session = await aredis.get(f"TOKEN:USERS:{_token.id}")
+    session = await aredis.get(f"TOKEN:USERS:{_token.id}")
 
-    # if token != session.decode("utf-8"):
-    #     raise invalid_token
+    if token != session.decode("utf-8"):
+        raise invalid_token
 
     return _token
 
