@@ -53,7 +53,7 @@ class KYCProfile(KYC):
 class Profile(BaseModel):
     username: Optional[str]
     kyc: Optional[KYCProfile] = None
-    kyc_approved: bool = False
+    kyc_approved: Optional[bool] = False
     balance: Optional[float] = 0
     address: Address
     locale: str = "en"

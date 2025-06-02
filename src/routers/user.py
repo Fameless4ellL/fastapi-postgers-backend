@@ -695,7 +695,7 @@ async def set_settings(
 
 @public.post(
     "/logout", tags=["user", Action.LOGOUT],
-    responses={400: {"model": BadResponse}, 200: {"model": Notifications}}
+    responses={400: {"model": BadResponse}}
 )
 async def logout(
     token: Annotated[Token, Depends(get_user_token)],
