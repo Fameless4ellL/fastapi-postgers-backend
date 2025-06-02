@@ -54,7 +54,10 @@ async def register(
 
     user_in_db = await db.execute(
         select(User)
-        .filter(User.phone_number == user.phone_number)
+        .filter(or_(
+            User.phone_number == user.phone_number,
+            User.username == user.username
+        ))
     )
     user_in_db = user_in_db.scalar()
 
