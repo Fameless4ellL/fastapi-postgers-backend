@@ -399,6 +399,31 @@ class GameUpload:
         return v
 
 
+class PurchasedTickets(BaseModel):
+    pcs: int = 0
+    currency: str
+    amount: Union[float, int]
+    prize: str
+
+
+class Participant(BaseModel):
+    id: int
+    user_id: int
+    user: Optional[str]
+    tickets: int = Field(default=0, ge=0, description="Number of tickets purchased by the user")
+    amount: float = 0.0
+    date: str
+
+
+class ParticipantTickets(BaseModel):
+    id: int
+    user_id: int
+    user: Optional[str]
+    tickets: list[int] = Field(default_factory=list, description="List of ticket numbers purchased by the user")
+    number: str
+    date: str
+
+
 class Empty:
     pass
 

@@ -1,16 +1,18 @@
-from fastapi import Depends, Path, status, Security
-from fastapi.responses import JSONResponse
 from typing import Annotated, Literal
 
+from fastapi import Depends, Path, status, Security
+from fastapi.responses import JSONResponse
 from sqlalchemy import select, func, orm, exists
+from sqlalchemy.ext.asyncio import AsyncSession
+
+from src.globals import q
+from src.models.db import get_db, get_sync_db
 from src.models.log import Action
-from src.models.user import Role, User
 from src.models.other import Currency, Game, GameStatus, GameView, TicketStatus, Ticket
+from src.models.user import Role, User
 from src.routers import admin
 from src.routers.admin import get_crud_router
-from src.utils.dependencies import get_admin_token
-from sqlalchemy.ext.asyncio import AsyncSession
-from src.models.db import get_db, get_sync_db
+from src.schemes import BadResponse, JsonForm
 from src.schemes.admin import (
     GameFilter,
     GameUpload,
@@ -19,10 +21,11 @@ from src.schemes.admin import (
     GameCreate,
     GameUpdate,
     Winners,
+    PurchasedTickets,
+    Participant,
+    ParticipantTickets,
 )
-from src.globals import q
-from src.schemes import BadResponse, JsonForm
-
+from src.utils.dependencies import get_admin_token
 
 get_crud_router(
     model=Game,
@@ -57,6 +60,7 @@ get_crud_router(
         ])],
     responses={
         400: {"model": BadResponse},
+        200: {"description": "Success"},
     },
 )
 async def delete_game(
@@ -112,6 +116,7 @@ async def delete_game(
         ])],
     responses={
         400: {"model": BadResponse},
+        200: {"model": PurchasedTickets},
     },
 )
 async def get_purchased_tickets(
@@ -173,6 +178,7 @@ async def get_purchased_tickets(
         ])],
     responses={
         400: {"model": BadResponse},
+        200: {"model": list[Participant]},
     },
 )
 async def get_participants(
@@ -232,6 +238,7 @@ async def get_participants(
         ])],
     responses={
         400: {"model": BadResponse},
+        200: {"model": list[ParticipantTickets]}
     },
 )
 async def get_participant_tickets(
