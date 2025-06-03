@@ -113,43 +113,37 @@ async def get_participants(
     """
     Participants and tickets by jackpot ID
     """
-    stmt = select(
-        User.id,
-        User.username,
-        func.count(Ticket.id).label("tickets"),
-        Ticket.id.label("ticket_id"),
-        Ticket.game_id,
-        func.min(Ticket.created_at).label("created_at")
-    ).join(
-        Ticket, User.id == Ticket.user_id
-    ).filter(
-        Ticket.jackpot_id == game_id
-    ).group_by(
-        User.id,
-        Ticket.id,
-        Ticket.game_id
-    ).order_by(
-        func.min(Ticket.created_at).desc()
+    stmt = (
+        select(
+            func.json_build_object(
+                "id", User.id,
+                "username", User.username,
+                "tickets", func.count(Ticket.id),
+                "ticket_id", Ticket.id,
+                "jackpot_id", Ticket.jackpot_id,
+                "created_at", func.min(Ticket.created_at)
+            )
+        )
+        .select_from(User)
+        .join(Ticket, User.id == Ticket.user_id)
+        .filter( Ticket.jackpot_id == game_id)
+        .group_by(
+            User.id,
+            Ticket.id,
+            Ticket.jackpot_id
+        )
+        .order_by(func.min(Ticket.created_at).desc())
     )
-    participants = await db.execute(stmt.offset(offset).limit(limit))
-    participants = participants.fetchall()
-
-    data = [{
-        "id": user.ticket_id,
-        "user_id": user.id,
-        "username": user.username,
-        "tickets": user.tickets,
-        "game_id": user.game_id,
-        "created_at": user.created_at.strftime("%Y-%m-%d %H:%M:%S")
-    } for user in participants]
-
     count_stmt = select(func.count()).select_from(stmt)
     count_result = await db.execute(count_stmt)
     count = count_result.scalar()
 
+    participants = await db.execute(stmt.offset(offset).limit(limit))
+    participants = participants.scalars().all()
+
     return JSONResponse(
         status_code=status.HTTP_200_OK,
-        content={"count": count, "data": data}
+        content={"count": count, "data": participants}
     )
 
 
@@ -170,33 +164,38 @@ async def get_participants(
 )
 async def get_tickets(
     db: Annotated[AsyncSession, Depends(get_db)],
-    game_id: Annotated[int, Path()],
-    user_id: Annotated[int, Path()],
-    offset: Optional[int] = 0,
-    limit: Optional[int] = 10
+    game_id: Annotated[int, Path(ge=0)],
+    user_id: Annotated[int, Path(ge=0)],
+    offset: int = 0,
+    limit: int = 10
 ):
     """
     get tickets user by jackpot ID
     """
-    stmt = select(Ticket).filter(
-        Ticket.jackpot_id == game_id,
-        Ticket.user_id == user_id
+    stmt = (
+        select(
+            func.json_build_object(
+                "id", Ticket.id,
+                "number", Ticket.number,
+                "numbers", Ticket.numbers
+            )
+        )
+        .select_from(Ticket)
+        .filter(
+            Ticket.jackpot_id == game_id,
+            Ticket.user_id == user_id
+        )
+        .order_by(Ticket.created_at.desc())
     )
-    tickets = await db.execute(stmt.offset(offset).limit(limit))
-    tickets = tickets.scalars().all()
-
-    data = [{
-        "id": ticket.id,
-        "number": ticket.number,
-        "numbers": ticket.numbers,
-    } for ticket in tickets]
-
     count_stmt = select(func.count()).select_from(stmt)
     count_result = await db.execute(count_stmt)
     count = count_result.scalar()
 
+    tickets = await db.execute(stmt.offset(offset).limit(limit))
+    tickets = tickets.scalars().all()
+
     return JSONResponse(
-        status_code=status.HTTP_200_OK, content={"count": count, "data": data}
+        status_code=status.HTTP_200_OK, content={"count": count, "data": tickets}
     )
 
 
