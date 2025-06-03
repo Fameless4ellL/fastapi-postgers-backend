@@ -21,16 +21,16 @@ from src.utils.dependencies import get_admin_token
 
 @admin.get(
     "/kyc",
-    # dependencies=[Security(
-    #     get_admin_token,
-    #     scopes=[
-    #         Role.SUPER_ADMIN.value,
-    #         Role.ADMIN.value,
-    #         Role.GLOBAL_ADMIN.value,
-    #         Role.LOCAL_ADMIN.value,
-    #         Role.FINANCIER.value,
-    #         Role.SUPPORT.value
-    #     ])],
+    dependencies=[Security(
+        get_admin_token,
+        scopes=[
+            Role.SUPER_ADMIN.value,
+            Role.ADMIN.value,
+            Role.GLOBAL_ADMIN.value,
+            Role.LOCAL_ADMIN.value,
+            Role.FINANCIER.value,
+            Role.SUPPORT.value
+        ])],
     responses={
         400: {"model": BadResponse},
         200: {"model": list[KycBase]}
@@ -147,16 +147,16 @@ async def detele_kyc_list(
 @admin.put(
     "/kyc",
     tags=[Action.ADMIN_UPDATE],
-    # dependencies=[Security(
-    #     get_admin_token,
-    #     scopes=[
-    #         Role.SUPER_ADMIN.value,
-    #         Role.ADMIN.value,
-    #         Role.GLOBAL_ADMIN.value,
-    #         Role.LOCAL_ADMIN.value,
-    #         Role.FINANCIER.value,
-    #         Role.SUPPORT.value
-    #     ])],
+    dependencies=[Security(
+        get_admin_token,
+        scopes=[
+            Role.SUPER_ADMIN.value,
+            Role.ADMIN.value,
+            Role.GLOBAL_ADMIN.value,
+            Role.LOCAL_ADMIN.value,
+            Role.FINANCIER.value,
+            Role.SUPPORT.value
+        ])],
     responses={
         400: {"model": BadResponse},
     },

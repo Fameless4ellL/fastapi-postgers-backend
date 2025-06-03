@@ -148,9 +148,6 @@ def proceed_game(game_id: Optional[int] = None):
         ).with_for_update().all()
 
     for game in pending_games:
-        if not game:
-            continue
-
         logger.info(f"Proceeding game {game.id} - {game.name}")
 
         game.status = GameStatus.ACTIVE
