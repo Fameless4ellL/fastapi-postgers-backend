@@ -14,6 +14,7 @@ from sqlalchemy.sql import sqltypes
 from tronpy.keys import to_base58check_address
 
 from src.globals import aredis, q
+from src.models import OperationType
 from src.models.db import get_db
 from src.models.log import Action
 from src.models.other import Currency, GameStatus, Ticket, InstaBingo, Jackpot, Game, Network
@@ -27,7 +28,8 @@ from src.models.user import (
     Document
 )
 from src.routers import public
-from src.utils.dependencies import get_user, get_currency, get_user_token, worker, transaction_atomic, Token
+from src.utils.dependencies import get_user, get_currency, get_user_token, worker, transaction_atomic, Token, \
+    LimitVerifier
 from src.schemes import BadResponse, Country, JsonForm, UserBalanceList
 from src.schemes import (
     MyGames, MyGamesType, Tickets, Withdraw
@@ -180,7 +182,11 @@ async def balance(
     )
 
 
-@public.post("/withdraw", tags=["user", Action.WITHDRAW])
+@public.post(
+    "/withdraw",
+    tags=["user", Action.WITHDRAW],
+    dependencies=[Depends(LimitVerifier(OperationType.WITHDRAWAL))],
+)
 async def withdraw(
     user: Annotated[User, Depends(get_user)],
     db: Annotated[AsyncSession, Depends(get_db)],

@@ -238,11 +238,11 @@ async def token(
 
     access_token = create_access_token(data=data)
 
-    # await aredis.set(
-    #     f"TOKEN:USERS:{userdb.id}",
-    #     access_token,
-    #     ex=ACCESS_TOKEN_EXPIRE_MINUTES
-    # )
+    await aredis.set(
+        f"TOKEN:USERS:{userdb.id}",
+        access_token,
+        ex=ACCESS_TOKEN_EXPIRE_MINUTES
+    )
 
     return JSONResponse(
         status_code=200, content={"access_token": access_token, "token_type": "bearer"}

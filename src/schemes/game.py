@@ -124,7 +124,7 @@ class Deposit(BaseModel):
 
 
 class Withdraw(BaseModel):
-    amount: Decimal = Field(decimal_places=2)
+    amount: Decimal = Field(decimal_places=2, ge=0)
     address: str
 
 

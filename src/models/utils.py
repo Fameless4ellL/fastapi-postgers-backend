@@ -1,4 +1,5 @@
 import random
+from enum import Enum
 
 from src.models.db import get_sync_db
 
@@ -27,3 +28,9 @@ def generate_unique_ticket_number(
 
         if not db.query(existing_ticket.exists()).scalar():
             return ticket_number
+
+
+class UserType(Enum):
+    VIP = "VIP"
+    PREMIUM = "Premium"
+    BASIC = "Basic"

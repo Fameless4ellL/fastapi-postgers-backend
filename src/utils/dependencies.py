@@ -4,6 +4,7 @@ import traceback
 import uuid
 from dataclasses import dataclass
 from datetime import datetime, timedelta
+from decimal import Decimal
 from email.mime.multipart import MIMEMultipart
 from email.mime.text import MIMEText
 from itertools import islice
@@ -15,16 +16,17 @@ from aiohttp import client_exceptions
 from fastapi import Depends, HTTPException, status, security, Request, Header
 from httpx import AsyncClient
 from pytz.tzinfo import DstTzInfo
-from sqlalchemy import select, exists
+from sqlalchemy import select, exists, func
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import joinedload
 from web3 import Web3, middleware
 
 from settings import email, settings
 from src.globals import aredis, q
+from src.models import Limit, LimitStatus, OperationType, LimitType
 from src.models.db import get_db
 from src.models.other import Game, GameStatus, GameType, Network, Currency
-from src.models.user import User, Role
+from src.models.user import User, Role, BalanceChangeHistory
 from src.utils import worker
 from src.utils.signature import decode_access_token
 from src.utils.web3 import AWSHTTPProvider
@@ -390,3 +392,154 @@ async def transaction_atomic(db: Annotated[AsyncSession, Depends(get_db)]):
     """
     async with db.begin():
         yield db
+
+
+class LimitTypeBase:
+    """
+    Base class for limit types.
+    """
+    def __init__(self, user: User = None, db: AsyncSession = None, request: Request = None, limit: Limit = None):
+        self.user = user
+        self.db = db
+        self.request = request
+        self.limit = limit
+
+    async def check(self):
+        raise NotImplementedError("Subclasses should implement this method.")
+
+    def clean(self, op: Decimal):
+        raise NotImplementedError("Subclasses should implement this method.")
+
+
+class LimitTypeSum(LimitTypeBase):
+    """
+    Limit type for sum operations.
+    """
+    async def get_requested_amount(self):
+        data = await self.request.json()
+        if "amount" in data:
+            return Decimal(data["amount"])
+
+        return Decimal(0)
+
+    async def check(self):
+        op = (
+            select(func.sum(BalanceChangeHistory.change_amount).label("total"))
+            .filter(BalanceChangeHistory.user_id == self.user.id)
+        )
+
+        if self.limit.period.label is not None:
+            op = op.filter(BalanceChangeHistory.created_at >= datetime.now() - self.limit.period.label)
+
+        if self.limit.operation_type != OperationType.ALL:
+            op = op.filter(BalanceChangeHistory.change_type == self.limit.operation_type.value)
+
+        op = await self.db.execute(op)
+        op = op.scalar() or 0
+        op = op + await self.get_requested_amount()
+
+        clean = self.clean(op)
+        return op, clean
+
+    def clean(self, op):
+        if op > self.limit.value:
+            return f"Limit exceeded: {self.limit.value}"
+        return ""
+
+
+class LimitTypeNumber(LimitTypeBase):
+    """
+    Limit type for number of operations.
+    """
+    async def check(self):
+        op = (
+            select(func.count(BalanceChangeHistory.id).label("total"))
+            .filter(BalanceChangeHistory.user_id == self.user.id)
+        )
+
+        if self.limit.period.label is not None:
+            op = op.filter(BalanceChangeHistory.created_at >= datetime.now() - self.limit.period.label)
+
+        if self.limit.operation_type != OperationType.ALL:
+            op = op.filter(BalanceChangeHistory.change_type == self.limit.operation_type.value)
+
+        op = await self.db.execute(op)
+        op = op.scalar() or 0
+
+        clean = self.clean(op)
+        return op, clean
+
+    def clean(self, op):
+        if op >= self.limit.value:
+            return "Limit of operations exceeded"
+        return ""
+
+
+class LimitVerifier:
+    """
+    A class to verify user limits for specific operations.
+    like withdrawal, purchase, or any other operation defined in OperationType.
+    """
+    _handlers = {
+        LimitType.SUM: LimitTypeSum,
+        LimitType.NUMBER: LimitTypeNumber,
+    }
+
+    def __init__(self, operation_type: OperationType):
+        self.operation_type = operation_type
+        self.user = None
+        self.db = None
+        self.request = None
+
+    async def __call__(
+        self,
+        db: Annotated[AsyncSession, Depends(get_db)],
+        user: Annotated[User, Depends(get_user)],
+        request: Request
+    ):
+        """
+        Verify user limits.
+        """
+        self.db = db
+        self.user = user
+        self.request = request
+
+        limits = await self._get_limits()
+
+        for limit in limits:
+            if limit.operation_type not in {self.operation_type, OperationType.ALL}:
+                continue
+
+            _limit = self._handlers.get(limit.type)
+            if not _limit:
+                raise HTTPException(
+                    status_code=status.HTTP_400_BAD_REQUEST,
+                    detail=f"Unsupported limit type: {limit.type}"
+                )
+
+            _limit = _limit(
+                db=self.db,
+                user=self.user,
+                request=request,
+                limit=limit,
+            )
+            _, err = await _limit.check()
+            if err:
+                raise HTTPException(
+                    status_code=status.HTTP_403_FORBIDDEN,
+                    detail=err
+                )
+
+        return True
+
+    async def _get_limits(self):
+        """
+        Fetch limits for the user based on their type and operation type.
+        """
+        stmt = select(Limit).filter(
+            Limit.user_type == self.user.type,
+            Limit.status == LimitStatus.ACTIVE,
+            Limit.is_deleted.is_(False),
+        )
+        db = await self.db.execute(stmt)
+        return db.scalars().all()

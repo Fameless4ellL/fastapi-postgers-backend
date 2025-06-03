@@ -13,6 +13,7 @@ import datetime
 from enum import Enum
 from src.utils.datastructure import MultiValueStrEnum
 from .db import Base
+from .utils import UserType
 
 
 class LimitType(Enum):
@@ -37,12 +38,6 @@ class Period(MultiValueStrEnum):
     WEEK = "week", datetime.timedelta(weeks=1)
     MONTH = "month", datetime.timedelta(days=30)
     YEAR = "year", datetime.timedelta(days=365)
-
-
-class UserType(Enum):
-    VIP = "VIP"
-    PREMIUM = "Premium"
-    BASIC = "Basic"
 
 
 class LimitStatus(Enum):

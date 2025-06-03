@@ -5,6 +5,7 @@ from fastapi import Depends, status
 from fastapi.responses import JSONResponse
 from sqlalchemy.orm import Session
 
+from src.models import OperationType
 from src.models.db import get_sync_db
 from src.models.log import Action
 from src.models.user import Balance, BalanceChangeHistory, User, Wallet
@@ -16,7 +17,7 @@ from src.models.other import (
     Number
 )
 from src.routers import public
-from src.utils.dependencies import get_user
+from src.utils.dependencies import get_user, LimitVerifier
 from src.schemes import BadResponse
 from src.schemes import BuyInstaTicket
 from src.schemes.instabingo import InstaBingoInfo, InstaBingoResults
@@ -34,14 +35,14 @@ from src.utils.rng import get_random
     },
 )
 async def get_instabingo(
-    # user: Annotated[User, Depends(get_user)],
+    user: Annotated[User, Depends(get_user)],
     db: Annotated[Session, Depends(get_sync_db)],
 ):
     """
     Получение нужной информации для игры в инстабинго
     """
     game = db.query(InstaBingo).filter(
-        # InstaBingo.country == user.country
+        InstaBingo.country == user.country
     ).first()
 
     if not game:
@@ -158,6 +159,7 @@ async def instabingo_check(
 @public.post(
     "/instabingo/tickets",
     tags=["InstaBingo", Action.TRANSACTION],
+    dependencies=[Depends(LimitVerifier(OperationType.PURCHASE))],
     responses={400: {"model": BadResponse}, 201: {"description": "OK"}}
 )
 async def buy_tickets(

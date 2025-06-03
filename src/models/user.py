@@ -5,6 +5,7 @@ from enum import Enum
 from typing import Union
 
 from src.globals import TotpFactory
+from .utils import UserType
 from .custom_types import FileType
 from .db import Base
 from sqlalchemy import DECIMAL, Boolean, Column, DateTime, ForeignKey, Integer, String, Enum as SQLEnum
@@ -44,6 +45,7 @@ class User(Base):
     email: Mapped[Union[str, None]] = Column(String(64), nullable=True)
     password: Mapped[Union[str, None]] = Column(String(128), nullable=True)
     role: Mapped[str] = Column(String(64), default=Role.USER.value)
+    type: Mapped[UserType] = Column(SQLEnum(UserType), default=UserType.BASIC, doc="Type of users")
     active: Mapped[bool] = Column(Boolean, default=True)
 
     kyc: Mapped[bool] = Column(Boolean, default=False)

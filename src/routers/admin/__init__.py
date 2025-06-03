@@ -251,8 +251,8 @@ def get_crud_router(
                     f.write(await file.read())
 
             q.enqueue_at(
-                new_item.scheduled_datetime,
-                worker.proceed_game,
+                datetime=new_item.scheduled_datetime,
+                f=worker.proceed_game,
                 game_id=new_item.id,
                 job_id=f"proceed_game_{new_item.id}",
             )

@@ -4,6 +4,8 @@ from typing import Annotated, Optional
 from fastapi import Depends, Path, status
 from fastapi.responses import JSONResponse
 from sqlalchemy import func, select
+
+from src.models import OperationType
 from src.models.db import get_db
 from src.models.log import Action
 from src.models.user import Balance, BalanceChangeHistory, User, Wallet
@@ -17,7 +19,7 @@ from src.models.other import (
     JackpotType,
 )
 from src.routers import public
-from src.utils.dependencies import generate_game, get_user, nth
+from src.utils.dependencies import generate_game, get_user, nth, LimitVerifier
 from src.utils.validators import url_for
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import joinedload
@@ -71,12 +73,14 @@ async def game_instances(
         Game.game_type == _type
     ).options(
         joinedload(Game.currency)
-    ).offset(offset).limit(limit)
+    ).order_by(
+        Game.scheduled_datetime.asc()
+    )
 
     if _type is GameType.LOCAL:
         stmt = stmt.filter(Game.country == user.country)
 
-    result = await db.execute(stmt)
+    result = await db.execute(stmt.offset(offset).limit(limit))
     game = result.scalars().all()
 
     data = [{
@@ -230,7 +234,9 @@ async def read_game(
 
 
 @public.post(
-    "/game/{game_id}/tickets", tags=["game", Action.TRANSACTION],
+    "/game/{game_id}/tickets",
+    tags=["game", Action.TRANSACTION],
+    dependencies=[Depends(LimitVerifier(OperationType.PURCHASE))],
     responses={400: {"model": BadResponse}, 201: {"description": "OK"}}
 )
 async def buy_tickets(
