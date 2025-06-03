@@ -120,7 +120,7 @@ async def get_participants(
                 "username", User.username,
                 "tickets", func.count(Ticket.id),
                 "ticket_id", Ticket.id,
-                "jackpot_id", Ticket.jackpot_id,
+                "game_id", Ticket.jackpot_id,
                 "created_at", func.min(Ticket.created_at)
             )
         )
