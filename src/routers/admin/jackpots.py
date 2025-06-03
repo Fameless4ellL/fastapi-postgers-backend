@@ -116,11 +116,10 @@ async def get_participants(
     stmt = (
         select(
             func.json_build_object(
-                "id", Ticket.id,
+                "id", func.row_number().over(order_by=func.min(Ticket.created_at).desc()),
                 "user_id", User.id,
                 "username", User.username,
                 "tickets", func.count(Ticket.id),
-                "ticket_id", Ticket.id,
                 "game_id", Ticket.game_id,
                 "created_at", func.min(Ticket.created_at)
             )
@@ -130,8 +129,7 @@ async def get_participants(
         .filter(Ticket.jackpot_id == game_id)
         .group_by(
             User.id,
-            Ticket.id,
-            Ticket.jackpot_id
+            Ticket.game_id
         )
         .order_by(func.min(Ticket.created_at).desc())
     )
@@ -149,7 +147,7 @@ async def get_participants(
 
 
 @admin.get(
-    "/jackpots/{game_id}/ticket/{user_id}",
+    "/jackpots/{obj_id}/ticket/{user_id}",
     dependencies=[Security(
         get_admin_token,
         scopes=[
@@ -165,7 +163,7 @@ async def get_participants(
 )
 async def get_tickets(
     db: Annotated[AsyncSession, Depends(get_db)],
-    game_id: Annotated[int, Path(ge=0)],
+    obj_id: Annotated[int, Path(ge=0)],
     user_id: Annotated[int, Path(ge=0)],
     offset: int = 0,
     limit: int = 10
@@ -183,7 +181,7 @@ async def get_tickets(
         )
         .select_from(Ticket)
         .filter(
-            Ticket.game_id == game_id,
+            Ticket.jackpot_id == obj_id,
             Ticket.user_id == user_id
         )
         .order_by(Ticket.created_at.desc())
@@ -201,7 +199,7 @@ async def get_tickets(
 
 
 @admin.get(
-    "/jackpots/{game_id}/winner",
+    "/jackpots/{obj_id}/winner",
     dependencies=[Security(
         get_admin_token,
         scopes=[
@@ -217,7 +215,7 @@ async def get_tickets(
 )
 async def get_winner(
     db: Annotated[AsyncSession, Depends(get_db)],
-    game_id: Annotated[int, Path(ge=0)],
+    obj_id: Annotated[int, Path(ge=0)],
 ):
     """
     get winner of jackpot ID
@@ -229,7 +227,7 @@ async def get_winner(
     ).join(
         User, Ticket.user_id == User.id
     ).filter(
-        Ticket.jackpot_id == game_id,
+        Ticket.jackpot_id == obj_id,
         Ticket.won.is_(True)
     )
 
@@ -251,7 +249,7 @@ async def get_winner(
         }
 
     tickets_pcs = select(func.count()).filter(
-        Ticket.jackpot_id == game_id
+        Ticket.jackpot_id == obj_id
     )
     tickets_pcs = await db.execute(tickets_pcs)
     tickets_pcs = tickets_pcs.scalar()
