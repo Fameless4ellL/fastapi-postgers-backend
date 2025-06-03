@@ -75,7 +75,6 @@ def calculate_metrics(date: Optional[datetime] = None):
     jackpot_prize = (
             db.query(func.sum(Jackpot.amount))
             .filter(
-                Game.kind == GameView.MONETARY,
                 Jackpot.created_at >= date,
                 Jackpot.country.is_(None)
             )
