@@ -116,17 +116,18 @@ async def get_participants(
     stmt = (
         select(
             func.json_build_object(
-                "id", User.id,
+                "id", Ticket.id,
+                "user_id", User.id,
                 "username", User.username,
                 "tickets", func.count(Ticket.id),
                 "ticket_id", Ticket.id,
-                "game_id", Ticket.jackpot_id,
+                "game_id", Ticket.game_id,
                 "created_at", func.min(Ticket.created_at)
             )
         )
-        .select_from(User)
-        .join(Ticket, User.id == Ticket.user_id)
-        .filter( Ticket.jackpot_id == game_id)
+        .select_from(Ticket)
+        .join(User, User.id == Ticket.user_id)
+        .filter(Ticket.game_id == game_id)
         .group_by(
             User.id,
             Ticket.id,
@@ -182,7 +183,7 @@ async def get_tickets(
         )
         .select_from(Ticket)
         .filter(
-            Ticket.jackpot_id == game_id,
+            Ticket.game_id == game_id,
             Ticket.user_id == user_id
         )
         .order_by(Ticket.created_at.desc())
@@ -216,7 +217,7 @@ async def get_tickets(
 )
 async def get_winner(
     db: Annotated[AsyncSession, Depends(get_db)],
-    game_id: Annotated[int, Path()],
+    game_id: Annotated[int, Path(ge=0)],
 ):
     """
     get winner of jackpot ID
