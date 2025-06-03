@@ -127,7 +127,7 @@ async def get_participants(
         )
         .select_from(Ticket)
         .join(User, User.id == Ticket.user_id)
-        .filter(Ticket.game_id == game_id)
+        .filter(Ticket.jackpot_id == game_id)
         .group_by(
             User.id,
             Ticket.id,
