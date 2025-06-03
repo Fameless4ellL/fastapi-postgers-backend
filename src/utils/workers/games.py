@@ -464,7 +464,7 @@ def proceed_jackpot(jackpot_id: Optional[int] = None):
             # Filter tickets based on the current sequence of digits
             filtered_tickets = [
                 ticket for ticket in remaining_tickets
-                if ticket.numbers.startswith(new_winning_number)
+                if ticket.number.startswith(new_winning_number)
             ]
 
             if filtered_tickets:
