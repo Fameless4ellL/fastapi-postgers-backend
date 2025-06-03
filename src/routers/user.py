@@ -627,37 +627,23 @@ async def get_notifications(
     """
     Получение уведомлений для пользователя
     """
-    # stmt = (
-    #     select(
-    #         func.json_build_object(
-    #             "id", Notification.id,
-    #             "head", Notification.head,
-    #             "body", Notification.body,
-    #             "args", Notification.args,
-    #             "created", func.date_part('epoch', Notification.created_at)
-    #         )
-    #     )
-    # )
-    # notifications = await db.execute(stmt.offset(skip).limit(limit))
-    # notifications = notifications.scalars().all()
-
-    stmt = select(Notification).filter(Notification.user_id == user.id)
-    notifications = await db.execute(stmt.offset(skip).limit(limit))
-    notifications = notifications.scalars().all()
-
-    data = [{
-        "id": n.id,
-        "head": n.head,
-        "body": n.body,
-        "args": json.loads(n.args),
-        "created": n.created_at.timestamp()
-    } for n in notifications]
-
-    count_stmt = select(func.count(Notification.id)).filter(
-        Notification.user_id == user.id
+    stmt = (
+        select(
+            func.json_build_object(
+                "id", Notification.id,
+                "head", Notification.head,
+                "body", Notification.body,
+                "args_", Notification.args,
+                "created", func.date_part('epoch', Notification.created_at)
+            )
+        )
     )
+    count_stmt = select(func.count(Notification.id)).filter(Notification.user_id == user.id)
     count_result = await db.execute(count_stmt)
     count = count_result.scalar()
+
+    notifications = await db.execute(stmt.offset(skip).limit(limit))
+    notifications = notifications.scalars().all()
 
     await db.execute(
         update(Notification)
@@ -668,7 +654,7 @@ async def get_notifications(
 
     return JSONResponse(
         status_code=status.HTTP_200_OK,
-        content=dict(items=data, count=count)
+        content=Notifications(items=notifications, count=count).model_dump(mode="json")
     )
 
 

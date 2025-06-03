@@ -1,3 +1,4 @@
+import json
 from decimal import Decimal
 
 import pycountry
@@ -80,8 +81,12 @@ class NotificationItem(BaseModel):
     id: int
     head: str
     body: str
-    args: dict
+    args_: str
     created: float
+
+    @computed_field
+    def args(self) -> dict:
+        return json.loads(self.args_)
 
 
 class Notifications(BaseModel):

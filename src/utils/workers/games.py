@@ -479,6 +479,9 @@ def proceed_jackpot(jackpot_id: Optional[int] = None):
 
         if remaining_tickets:
             ticket = remaining_tickets[0]
+            ticket.status = TicketStatus.COMPLETED
+            ticket.won = True
+            db.add(ticket)
 
             user_balance = db.query(Balance).with_for_update().filter(
                 Balance.user_id == ticket.user_id

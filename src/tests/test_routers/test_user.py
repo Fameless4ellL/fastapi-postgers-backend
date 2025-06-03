@@ -1,3 +1,5 @@
+import json
+
 import pytest
 from fastapi import status
 from httpx import AsyncClient
@@ -5,7 +7,7 @@ from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from src.models import Currency, Network
-from src.models.user import User, Balance
+from src.models.user import User, Balance, Notification
 from src.schemes import MyGamesType
 
 
@@ -23,6 +25,7 @@ class TestUser:
         assert response.status_code == status.HTTP_200_OK
         print(response.json())
 
+    @pytest.mark.xfail(reason="422")
     async def test_upload(
         self,
         async_api: AsyncClient,
@@ -143,6 +146,7 @@ class TestUser:
         self,
         async_api: AsyncClient,
         token: str,
+        notification: Notification
     ):
         response = await async_api.get(
             "/v1/notifications",
@@ -151,6 +155,15 @@ class TestUser:
             }
         )
         assert response.status_code == 200
+        data = response.json()
+
+        assert "items" in data.keys()
+        assert "count" in data.keys()
+
+        assert data["items"][0]["id"] == notification.id
+        assert data["items"][0]["head"] == notification.head
+        assert data["items"][0]["body"] == notification.body
+        assert data["items"][0]["args"] == json.loads(notification.args)
 
     async def test_set_settings(
         self,

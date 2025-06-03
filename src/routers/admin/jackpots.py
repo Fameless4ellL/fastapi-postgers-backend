@@ -1,6 +1,6 @@
 from typing import Annotated, Literal, Optional
 
-from fastapi import Depends, Path, Security, status
+from fastapi import Depends, Path, Security, status, Query
 from fastapi.responses import JSONResponse
 from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -165,6 +165,7 @@ async def get_tickets(
     db: Annotated[AsyncSession, Depends(get_db)],
     obj_id: Annotated[int, Path(ge=0)],
     user_id: Annotated[int, Path(ge=0)],
+    game_id: Annotated[int, Query(ge=0)],
     offset: int = 0,
     limit: int = 10
 ):
@@ -186,6 +187,9 @@ async def get_tickets(
         )
         .order_by(Ticket.created_at.desc())
     )
+    if game_id:
+        stmt = stmt.filter(Ticket.game_id == game_id)
+
     count_stmt = select(func.count()).select_from(stmt)
     count_result = await db.execute(count_stmt)
     count = count_result.scalar()

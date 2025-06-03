@@ -1,3 +1,4 @@
+import json
 from datetime import datetime
 
 import pytest
@@ -7,7 +8,7 @@ from redis.asyncio import Redis
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from src.models.other import Currency, Game, GameType, Network, Ticket, GameView
-from src.models.user import User, Balance
+from src.models.user import User, Balance, Notification
 from src.utils.signature import get_password_hash
 
 
@@ -234,6 +235,32 @@ async def balance(db: AsyncSession, user: User):
     try:
         await db.execute(
             delete(Balance).where(Balance.user_id == user.id)
+        )
+        await db.commit()
+    except Exception as e:
+        await db.rollback()
+        print(e)
+
+
+@pytest.fixture
+async def notification(
+    db: AsyncSession,
+    user: User
+):
+    notification = Notification(
+        user_id=user.id,
+        head="Test head",
+        body="Test body",
+        args=json.dumps({"test": "test"})
+    )
+    db.add(notification)
+    await db.commit()
+
+    yield notification
+
+    try:
+        await db.execute(
+            delete(Notification).where(Notification.user_id == user.id)
         )
         await db.commit()
     except Exception as e:
