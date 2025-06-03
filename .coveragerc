@@ -2,3 +2,4 @@
 omit =
     src/models/logs/*
     src/models/main/*
+    src/tests/*

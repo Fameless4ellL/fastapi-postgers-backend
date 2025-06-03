@@ -1,4 +1,3 @@
-import importlib
 import json
 from decimal import Decimal
 from typing import Annotated, List
@@ -488,9 +487,6 @@ async def get_my_games(
     """
     Получение игр пользователя в котором он участвовал
     """
-    model = importlib.import_module("src.models.other")
-    model = getattr(model, item.model)
-
     if item.model == "InstaBingo":
         stmt = (
             select(

@@ -35,16 +35,27 @@ class TestAdminUsers:
 
     async def test_retrieves_user_details(
         self,
+        db: AsyncSession,
         async_api: AsyncClient,
         admin_token: str,
-        user: User
     ):
+        user = User(
+            phone_number="77079898999",
+            username="test_user3",
+            country="KAZ",
+        )
+        db.add(user)
+        await db.commit()
+        await db.refresh(user)
+
         response = await async_api.get(
             f"v1/admin/users/{user.id}",
             headers={"Authorization": f"Bearer {admin_token}"},
         )
         assert response.status_code == status.HTTP_200_OK
         assert response.json()["id"] == user.id
+
+        await db.delete(user)
 
     async def test_retrieves_user_details_not_found(
         self,
