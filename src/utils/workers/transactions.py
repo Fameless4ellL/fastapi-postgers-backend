@@ -298,8 +298,6 @@ def withdraw(
         status = BalanceChangeHistory.Status.CANCELED
 
     else:
-        balance.balance -= Decimal(balance_change_history.change_amount)
-
         status = BalanceChangeHistory.Status.SUCCESS
 
     balance_change_history.status = status
