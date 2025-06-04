@@ -634,7 +634,7 @@ async def get_notifications(
             )
         )
         .select_from(Notification)
-        .filter(Notification.user_id == user.id, Notification.read.is_(False))
+        .filter(Notification.user_id == user.id)
         .order_by(Notification.created_at.desc())
     )
     count_stmt = select(func.count(Notification.id)).filter(Notification.user_id == user.id)
