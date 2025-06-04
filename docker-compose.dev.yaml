@@ -57,24 +57,6 @@ services:
     ports:
       - "0.0.0.0:8100:8000"
 
-#  worker:
-#    build:
-#      context: .
-#    command: >
-#      bash -c 'while !</dev/tcp/db/5432; do sleep 1; done;
-#      python3  ./worker/worker.py'
-#    volumes:
-#      - .:/app/
-#    environment:
-#      - PYTHONPATH=/app
-#    depends_on:
-#      - api
-#      - db
-#      - logs
-#      - redis
-#      - rng
-#    restart: on-failure
-
   rq:
     build:
       context: .
