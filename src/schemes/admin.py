@@ -284,7 +284,7 @@ class GameCreate(BaseAdmin):
     price: Decimal = Field(default=1, gt=0, lt=10**7, decimal_places=2, max_digits=7)
     description: Optional[str] = Field("", max_length=500)
     max_win_amount: Optional[Decimal] = Field(default=8, gt=0, lt=10**7, decimal_places=2, max_digits=11)
-    prize: Union[float, str] = 1000
+    prize: Union[float, str] = 0
     country: Optional[CountryAlpha3] = None
     min_ticket_count: int = 1
     scheduled_datetime: Optional[FutureDatetime]
@@ -869,4 +869,9 @@ class LimitUpdate(LimitCreate):
     pass
 
 
-
+class JackpotWinner(BaseModel):
+    id: Optional[int] = None
+    user_id: Optional[int] = None
+    username: Optional[int] = None
+    numbers: Optional[int] = None
+    tickets_pcs: int = 0
