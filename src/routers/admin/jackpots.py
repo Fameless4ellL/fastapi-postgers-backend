@@ -173,7 +173,7 @@ async def get_tickets(
     db: Annotated[AsyncSession, Depends(get_db)],
     obj_id: Annotated[int, Path(ge=0)],
     user_id: Annotated[int, Path(ge=0)],
-    game_id: Annotated[int, Query(ge=0)],
+    game_id: Annotated[Optional[int], Query(ge=0)] = None,
     offset: int = 0,
     limit: int = 10
 ):
