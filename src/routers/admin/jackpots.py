@@ -1,6 +1,8 @@
+from datetime import datetime
 from typing import Annotated, Literal, Optional
 
 from fastapi import Depends, Path, Security, status, Query
+from fastapi.exceptions import RequestValidationError
 from fastapi.responses import JSONResponse
 from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -59,15 +61,21 @@ async def delete_jackpot(
     """
     Delete or cancel a jackpot game
     """
-    stmt = select(Jackpot).filter(
-        Jackpot.id == game_id,
-        Jackpot.fund_start <= func.now()
-    )
+    stmt = select(Jackpot).filter(Jackpot.id == game_id)
     game = await db.execute(stmt)
     game = game.scalar()
     if not game:
         return JSONResponse(
             status_code=status.HTTP_400_BAD_REQUEST, content="Game not found"
+        )
+
+    if game.fund_start <= datetime.now():
+        raise RequestValidationError(
+            errors=[{
+                "loc": ("body", "game_id"),
+                "msg": f"Game {game_id} has already started",
+                "type": "value_error"
+            }]
         )
 
     if _type == "delete":
