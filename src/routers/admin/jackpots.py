@@ -19,7 +19,7 @@ from src.schemes.admin import (
     Jackpots,
     JackpotCreate,
     JackpotUpdate,
-    JackpotFilter,
+    JackpotFilter, JackpotWinner,
 )
 from src.schemes import BadResponse, JsonForm
 
@@ -215,6 +215,7 @@ async def get_tickets(
         ])],
     responses={
         400: {"model": BadResponse},
+        200: {"model": JackpotWinner},
     },
 )
 async def get_winner(
@@ -226,6 +227,7 @@ async def get_winner(
     """
     stmt = select(
         Ticket.id,
+        User.id,
         User.username,
         Ticket.numbers
     ).join(
@@ -240,14 +242,16 @@ async def get_winner(
 
     data = {
         'id': None,
+        'user_id': None,
         'username': None,
         'numbers': None,
     }
 
     if winner:
-        ticket_id, username, numbers = winner
+        ticket_id, user_id, username, numbers = winner
         data = {
             "id": ticket_id,
+            "user_id": user_id,
             "username": username,
             "numbers": numbers
         }
