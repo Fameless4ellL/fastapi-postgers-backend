@@ -1,12 +1,11 @@
-from datetime import datetime
 from typing import Annotated, Literal, Optional
 
 from fastapi import Depends, Path, Security, status, Query
-from fastapi.exceptions import RequestValidationError
 from fastapi.responses import JSONResponse
 from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from src.exceptions.jackpot import JackpotExceptions
 from src.globals import q
 from src.models.db import get_db
 from src.models.log import Action
@@ -14,7 +13,7 @@ from src.models.other import GameStatus, Jackpot, Ticket, RepeatType
 from src.models.user import User, Role
 from src.routers import admin
 from src.routers.admin import get_crud_router
-from src.utils.dependencies import get_admin_token
+from src.schemes import BadResponse, JsonForm, ErrorMessage
 from src.schemes.admin import (
     GameUpload,
     JackpotBase,
@@ -23,7 +22,7 @@ from src.schemes.admin import (
     JackpotUpdate,
     JackpotFilter, JackpotWinner,
 )
-from src.schemes import BadResponse, JsonForm
+from src.utils.dependencies import get_admin_token
 
 get_crud_router(
     model=Jackpot,
@@ -50,7 +49,7 @@ get_crud_router(
             Role.SUPPORT.value,
         ])],
     responses={
-        400: {"model": BadResponse},
+        400: {"model": ErrorMessage},
     },
 )
 async def delete_jackpot(
@@ -64,19 +63,9 @@ async def delete_jackpot(
     stmt = select(Jackpot).filter(Jackpot.id == game_id)
     game = await db.execute(stmt)
     game = game.scalar()
-    if not game:
-        return JSONResponse(
-            status_code=status.HTTP_400_BAD_REQUEST, content="Game not found"
-        )
 
-    if game.fund_start <= datetime.now():
-        raise RequestValidationError(
-            errors=[{
-                "loc": ("body", "game_id"),
-                "msg": f"Game {game_id} has already started",
-                "type": "value_error"
-            }]
-        )
+    await JackpotExceptions.raise_exception_user_not_found(game)
+    await JackpotExceptions.raise_exception_jackpot_already_started(game)
 
     if _type == "delete":
         game.status = GameStatus.DELETED

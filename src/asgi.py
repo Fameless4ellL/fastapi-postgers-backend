@@ -15,6 +15,7 @@ from src.routers import public, admin, _cron
 from src.models import get_logs_db
 from settings import settings
 from src.utils.signature import decode_access_token
+from src.handler import add_exception_handlers
 
 
 logging.basicConfig(level=logging.INFO)
@@ -51,6 +52,7 @@ fastapp.add_middleware(
     allow_methods=['*'],
     allow_headers=['*'],
 )
+add_exception_handlers(fastapp)
 
 
 @fastapp.middleware("http")

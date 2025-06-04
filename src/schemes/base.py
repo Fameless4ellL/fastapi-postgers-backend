@@ -20,6 +20,12 @@ class BadResponse(BaseModel):
     message: str = Field(default="Bad Request")
 
 
+class ErrorMessage(BaseModel):
+    """An error message schema."""
+    message: str
+    code_error: str
+
+
 class CountryBase(BaseModel):
     model_config = {"from_attributes": True}
 

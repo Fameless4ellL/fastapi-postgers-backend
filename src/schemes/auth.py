@@ -1,6 +1,7 @@
+from typing import Optional
+
 from pydantic import BaseModel, Field, SecretStr
 from pydantic_extra_types.country import CountryAlpha3
-from typing import Optional
 
 from src.schemes.base import ModPhoneNumber
 

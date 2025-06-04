@@ -12,7 +12,7 @@ from src.models.user import BalanceChangeHistory, Wallet, Balance
 from src.models.other import Currency
 from src.routers import _cron
 from src.globals import q
-from worker.worker import worker
+from src.utils import worker
 
 
 class JobRequest(BaseModel):
