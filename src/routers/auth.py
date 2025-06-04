@@ -147,14 +147,15 @@ async def login(
     db: Annotated[AsyncSession, Depends(get_db)],
     user: UserLogin,
 ):
-    if not user.phone_number and not user.username:
+    if not user.phone_number:
         return JSONResponse(
-            status_code=400, content={"message": "Phone number or username is required"}
+            status_code=400, content={"message": "Phone number is required"}
         )
 
     userdb = await db.execute(
-        select(User).filter(
-            or_(User.phone_number == user.phone_number, User.username == user.username)
+        select(User)
+        .filter(
+            or_(User.phone_number == user.phone_number)
         )
     )
     userdb = userdb.scalar()

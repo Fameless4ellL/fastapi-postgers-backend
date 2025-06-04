@@ -194,7 +194,7 @@ class Game(Base):
     price: Mapped[decimal.Decimal] = Column(DECIMAL(10, 2), nullable=False, default=1)
     description: Mapped[str] = Column(String(500), nullable=True, doc="Description of the game")
     max_win_amount: Mapped[decimal.Decimal] = Column(DECIMAL(9, 2), nullable=True, default=8)
-    prize: Mapped[str] = Column(String(256), nullable=True, default="1000", doc="The prize of the game instance")
+    prize: Mapped[str] = Column(String(256), nullable=True, default="0", doc="The prize of the game instance")
     country: Mapped[str] = Column(String(32), nullable=True)
     min_ticket_count: Mapped[int] = Column(Integer, default=1, doc="Minimum number of tickets per user")
 
