@@ -4,7 +4,7 @@ from typing import Annotated, Union
 from fastapi import Depends, Path, status, Security, UploadFile
 from fastapi.exceptions import RequestValidationError
 from fastapi.responses import JSONResponse
-from rq import Repeat
+from rq import Retry
 from sqlalchemy import func, select, or_, delete, String
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -292,7 +292,7 @@ async def create_admin(
             f"{settings.web_app_url}/registration/{code}"
         ),
         to_email=new_admin.email,
-        repeat=Repeat(times=3, interval=[5, 10, 15]),
+        repeat=Retry(max=3, interval=[5, 10, 15]),
         job_id=f"send_mail({new_admin.email})"
     )
 

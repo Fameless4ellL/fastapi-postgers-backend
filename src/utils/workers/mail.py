@@ -9,6 +9,7 @@ from src.utils import worker
 
 log = logging.getLogger(__name__)
 
+
 @worker.register
 def send_mail(
     subject: str,

@@ -6,7 +6,7 @@ from fastapi.responses import JSONResponse
 from httpx import AsyncClient
 from passlib.exc import MalformedTokenError, TokenError
 from passlib.totp import TOTP
-from rq import Repeat
+from rq import Retry
 from sqlalchemy import select, or_
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -145,7 +145,7 @@ async def set_reset_password(
         subject="Password Reset",
         body="Your password has been reset successfully",
         to_email=user.email,
-        repeat=Repeat(times=3, interval=[5, 10, 15]),
+        repeat=Retry(max=3, interval=[5, 10, 15]),
         job_id=f"reset-password-{user.id}-{secrets.token_urlsafe(16)}",
     )
 
@@ -206,7 +206,7 @@ async def send_reset_password(
             f"{settings.web_app_url}/reset-password/{code}"
         ),
         to_email=user.email,
-        repeat=Repeat(times=3, interval=[5, 10, 15]),
+        repeat=Retry(max=3, interval=[5, 10, 15]),
         job_id=f"reset-password-{user.id}-{code}",
     )
 
