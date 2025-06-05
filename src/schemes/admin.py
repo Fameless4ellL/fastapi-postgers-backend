@@ -509,6 +509,7 @@ class JackpotSchema(BaseAdmin):
     has_tickets: bool = False
     country: Country
     status: Optional[GameStatus] = None
+    scheduled_datetime: Optional[datetime] = None
     created_at: datetime
 
 
