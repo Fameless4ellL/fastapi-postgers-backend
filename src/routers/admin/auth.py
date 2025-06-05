@@ -6,11 +6,12 @@ from fastapi.responses import JSONResponse
 from httpx import AsyncClient
 from passlib.exc import MalformedTokenError, TokenError
 from passlib.totp import TOTP
+from rq import Repeat
 from sqlalchemy import select, or_
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from settings import settings
-from src.globals import aredis, TotpFactory
+from src.globals import aredis, TotpFactory, q
 from src.models.db import get_db
 from src.models.log import Action
 from src.models.user import User, Role
@@ -24,7 +25,8 @@ from src.schemes.admin import (
     Totp,
     VerifyLink,
 )
-from src.utils.dependencies import Token, get_admin_token, send_mail, http_client, get_admin, get_ip
+from src.utils import worker
+from src.utils.dependencies import Token, get_admin_token, http_client, get_admin, get_ip
 from src.utils.signature import (
     create_access_token,
     get_password_hash,
@@ -138,11 +140,13 @@ async def set_reset_password(
     await db.commit()
     await aredis.delete(f"IP:EMAIL:{ip}")
 
-    bg.add_task(
-        send_mail,
-        "Password Reset",
-        "Your password has been reset",
-        user.email,
+    q.enqueue(
+        worker.send_mail,
+        subject="Password Reset",
+        body="Your password has been reset successfully",
+        to_email=user.email,
+        repeat=Repeat(times=3, interval=[5, 10, 15]),
+        job_id=f"reset-password-{user.id}-{secrets.token_urlsafe(16)}",
     )
 
     return JSONResponse(status_code=status.HTTP_200_OK, content="OK", background=bg)
@@ -173,7 +177,6 @@ async def set_new_user_password(
 async def send_reset_password(
     db: Annotated[AsyncSession, Depends(get_db)],
     item: ForgotPassword,
-    bg: background.BackgroundTasks,
 ):
     """
     Reset password
@@ -194,15 +197,17 @@ async def send_reset_password(
     code = secrets.token_urlsafe(16)
     await aredis.set(f"EMAIL:{code}", user.email, ex=60 * 15)
 
-    bg.add_task(
-        send_mail,
-        "Восстановление доступа",
-        (
-            f"Здравствуйте, {user.firstname} !"
-            "Перейдите по ссылке, чтобы сбросить пароль для вашей учетной записи на платформе BINGO :"
-            f" {settings.web_app_url}/reset-password/{code}"
+    q.enqueue(
+        worker.send_mail,
+        subject="Восстановление доступа",
+        body=(
+            f"Здравствуйте, {user.firstname} !\n"
+            "Перейдите по ссылке, чтобы сбросить пароль для вашей учетной записи на платформе BINGO :\n"
+            f"{settings.web_app_url}/reset-password/{code}"
         ),
-        user.email,
+        to_email=user.email,
+        repeat=Repeat(times=3, interval=[5, 10, 15]),
+        job_id=f"reset-password-{user.id}-{code}",
     )
 
     return JSONResponse(status_code=status.HTTP_200_OK, content="Email has been sent")

@@ -1,12 +1,9 @@
 import logging
-import smtplib
 import traceback
 import uuid
 from dataclasses import dataclass
 from datetime import datetime, timedelta
 from decimal import Decimal
-from email.mime.multipart import MIMEMultipart
-from email.mime.text import MIMEText
 from itertools import islice
 from typing import Annotated
 
@@ -21,7 +18,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import joinedload
 from web3 import Web3, middleware
 
-from settings import email, settings
+from settings import settings
 from src.globals import aredis, q
 from src.models import Limit, LimitStatus, OperationType, LimitType
 from src.models.db import get_db
@@ -324,36 +321,6 @@ async def generate_game(
 def nth(iterable, n, default=None):
     "Returns the nth item or a default value."
     return next(islice(iterable, n, None), default)
-
-
-def send_mail(
-    subject: str,
-    body: str,
-    to_email: str,
-):
-    msg = MIMEMultipart()
-    msg["From"] = email.FROM
-    msg["To"] = to_email
-    msg["subject"] = subject
-    msg.attach(MIMEText(body))
-
-    try:
-        logger.info(f"Connecting to SMTP server: {email.host}:{email.port}")
-        server = smtplib.SMTP(email.host, email.port)
-        server.starttls()
-
-        logger.info("Logging in to SMTP server")
-        server.login(email.login, email.password)
-
-        text = msg.as_string()
-        logger.info(f"Sending email to {to_email}")
-        server.sendmail(email.FROM, to_email, text)
-
-        server.quit()
-        logger.info("Email sent successfully")
-    except smtplib.SMTPException as e:
-        logger.error(f"Failed to send email: {e}")
-        traceback.print_exc()
 
 
 async def is_field_unique(

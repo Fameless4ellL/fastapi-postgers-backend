@@ -1,21 +1,22 @@
 import random
 from typing import Annotated, Union
 
-from fastapi import Depends, Path, background, status, Security, UploadFile
+from fastapi import Depends, Path, status, Security, UploadFile
 from fastapi.exceptions import RequestValidationError
 from fastapi.responses import JSONResponse
+from rq import Repeat
 from sqlalchemy import func, select, or_, delete, String
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from src.globals import aredis
+from settings import settings
+from src.globals import aredis, q
 from src.models.db import get_db
 from src.models.log import Action
 from src.models.other import Network, Currency
 from src.models.user import User, Role, Document
 from src.routers import admin
 from src.routers.admin import get_crud_router
-from src.utils.dependencies import Token, get_admin_token, send_mail, is_field_unique
-from src.utils.validators import url_for
+from src.schemes import BadResponse, JsonForm
 from src.schemes.admin import (
     Admin,
     AdminCreate,
@@ -33,8 +34,9 @@ from src.schemes.admin import (
     Profile,
     AdminRoles
 )
-from src.schemes import BadResponse, JsonForm
-from settings import settings
+from src.utils import worker
+from src.utils.dependencies import Token, get_admin_token, is_field_unique
+from src.utils.validators import url_for
 
 get_crud_router(
     model=Network,
@@ -211,7 +213,6 @@ async def create_admin(
         ]
     )],
     item: Annotated[AdminCreate, JsonForm()],
-    bg: background.BackgroundTasks,
     avatar: UploadFile,
     documents: list[UploadFile],
 ):
@@ -283,18 +284,20 @@ async def create_admin(
     code = random.randint(100000, 999999)
     await aredis.set(f"EMAIL:{new_admin.email}", code, ex=60 * 15)
 
-    bg.add_task(
-        send_mail,
-        "New Admin",
-        (
+    q.enqueue(
+        worker.send_mail,
+        subject="New Admin",
+        body=(
             f"New admin {new_admin.username} has been created. your code is {code}",
-            f" {settings.web_app_url}/registration/{code}"
+            f"{settings.web_app_url}/registration/{code}"
         ),
-        new_admin.email,
+        to_email=new_admin.email,
+        repeat=Repeat(times=3, interval=[5, 10, 15]),
+        job_id=f"send_mail({new_admin.email})"
     )
 
     return JSONResponse(
-        status_code=status.HTTP_201_CREATED, content="OK", background=bg
+        status_code=status.HTTP_201_CREATED, content="OK",
     )
 
 

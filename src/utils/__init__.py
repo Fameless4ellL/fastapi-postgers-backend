@@ -53,6 +53,13 @@ class FuncRegister:
         utils/workers/games.py
         """
 
+    @staticmethod
+    def send_mail(subject: str, body: str, to_email: str):
+        """
+        See the related method for more details:
+        utils/workers/email.py
+        """
+
 
 worker = FuncRegister()
 
