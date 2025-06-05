@@ -1,7 +1,7 @@
 """Jackpot exceptions."""
 
 import typing as t
-from datetime import datetime
+from datetime import datetime, timezone
 from uuid import UUID
 from pydantic import BaseModel
 from src.exceptions.base import NotFoundError
@@ -27,6 +27,6 @@ class JackpotExceptions:
         game: t.Union[None, UUID, BaseModel, list[BaseModel]],
     ) -> bool:
         """Raise exception if arbitrator not found."""
-        if game.fund_start > datetime.now():
+        if game.fund_start > datetime.now(timezone.utc):
             raise NotFoundError(name=JACKPOT_ALREADY_STARTED)
         return True
