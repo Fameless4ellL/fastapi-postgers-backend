@@ -669,7 +669,7 @@ async def set_settings(
     """
     Изменение настроек пользователя
     """
-    user = select(User).with_for_update().filter(User.id == token.id)
+    user = select(User).filter(User.id == token.id)
     user = await db.execute(user)
     user = user.scalar()
 
