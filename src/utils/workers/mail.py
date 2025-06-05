@@ -1,12 +1,13 @@
 """Email sending worker using SMTP"""
+import logging
 import smtplib
 from email.mime.multipart import MIMEMultipart
 from email.mime.text import MIMEText
 
 import settings
-from src.asgi import log
 from src.utils import worker
 
+log = logging.getLogger(__name__)
 
 @worker.register
 def send_mail(
