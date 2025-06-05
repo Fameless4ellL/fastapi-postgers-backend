@@ -8,7 +8,7 @@ from pydantic import BaseModel, ConfigDict
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 from src.models.db import get_db
-from src.models.user import BalanceChangeHistory, Wallet, Balance
+from src.models.user import BalanceChangeHistory, Wallet, Balance, Notification
 from src.models.other import Currency
 from src.routers import _cron
 from src.globals import q
@@ -110,6 +110,15 @@ async def transfer(
         args=item.model_dump_json()
     )
     db.add(balance_change_history)
+
+    # if limit is reached more than 1000, by one transaction
+    if item.value > 1000:
+        notification = Notification(
+            user_id=wallet.user_id,
+            head="Large Deposit Alert",
+            body=f"You have received a large deposit of {item.value} {currency.symbol}.",
+        )
+        db.add(notification)
     await db.commit()
 
     return {"status": "ok"}

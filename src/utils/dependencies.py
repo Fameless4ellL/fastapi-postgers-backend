@@ -102,10 +102,15 @@ async def get_user(
         select(User).filter(User.id == token.id)
     )
     user = user.scalar()
-
+    # TODO improve err raise
     if user is None:
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED, detail="User not found"
+        )
+
+    if user.is_blocked:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN, detail="User is blocked"
         )
 
     return user
@@ -537,7 +542,7 @@ class LimitVerifier:
         Fetch limits for the user based on their type and operation type.
         """
         stmt = select(Limit).filter(
-            Limit.user_type == self.user.type,
+            Limit.kyc == self.user.kyc,
             Limit.status == LimitStatus.ACTIVE,
             Limit.is_deleted.is_(False),
         )
