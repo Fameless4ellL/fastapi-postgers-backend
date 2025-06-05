@@ -278,7 +278,7 @@ async def upload_kyc(
     """
     Загрузка документа
     """
-    user = select(User).with_for_update().filter(User.id == token.id)
+    user = select(User).filter(User.id == token.id)
     user = await db.execute(user)
     user = user.scalar()
 
@@ -659,7 +659,7 @@ async def get_notifications(
 
 @public.post(
     "/settings", tags=["user", Action.UPDATE],
-    responses={400: {"model": BadResponse}, 200: {"model": Notifications}}
+    responses={400: {"model": BadResponse}}
 )
 async def set_settings(
     db: Annotated[AsyncSession, Depends(transaction_atomic)],
