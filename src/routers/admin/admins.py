@@ -292,7 +292,7 @@ async def create_admin(
             f"{settings.web_app_url}/registration/{code}"
         ),
         to_email=new_admin.email,
-        repeat=Retry(max=3, interval=[5, 10, 15]),
+        retry=Retry(max=3, interval=[5, 10, 15]),
         job_id=f"send_mail({new_admin.email})"
     )
 
