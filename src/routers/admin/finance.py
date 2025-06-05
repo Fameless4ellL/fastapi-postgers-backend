@@ -20,14 +20,14 @@ from src.models.db import get_db
 from src.models.limit import Limit
 from src.models.user import User, Role, BalanceChangeHistory, Balance
 from src.routers import admin
-from src.utils import worker
-from src.utils.dependencies import get_admin_token, get_timezone, Token
+from src.schemes import BadResponse
 from src.schemes.admin import (
     Operations,
     OperationFilter,
     Operation, Limits, LimitBase, LimitCreate,
 )
-from src.schemes import BadResponse
+from src.utils import worker
+from src.utils.dependencies import get_admin_token, get_timezone, Token
 
 
 @admin.get(
@@ -223,7 +223,7 @@ async def get_limit_list(
                 "currency", Currency.code,
                 "operation_type", func.lower(Limit.operation_type.cast(String)),
                 "period", func.lower(Limit.period.cast(String)),
-                "user_type", Limit.user_type,
+                "kyc", Limit.kyc,
                 "status", func.lower(Limit.status.cast(String)),
                 "risk", func.lower(Limit.risk.cast(String)),
                 "is_deleted", Limit.is_deleted,
@@ -280,7 +280,7 @@ async def get_limit(
                 "currency", Currency.code,
                 "operation_type", func.lower(Limit.operation_type.cast(String)),
                 "period", func.lower(Limit.period.cast(String)),
-                "user_type", Limit.user_type,
+                "kyc", Limit.kyc,
                 "status", func.lower(Limit.status.cast(String)),
                 "risk", func.lower(Limit.risk.cast(String)),
                 "created_at", Limit.created_at,

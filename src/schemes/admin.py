@@ -24,7 +24,7 @@ from pydantic import (
 from pydantic_extra_types.country import CountryAlpha3
 
 from settings import settings
-from src.models.limit import LimitType, Period, UserType, LimitStatus, RiskLevel, OperationType
+from src.models.limit import LimitType, Period, LimitStatus, RiskLevel, OperationType
 from src.models.other import GameStatus, GameType, GameView, JackpotType, RepeatType, TicketStatus
 from src.models.user import BalanceChangeHistory, Role, User as DBUser
 from src.utils.validators import get_currency_by_id, get_first_currency
@@ -842,7 +842,7 @@ class LimitBase(BaseModel):
     currency: Optional[str] = None
     operation_type: OperationType
     period: Period
-    user_type: Annotated[UserType, BeforeValidator(lambda v: UserType[v])]
+    kyc: Optional[bool] = False
     status: LimitStatus
     risk: Optional[RiskLevel] = None
     is_deleted: Optional[bool] = False
@@ -861,7 +861,7 @@ class LimitCreate(BaseModel):
     value: Decimal
     operation_type: OperationType
     period: Period
-    user_type: UserType
+    kyc: bool = False
     status: LimitStatus
     risk: RiskLevel
 
