@@ -1,5 +1,6 @@
 import datetime
 import random
+from decimal import Decimal
 from typing import Annotated, Optional
 from fastapi import Depends, Path, status
 from fastapi.responses import JSONResponse
@@ -17,6 +18,7 @@ from src.models.other import (
     Jackpot,
     Ticket,
     JackpotType,
+    GameView,
 )
 from src.routers import public
 from src.utils.dependencies import generate_game, get_user, nth, LimitVerifier
@@ -250,6 +252,7 @@ async def buy_tickets(
     """
     game = await db.execute(
         select(Game)
+        .with_for_update()
         .filter(Game.id == game_id)
         .options(
             joinedload(Game.currency).joinedload(Currency.network)
@@ -257,7 +260,7 @@ async def buy_tickets(
     )
     game: Optional[Game] = game.scalar()
 
-    if game is None:
+    if not game:
         return JSONResponse(
             status_code=status.HTTP_400_BAD_REQUEST,
             content=BadResponse(message="Game not found").model_dump()
@@ -376,6 +379,11 @@ async def buy_tickets(
             proof=tx
         )
         db.add(balance_change)
+
+        if game.kind == GameView.MONETARY:
+            game.prize = Decimal(game.prize) + total_price
+            db.add(game)
+
         await db.commit()
 
     # create ticket
@@ -383,6 +391,7 @@ async def buy_tickets(
         Ticket(
             user_id=user.id,
             game_id=game_id,
+            currency_id=game.currency_id,
             numbers=numbers,
             demo=item.demo,
             jackpot_id=jackpot_id,

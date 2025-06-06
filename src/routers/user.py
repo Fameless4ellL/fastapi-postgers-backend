@@ -351,11 +351,7 @@ async def get_tickets(
         .join(Currency, Ticket.currency_id == Currency.id)
         .filter(Ticket.user_id == user.id)
         .order_by(Ticket.created_at.desc())
-        .group_by(
-            Ticket.id,
-            Ticket.game_id,
-            Currency.code
-        )
+        .group_by()
     )
 
     if game_id:
@@ -364,7 +360,7 @@ async def get_tickets(
     if jackpot_id:
         stmt = stmt.filter(Ticket.jackpot_id == jackpot_id)
 
-    count = stmt.with_only_columns(func.count())
+    count = stmt.order_by(None).with_only_columns(func.count())
     count = await db.execute(count)
     count = count.scalar()
 
