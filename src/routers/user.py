@@ -351,6 +351,11 @@ async def get_tickets(
         .join(Currency, Ticket.currency_id == Currency.id)
         .filter(Ticket.user_id == user.id)
         .order_by(Ticket.created_at.desc())
+        .group_by(
+            Ticket.id,
+            Ticket.game_id,
+            Currency.code
+        )
     )
 
     if game_id:

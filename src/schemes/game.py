@@ -95,7 +95,7 @@ class Ticket(BaseModel):
     currency: Optional[str] = None
     numbers: list[int]
     won: Optional[bool] = False
-    amount: Decimal = 0
+    amount: Union[Decimal, float] = 0
     demo: Optional[bool] = False
     created: float
 
