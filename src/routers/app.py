@@ -1,6 +1,7 @@
 import datetime
 import random
-from decimal import Decimal
+from contextlib import suppress
+from decimal import Decimal, DecimalException
 from typing import Annotated, Optional
 from fastapi import Depends, Path, status
 from fastapi.responses import JSONResponse
@@ -343,9 +344,8 @@ async def buy_tickets(
         # jackpots
         jackpots = await db.execute(
             select(Jackpot)
-            .filter(
-                Jackpot.status == GameStatus.PENDING
-            )
+            .with_for_update()
+            .filter(Jackpot.status == GameStatus.PENDING)
         )
         jackpots = jackpots.scalars().all()
 
@@ -380,9 +380,10 @@ async def buy_tickets(
         )
         db.add(balance_change)
 
-        if game.kind == GameView.MONETARY:
-            game.prize = Decimal(game.prize) + total_price
-            db.add(game)
+        if game.kind == GameView.MONETARY and str(game.prize):
+            with suppress(DecimalException):
+                game.prize = Decimal(game.prize) + total_price
+                db.add(game)
 
         await db.commit()
 
