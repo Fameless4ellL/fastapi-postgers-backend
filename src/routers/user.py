@@ -350,7 +350,7 @@ async def get_tickets(
         .select_from(Ticket)
         .join(Currency, Ticket.currency_id == Currency.id)
         .filter(Ticket.user_id == user.id)
-        .order_by(Ticket.timestamp.desc())
+        .order_by(Ticket.created_at.desc())
     )
 
     if game_id:
