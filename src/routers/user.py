@@ -334,7 +334,24 @@ async def get_tickets(
     """
     Получение билетов пользователя
     """
-    stmt = select(Ticket).filter(Ticket.user_id == user.id)
+    stmt = (
+        select(
+            func.json_build_object(
+                "id", Ticket.id,
+                "game_instance_id", Ticket.game_id,
+                "currency", Currency.code,
+                "numbers", Ticket.numbers,
+                "demo", Ticket.demo,
+                "won", Ticket.won,
+                "amount", Ticket.amount,
+                "created", func.extract('epoch', Ticket.created_at)
+            )
+        )
+        .select_from(Ticket)
+        .join(Currency, Ticket.currency_id == Currency.id)
+        .filter(Ticket.user_id == user.id)
+        .order_by(Ticket.timestamp.desc())
+    )
 
     if game_id:
         stmt = stmt.filter(Ticket.game_id == game_id)
@@ -349,20 +366,9 @@ async def get_tickets(
     tickets = await db.execute(stmt.offset(skip).limit(limit))
     tickets = tickets.scalars().all()
 
-    data = [{
-        "id": t.id,
-        "game_instance_id": t.game_id,
-        "currency": t.currency.code if t.currency else None,
-        "numbers": t.numbers,
-        "demo": t.demo,
-        "won": t.won,
-        "amount": float(t.amount),
-        "created": t.created_at.timestamp()
-    } for t in tickets]
-
-    return JSONResponse(
-        status_code=status.HTTP_200_OK,
-        content=Tickets(tickets=data, count=count).model_dump()
+    return Tickets(
+        tickets=tickets,
+        count=count
     )
 
 

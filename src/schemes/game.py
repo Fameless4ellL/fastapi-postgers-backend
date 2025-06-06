@@ -94,9 +94,9 @@ class Ticket(BaseModel):
     game_instance_id: int
     currency: Optional[str] = None
     numbers: list[int]
-    won: Optional[bool]
-    amount: float = 0
-    demo: Optional[bool]
+    won: Optional[bool] = False
+    amount: Decimal = 0
+    demo: Optional[bool] = False
     created: float
 
 
