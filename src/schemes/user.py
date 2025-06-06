@@ -52,7 +52,8 @@ class KYCProfile(KYC):
 
 
 class Profile(BaseModel):
-    username: Optional[str]
+    username: Optional[str] = None
+    phone_number: str
     kyc: Optional[KYCProfile] = None
     kyc_approved: Optional[bool] = False
     balance: Optional[float] = 0
