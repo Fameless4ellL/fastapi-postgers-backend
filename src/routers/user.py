@@ -494,6 +494,7 @@ async def get_my_games(
                     "id", Ticket.id,
                     "price", InstaBingo.price,
                     "won", Ticket.won,
+                    "demo", Ticket.demo,
                     "currency", Currency.code,
                     "total_amount", func.sum(Ticket.amount).label("total_amount"),
                     "created", func.date_part('epoch', Ticket.created_at),
@@ -526,9 +527,12 @@ async def get_my_games(
                 func.json_build_object(
                     "id", Ticket.id,
                     "currency", Currency.code,
+                    "won", Ticket.won,
+                    "demo", Ticket.demo,
                     "name", Jackpot.name,
                     "image", Jackpot.image,
                     "status", Jackpot.status,
+                    "total_amount", Ticket.amount,
                     "prize", Jackpot.amount,
                     "endtime", func.date_part('epoch', Jackpot.scheduled_datetime),
                     "created", func.date_part('epoch', Jackpot.created_at),
@@ -562,12 +566,16 @@ async def get_my_games(
             select(
                 func.json_build_object(
                     "id", Ticket.id,
+                    "game_id", Game.id,
                     "currency", Currency.code,
                     "name", Game.name,
                     "image", Game.image,
                     "status", Game.status,
                     "price", Game.price,
+                    "won", Ticket.won,
+                    "demo", Ticket.demo,
                     "max_limit_grid", Game.max_limit_grid,
+                    "total_amount", Ticket.amount,
                     "prize", Game.prize,
                     "endtime", func.date_part('epoch', Game.scheduled_datetime),
                     "created", func.date_part('epoch', Game.created_at),
@@ -578,6 +586,7 @@ async def get_my_games(
             .filter(Ticket.user_id == user.id)
             .group_by(
                 Ticket.id,
+                Game.id,
                 Game.name,
                 Game.image,
                 Game.status,

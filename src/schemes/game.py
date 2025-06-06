@@ -109,6 +109,9 @@ class MyGame(Game):
     status: Annotated[str, AfterValidator(lambda x: x.lower())]
     image: Optional[Image] = None
     max_limit_grid: Optional[int] = None
+    game_id: Optional[int] = None
+    won: Optional[bool] = False
+    demo: Optional[bool] = False
     total_amount: float = 0
     endtime: Union[float, str]
     created: Union[float, str]
