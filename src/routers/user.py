@@ -342,6 +342,10 @@ async def get_tickets(
     if jackpot_id:
         stmt = stmt.filter(Ticket.jackpot_id == jackpot_id)
 
+    count = stmt.with_only_columns(func.count())
+    count = await db.execute(count)
+    count = count.scalar()
+
     tickets = await db.execute(stmt.offset(skip).limit(limit))
     tickets = tickets.scalars().all()
 
@@ -355,12 +359,6 @@ async def get_tickets(
         "amount": float(t.amount),
         "created": t.created_at.timestamp()
     } for t in tickets]
-
-    count_result = await db.execute(
-        select(func.count(Ticket.id))
-        .filter(Ticket.user_id == user.id)
-    )
-    count = count_result.scalar()
 
     return JSONResponse(
         status_code=status.HTTP_200_OK,
