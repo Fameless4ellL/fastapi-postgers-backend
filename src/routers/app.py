@@ -253,7 +253,6 @@ async def buy_tickets(
     """
     game = await db.execute(
         select(Game)
-        .with_for_update()
         .filter(Game.id == game_id)
         .options(
             joinedload(Game.currency).joinedload(Currency.network)
