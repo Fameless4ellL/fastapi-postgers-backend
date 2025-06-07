@@ -112,11 +112,11 @@ async def transfer(
     db.add(balance_change_history)
 
     # if limit is reached more than 1000, by one transaction
-    if item.value > 1000:
+    if amount > 1000:
         notification = Notification(
             user_id=wallet.user_id,
             head="Large Deposit Alert",
-            body=f"You have received a large deposit of {item.value} {currency.symbol}.",
+            body=f"You have received a large deposit of {amount} from {wallet.user_id}.",
         )
         db.add(notification)
     await db.commit()
