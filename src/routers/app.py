@@ -381,7 +381,7 @@ async def buy_tickets(
 
         if game.kind == GameView.MONETARY and str(game.prize):
             with suppress(DecimalException):
-                game.prize = Decimal(game.prize) + total_price
+                game.prize = str(Decimal(game.prize) + total_price)
                 db.add(game)
 
         await db.commit()
