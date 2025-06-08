@@ -496,14 +496,14 @@ async def get_my_games(
         stmt = (
             select(
                 func.json_build_object(
-                    "id", Ticket.id,
+                    "id", InstaBingo.id,
                     "price", InstaBingo.price,
-                    "won", Ticket.won,
-                    "demo", Ticket.demo,
+                    "won", func.bool_and(Ticket.won),
+                    "demo", func.bool_and(Ticket.demo),
                     "currency", Currency.code,
                     "total_amount", func.sum(Ticket.amount).label("total_amount"),
-                    "created", func.date_part('epoch', Ticket.created_at),
-                    "endtime", func.date_part('epoch', Ticket.created_at),
+                    "ticket_count", func.count(Ticket.id).label("ticket_count"),
+                    "created", func.date_part('epoch', func.min(Ticket.created_at)),
                     "status", func.cast(GameStatus.COMPLETED.name, sqltypes.VARCHAR(50)),
                     "name", func.cast("InstaBingo", sqltypes.VARCHAR(50)),
                 ))
@@ -512,75 +512,57 @@ async def get_my_games(
             .join(Ticket, Ticket.instabingo_id == InstaBingo.id)
             .filter(Ticket.user_id == user.id)
             .group_by(
-                Ticket.id,
+                InstaBingo.id,
                 InstaBingo.price,
-                Ticket.won,
-                Currency.code,
-                Ticket.created_at
+                Currency.code
             )
-            .order_by(Ticket.created_at.asc())
-        )
-
-        count = select(func.count(Ticket.id)).filter(
-            Ticket.instabingo_id == InstaBingo.id,
-            Ticket.user_id == user.id
+            .order_by(func.min(Ticket.created_at).desc())
         )
 
     elif item.model == "Jackpot":
         stmt = (
             select(
                 func.json_build_object(
-                    "id", Ticket.id,
+                    "id", Jackpot.id,
                     "currency", Currency.code,
-                    "won", Ticket.won,
-                    "demo", Ticket.demo,
-                    "name", Jackpot.name,
+                    "won", func.bool_or(Ticket.won),
+                    "demo", func.bool_and(Ticket.demo),
                     "image", Jackpot.image,
                     "status", Jackpot.status,
-                    "total_amount", Ticket.amount,
+                    "total_amount", func.sum(Ticket.amount).label("total_amount"),
+                    "ticket_count", func.count(Ticket.id).label("ticket_count"),
                     "prize", Jackpot.amount,
                     "endtime", func.date_part('epoch', Jackpot.scheduled_datetime),
                     "created", func.date_part('epoch', Jackpot.created_at),
+                    "name", Jackpot.name,
                 ))
             .select_from(Jackpot)
             .join(Currency, Currency.id == Jackpot.currency_id)
             .join(Ticket, Ticket.jackpot_id == Jackpot.id)
             .filter(Ticket.user_id == user.id)
             .group_by(
-                Ticket.id,
-                Ticket.won,
+                Jackpot.id,
                 Currency.code,
-                Ticket.created_at,
                 Jackpot.name,
-                Jackpot.image,
-                Jackpot.status,
-                Jackpot.amount,
-                Jackpot.scheduled_datetime,
-                Jackpot.created_at
             )
-            .order_by(Ticket.created_at.asc())
-        )
-
-        count = select(func.count(Ticket.id)).filter(
-            Ticket.jackpot_id == Jackpot.id,
-            Ticket.user_id == user.id
+            .order_by(func.min(Ticket.created_at).desc())
         )
 
     else:
         stmt = (
             select(
                 func.json_build_object(
-                    "id", Ticket.id,
-                    "game_id", Game.id,
+                    "id", Game.id,
                     "currency", Currency.code,
                     "name", Game.name,
                     "image", Game.image,
                     "status", Game.status,
                     "price", Game.price,
-                    "won", Ticket.won,
-                    "demo", Ticket.demo,
+                    "won", func.bool_or(Ticket.won),
+                    "demo", func.bool_and(Ticket.demo),
                     "max_limit_grid", Game.max_limit_grid,
-                    "total_amount", Ticket.amount,
+                    "total_amount", func.sum(Ticket.amount).label("total_amount"),
+                    "ticket_count", func.count(Ticket.id).label("ticket_count"),
                     "prize", Game.prize,
                     "endtime", func.date_part('epoch', Game.scheduled_datetime),
                     "created", func.date_part('epoch', Game.created_at),
@@ -590,28 +572,14 @@ async def get_my_games(
             .join(Ticket, Ticket.game_id == Game.id)
             .filter(Ticket.user_id == user.id)
             .group_by(
-                Ticket.id,
                 Game.id,
                 Game.name,
-                Game.image,
-                Game.status,
-                Game.price,
-                Game.max_limit_grid,
-                Game.prize,
-                Game.scheduled_datetime,
-                Game.created_at,
-                Ticket.won,
                 Currency.code,
-                Ticket.created_at
             )
-            .order_by(Ticket.created_at.asc())
-        )
-        # count Ticket id
-        count = select(func.count(Ticket.id)).filter(
-            Ticket.game_id == Game.id,
-            Ticket.user_id == user.id
+            .order_by(func.min(Ticket.created_at).desc())
         )
 
+    count = stmt.order_by(None).with_only_columns(func.count())
     count = await db.execute(count)
     count = count.scalar() or 0
 

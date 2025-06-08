@@ -232,7 +232,7 @@ async def buy_tickets(
         db.add(user_balance)
         db.commit()
 
-    total_price = game.price * len(item.numbers)
+    total_price = game.price
 
     # check if the user has enough balance
     if user_balance.balance < total_price:
