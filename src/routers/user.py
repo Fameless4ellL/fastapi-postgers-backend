@@ -501,22 +501,23 @@ async def get_my_games(
                     "won", func.bool_and(Ticket.won),
                     "demo", func.bool_and(Ticket.demo),
                     "currency", Currency.code,
-                    "total_amount", func.sum(Ticket.amount).label("total_amount"),
+                    "total_amount", Ticket.amount,
                     "ticket_count", func.count(Ticket.id).label("ticket_count"),
-                    "created", func.date_part('epoch', func.min(Ticket.created_at)),
+                    "created", func.date_part('epoch', Ticket.created_at),
                     "status", func.cast(GameStatus.COMPLETED.name, sqltypes.VARCHAR(50)),
                     "name", func.cast("InstaBingo", sqltypes.VARCHAR(50)),
                 ))
             .select_from(InstaBingo)
             .join(Currency, Currency.id == InstaBingo.currency_id)
             .join(Ticket, Ticket.instabingo_id == InstaBingo.id)
-            .filter(Ticket.user_id == user.id)
+            .filter(Ticket.user_id == 233)
             .group_by(
                 InstaBingo.id,
                 InstaBingo.price,
+                Ticket.id,
                 Currency.code
             )
-            .order_by(func.min(Ticket.created_at).desc())
+            .order_by(Ticket.created_at.desc())
         )
 
     elif item.model == "Jackpot":

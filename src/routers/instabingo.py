@@ -303,7 +303,6 @@ async def buy_tickets(
             history_id=balance_change.id,
             change_type=balance_change.change_type
         )
-
     else:
         user_balance.balance += total_price
         balance_change = BalanceChangeHistory(
