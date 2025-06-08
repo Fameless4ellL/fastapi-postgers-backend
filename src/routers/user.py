@@ -503,6 +503,7 @@ async def get_my_games(
                     "currency", Currency.code,
                     "total_amount", Ticket.amount,
                     "ticket_count", func.count(Ticket.id).label("ticket_count"),
+                    "endtime", func.date_part('epoch', Ticket.created_at),
                     "created", func.date_part('epoch', Ticket.created_at),
                     "status", func.cast(GameStatus.COMPLETED.name, sqltypes.VARCHAR(50)),
                     "name", func.cast("InstaBingo", sqltypes.VARCHAR(50)),
