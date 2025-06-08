@@ -113,7 +113,7 @@ class MyGame(Game):
     demo: Optional[bool] = False
     total_amount: float = 0
     ticket_count: int = 0
-    endtime: Union[float, str]
+    endtime: Union[None, float, str] = None
     created: Union[float, str]
 
 
