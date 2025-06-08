@@ -511,7 +511,7 @@ async def get_my_games(
             .select_from(InstaBingo)
             .join(Currency, Currency.id == InstaBingo.currency_id)
             .join(Ticket, Ticket.instabingo_id == InstaBingo.id)
-            .filter(Ticket.user_id == 233)
+            .filter(Ticket.user_id == user.id)
             .group_by(
                 InstaBingo.id,
                 InstaBingo.price,
