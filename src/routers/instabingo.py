@@ -332,6 +332,7 @@ async def buy_tickets(
         user_id=user.id,
         instabingo_id=game.id,
         numbers=item.numbers,
+        price=game.price,
         currency_id=game.currency_id,
         won=won,
         amount=prize,

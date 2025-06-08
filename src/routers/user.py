@@ -497,7 +497,7 @@ async def get_my_games(
             select(
                 func.json_build_object(
                     "id", InstaBingo.id,
-                    "price", InstaBingo.price,
+                    "price", Ticket.price,
                     "won", func.bool_and(Ticket.won),
                     "demo", func.bool_and(Ticket.demo),
                     "currency", Currency.code,

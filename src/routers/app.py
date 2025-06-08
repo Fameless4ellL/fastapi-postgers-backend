@@ -393,6 +393,7 @@ async def buy_tickets(
             game_id=game_id,
             currency_id=game.currency_id,
             numbers=numbers,
+            price=game.price,
             demo=item.demo,
             jackpot_id=jackpot_id,
         ) for numbers in item.numbers

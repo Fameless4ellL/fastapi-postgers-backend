@@ -251,6 +251,7 @@ class Ticket(Base):
     )
     numbers: Mapped[list[int]] = Column(ARRAY(Integer), nullable=False)
     won: Mapped[bool] = Column(Boolean, default=False)
+    price: Mapped[decimal.Decimal] = Column(DECIMAL(10, 2), nullable=False, default=1, doc="static price at the time of creation")
     amount: Mapped[decimal.Decimal] = Column(DECIMAL(9, 2), default=0)
     status: Mapped[TicketStatus] = Column(SqlEnum(TicketStatus), default=TicketStatus.PENDING)
     demo: Mapped[bool] = Column(Boolean, default=False)
