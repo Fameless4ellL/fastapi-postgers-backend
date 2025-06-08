@@ -107,7 +107,7 @@ def get_winners(
     _winners = {
         ticket
         for ticket in tickets
-        if set(ticket.numbers).issubset(set(drawn_numbers))
+        if number in ticket.numbers
     }
 
     if not _winners:
