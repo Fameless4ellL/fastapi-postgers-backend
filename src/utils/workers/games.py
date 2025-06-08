@@ -12,7 +12,6 @@ from src.models.other import (
     Game,
     GameStatus,
     GameView,
-    JackpotType,
     Ticket,
     Jackpot,
     TicketStatus,
@@ -108,7 +107,7 @@ def get_winners(
     _winners = {
         ticket
         for ticket in tickets
-        if set(drawn_numbers).issubset(set(ticket.numbers))
+        if set(ticket.numbers).issubset(set(drawn_numbers))
     }
 
     if not _winners:
@@ -180,30 +179,13 @@ def proceed_game(game_id: Optional[int] = None):
 
         if game.kind == GameView.MONETARY:
             # Рассчитываем призовой фонд
-            ticket_price = float(game.price or 1)
             total_tickets = float(game.prize)
 
-            jackpot = db.query(Jackpot).filter(
-                Jackpot._type == JackpotType[game.game_type.name],
-                Jackpot.status == GameStatus.PENDING
-            ).first()
-            if not jackpot:
-                percentage = float(jackpot.percentage) or 10
-                percentage = percentage / 100
-            else:
-                percentage = 0
-
-            # 10% на джекпот и 10% на расходы
-            total_prize = total_tickets * ticket_price * (1 - percentage - 0.1)
+            # 10% на расходы
+            total_prize = total_tickets * (1 - 0.1)
 
             max_win_per_combination = float(game.max_win_amount or 100)
             num_winning_combinations = int(total_prize // max_win_per_combination)
-            actual_prize_fund = num_winning_combinations * max_win_per_combination
-            jackpot_remainder = total_prize - actual_prize_fund
-            # Сохраняем остаток в джекпот
-            if jackpot:
-                jackpot.amount += Decimal(jackpot_remainder)
-                db.add(jackpot)
 
         winners = set()
         drawn_numbers = []
