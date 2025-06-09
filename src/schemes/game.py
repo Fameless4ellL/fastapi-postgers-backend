@@ -106,6 +106,7 @@ class Tickets(BaseModel):
 
 
 class MyGame(Game):
+    game_id: int
     status: Annotated[str, AfterValidator(lambda x: x.lower())]
     image: Optional[Image] = None
     max_limit_grid: Optional[int] = None
