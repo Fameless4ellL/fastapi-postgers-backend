@@ -6,7 +6,6 @@ from eth_account import Account
 from eth_account.signers.local import LocalAccount
 from fastapi import Depends, Request, status
 from fastapi.responses import JSONResponse
-from fastapi.security import OAuth2PasswordRequestForm
 from sqlalchemy import select, or_
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -23,7 +22,7 @@ from src.schemes import (
     UserLogin,
     AccessToken
 )
-from src.utils.signature import create_access_token, verify_password, ACCESS_TOKEN_EXPIRE_MINUTES
+from src.utils.signature import create_access_token, ACCESS_TOKEN_EXPIRE_MINUTES
 
 
 @public.post(
@@ -190,51 +189,6 @@ async def login(
         "id": userdb.id,
         "username": userdb.username,
         "country": userdb.country
-    }
-
-    access_token = create_access_token(data=data)
-
-    await aredis.set(
-        f"TOKEN:USERS:{userdb.id}",
-        access_token,
-        ex=ACCESS_TOKEN_EXPIRE_MINUTES
-    )
-
-    return JSONResponse(
-        status_code=200, content={"access_token": access_token, "token_type": "bearer"}
-    )
-
-
-@public.post("/token", tags=[Action.LOGIN], include_in_schema=False)
-async def token(
-    db: Annotated[AsyncSession, Depends(get_db)],
-    form: Annotated[OAuth2PasswordRequestForm, Depends(OAuth2PasswordRequestForm)],
-):
-    if not form.username and not form.password:
-        return JSONResponse(
-            status_code=400, content={"message": "Phone number or username is required"}
-        )
-
-    userdb = await db.execute(
-        select(User).filter(
-            or_(User.phone_number == form.username, User.username == form.username)
-        )
-    )
-    userdb = userdb.scalar()
-    if not userdb:
-        return JSONResponse(
-            status_code=status.HTTP_404_NOT_FOUND, content={"message": "User not found"}
-        )
-
-    if not verify_password(form.password, userdb.password):
-        return JSONResponse(
-            status_code=400, content={"message": "Invalid phone number or password"}
-        )
-
-    data = {
-        "id": userdb.id,
-        "username": userdb.username,
-        "country": userdb.country,
     }
 
     access_token = create_access_token(data=data)

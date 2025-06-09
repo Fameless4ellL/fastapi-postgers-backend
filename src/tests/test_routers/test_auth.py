@@ -54,24 +54,6 @@ class TestAuth:
         assert response.status_code == status.HTTP_200_OK
         assert "access_token" in response.json()
 
-    async def test_token(
-        self,
-        async_api: AsyncClient,
-        user: User
-    ):
-        response = await async_api.post(
-            "/v1/token",
-            # send form data
-            data={
-                "username": user.username,
-                "password": "test_password",
-                "grant_type": "password",
-                "scope": "read write",
-            },
-        )
-        assert response.status_code == status.HTTP_200_OK
-        assert "access_token" in response.json()
-
     @pytest.mark.parametrize(
         "code_data, expected_status, expected_response",
         [

@@ -5,12 +5,13 @@ from dataclasses import dataclass
 from datetime import datetime, timedelta
 from decimal import Decimal
 from itertools import islice
-from typing import Annotated
+from typing import Annotated, Optional
 
 import pytz
 import requests
 from aiohttp import client_exceptions
 from fastapi import Depends, HTTPException, status, security, Request, Header
+from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
 from httpx import AsyncClient
 from pytz.tzinfo import DstTzInfo
 from sqlalchemy import select, exists, func
@@ -37,21 +38,6 @@ logging.basicConfig(
 )
 logger = logging.getLogger(__name__)
 
-
-oauth2_scheme = security.OAuth2PasswordBearer(tokenUrl="/v1/token")
-admin_oauth2_scheme = security.OAuth2PasswordBearer(
-    tokenUrl="/v1/token",
-    scopes={
-        Role.GLOBAL_ADMIN.value: "Global admin",
-        Role.ADMIN.value: "Admin",
-        Role.LOCAL_ADMIN.value: "Local admin",
-        Role.SUPER_ADMIN.value: "Super admin",
-        Role.FINANCIER.value: "Financier",
-        Role.SMM.value: "SMM",
-        Role.SUPPORT.value: "Support",
-    }
-)
-
 invalid_token = HTTPException(
     status_code=status.HTTP_401_UNAUTHORIZED,
     detail="Invalid token",
@@ -62,33 +48,81 @@ invalid_token = HTTPException(
 @dataclass(frozen=True)
 class Token:
     id: int
-    username: str = None
-    country: str = None
-    scopes: list[str] = None
-    exp: datetime = None
+    username: Optional[str] = None
+    country: Optional[str] = None
+    scopes: Optional[list[str]] = None
+    exp: Optional[datetime] = None
+
+
+class JWTBearer(HTTPBearer):
+    def __init__(self, auto_error: bool = True):
+        super().__init__(auto_error=auto_error)
+
+    async def __call__(self, request: Request):
+        credentials: HTTPAuthorizationCredentials = await super().__call__(request)
+        if not credentials:
+            raise HTTPException(status_code=403, detail="Invalid authorization code.")
+
+        if credentials.scheme != "Bearer":
+            raise HTTPException(status_code=403, detail="Invalid authentication scheme.")
+
+        if not await self.verify(credentials.credentials):
+            raise HTTPException(status_code=403, detail="Invalid token or expired token.")
+        return self.get_token(credentials.credentials)
+
+    @staticmethod
+    def get_token(token: str) -> Token:
+        try:
+            payload = Token(**decode_access_token(token))
+        except TypeError:
+            payload = None
+
+        return payload
+
+    async def verify(self, token: str) -> bool:
+        is_token_valid: bool = False
+
+        payload = self.get_token(token)
+        if payload:
+            is_token_valid = True
+
+        if not await aredis.exists(f"TOKEN:USERS:{payload.id}"):
+            raise invalid_token
+
+        session = await aredis.get(f"TOKEN:USERS:{payload.id}")
+
+        if token != session.decode("utf-8"):
+            raise invalid_token
+
+        return is_token_valid
+
+
+class JWTBearerAdmin(JWTBearer):
+    async def verify(self, token: str) -> bool:
+        is_token_valid: bool = False
+
+        payload = JWTBearerAdmin.get_token(token)
+        if payload:
+            is_token_valid = True
+
+        if not payload.scopes:
+            raise invalid_token
+
+        if not await aredis.exists(f"TOKEN:ADMINS:{payload.id}"):
+            raise invalid_token
+
+        session = await aredis.get(f"TOKEN:ADMINS:{payload.id}")
+
+        if token != session.decode("utf-8"):
+            raise invalid_token
+
+        return is_token_valid
 
 
 async def get_user_token(
-    token: Annotated[str, Depends(oauth2_scheme)],
+    token: Annotated[Token, Depends(JWTBearer())],
 ) -> Token:
-    payload = decode_access_token(token)
-    try:
-        _token = Token(**payload)
-    except TypeError:
-        raise invalid_token
-
-    if payload is None:
-        raise invalid_token
-
-    if not await aredis.exists(f"TOKEN:USERS:{_token.id}"):
-        raise invalid_token
-
-    session = await aredis.get(f"TOKEN:USERS:{_token.id}")
-
-    if token != session.decode("utf-8"):
-        raise invalid_token
-
-    return _token
+    return token
 
 
 async def get_user(
@@ -114,38 +148,17 @@ async def get_user(
 
 
 async def get_admin_token(
-    token: Annotated[str, Depends(admin_oauth2_scheme)],
+    token: Annotated[Token, Depends(JWTBearerAdmin())],
     security_scopes: security.SecurityScopes
 ) -> Token:
-    payload = decode_access_token(token)
-
-    try:
-        _token = Token(**payload)
-    except TypeError:
-        raise invalid_token
-
-    if payload is None:
-        raise invalid_token
-
-    if not _token.scopes:
-        raise invalid_token
-
-    for scope in _token.scopes:
+    for scope in token.scopes:
         if scope not in security_scopes.scopes:
             raise HTTPException(
                 status_code=status.HTTP_401_UNAUTHORIZED,
                 detail="Not enough permissions"
             )
 
-    if not await aredis.exists(f"TOKEN:ADMINS:{_token.id}"):
-        raise invalid_token
-
-    session = await aredis.get(f"TOKEN:ADMINS:{_token.id}")
-
-    if token != session.decode("utf-8"):
-        raise invalid_token
-
-    return _token
+    return token
 
 
 async def get_admin(
