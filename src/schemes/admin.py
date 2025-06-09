@@ -510,6 +510,7 @@ class JackpotSchema(BaseAdmin):
     country: Country
     status: Optional[GameStatus] = None
     scheduled_datetime: Optional[datetime] = None
+    fund_start: Optional[datetime] = None
     created_at: datetime
 
 
