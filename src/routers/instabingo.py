@@ -42,7 +42,8 @@ async def get_instabingo(
     Получение нужной информации для игры в инстабинго
     """
     game = db.query(InstaBingo).filter(
-        InstaBingo.country == user.country
+        InstaBingo.country == user.country,
+        InstaBingo.deleted.is_(False)
     ).first()
 
     if not game:
