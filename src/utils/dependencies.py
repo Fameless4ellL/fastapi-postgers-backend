@@ -63,7 +63,7 @@ class JWTBearer(HTTPBearer):
         if not credentials:
             raise HTTPException(status_code=403, detail="Invalid authorization code.")
 
-        if credentials.scheme != "Bearer":
+        if str(credentials.scheme).lower() != "bearer":
             raise HTTPException(status_code=403, detail="Invalid authentication scheme.")
 
         if not await self.verify(credentials.credentials):
