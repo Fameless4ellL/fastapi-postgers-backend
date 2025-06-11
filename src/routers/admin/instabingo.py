@@ -11,7 +11,7 @@ from src.models.other import InstaBingo, Ticket, Currency, Number
 from src.models.user import Role, User
 from src.routers import admin
 from src.routers.admin import get_crud_router
-from src.utils.dependencies import get_admin_token
+from src.schemes import BadResponse
 from src.schemes.admin import (
     InstaBingoFilter,
     InstaBingoSchema,
@@ -22,7 +22,7 @@ from src.schemes.admin import (
     Empty,
     Countries
 )
-from src.schemes import BadResponse
+from src.utils.dependencies import get_admin_token
 
 get_crud_router(
     model=InstaBingo,
@@ -60,7 +60,7 @@ get_crud_router(
         400: {"model": BadResponse},
     },
 )
-async def get_instabingo_defafult(
+async def get_instabingo_default(
     db: Annotated[Session, Depends(get_sync_db)],
 ):
     """

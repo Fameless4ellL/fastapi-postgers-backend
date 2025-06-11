@@ -592,12 +592,12 @@ class InstaBingoBase(BaseAdmin):
 class InstaBingoCreate(BaseAdmin):
     # currency_id: Annotated[int, AfterValidator(get_currency_by_id)]
     price: float = 1.0
-    x15: int = 1
-    x16_20: int = 1
-    x21_25: int = 1
-    x26_30: int = 1
-    x31_35: int = 1
-    x36_40: int = 1
+    x15: float = 1
+    x16_20: float = 1
+    x21_25: float = 1
+    x26_30: float = 1
+    x31_35: float = 1
+    x36_40: float = 1
     country: Optional[CountryAlpha3] = None
 
     @model_serializer
