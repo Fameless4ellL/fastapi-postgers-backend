@@ -225,12 +225,16 @@ async def withdraw(
         )
         .with_for_update()
     )
-    balance = balance_result.scalar()
+    _balance = balance_result.scalar()
     if not balance:
-        balance = Balance(user_id=user.id)
+        _balance = Balance(
+            user_id=user.id,
+            currency_id=currency.id
+        )
         db.add(balance)
+        _balance = await db.refresh(_balance)
 
-    if balance.balance < item.amount:
+    if _balance.balance < item.amount:
         return JSONResponse(
             status_code=status.HTTP_400_BAD_REQUEST,
             content="Insufficient funds"
@@ -238,19 +242,19 @@ async def withdraw(
 
     history = BalanceChangeHistory(
         user_id=user.id,
-        balance_id=balance.id,
+        balance_id=_balance.id,
         currency_id=currency.id,
         change_amount=item.amount,
         change_type="withdraw",
         status=BalanceChangeHistory.Status.PENDING,
-        previous_balance=balance.balance,
-        new_balance=balance.balance - Decimal(item.amount),
+        previous_balance=_balance.balance,
+        new_balance=_balance.balance - Decimal(item.amount),
         args=json.dumps({"address": item.address})
     )
 
     db.add(history)
-    balance.balance = history.new_balance
-    db.add(balance)
+    _balance.balance = history.new_balance
+    db.add(_balance)
 
     await db.commit()
 
