@@ -801,7 +801,7 @@ class Operation(BaseModel):
     user_id: int
     username: Optional[str] = None
     country: Country
-    amount: float
+    sum: float
     transaction_type: Optional[str] = None
     status: Annotated[
         Optional[BalanceChangeHistory.Status],
@@ -809,7 +809,7 @@ class Operation(BaseModel):
     ]
     created_at: Union[datetime, str]
     game_id: Optional[int] = None
-    count: Optional[int] = 1
+    amount: Optional[int] = 1
 
 
 class Operations(BaseModel):

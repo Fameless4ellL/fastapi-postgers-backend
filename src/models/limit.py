@@ -22,7 +22,7 @@ class LimitType(Enum):
 
 class OperationType(Enum):
     ALL = "all"
-    WITHDRAWAL = "withdraw"
+    WITHDRAWAL = "withdrawal"
     PURCHASE = "purchase"
 
 
