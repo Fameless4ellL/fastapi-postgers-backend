@@ -646,27 +646,27 @@ class InstaBingoSchema(InstaBingoBase):
         return self.winnings or {}
 
     @computed_field
-    def x15(self) -> float:
+    def x15(self) -> Union[int, float]:
         return self.get_winnings().get(15, 1)
 
     @computed_field
-    def x16_20(self) -> float:
+    def x16_20(self) -> Union[int, float]:
         return self.get_winnings().get(16, 1)
 
     @computed_field
-    def x21_25(self) -> float:
+    def x21_25(self) -> Union[int, float]:
         return self.get_winnings().get(21, 1)
 
     @computed_field
-    def x26_30(self) -> float:
+    def x26_30(self) -> Union[int, float]:
         return self.get_winnings().get(26, 1)
 
     @computed_field
-    def x31_35(self) -> float:
+    def x31_35(self) -> Union[int, float]:
         return self.get_winnings().get(31, 1)
 
     @computed_field
-    def x36_40(self) -> float:
+    def x36_40(self) -> Union[int, float]:
         return self.get_winnings().get(36, 1)
 
 
