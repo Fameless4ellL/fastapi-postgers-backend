@@ -53,7 +53,7 @@ async def get_operation_list(
     timezone: Annotated[DstTzInfo, Depends(get_timezone)],
     export: bool = False,
     offset: int = 0,
-    limit: int = 10,
+    limit: int = 12,
 ):
     """
     Get operations list
