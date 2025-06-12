@@ -640,7 +640,7 @@ class InstaBingoUpdate(InstaBingoCreate):
 
 class InstaBingoSchema(InstaBingoBase):
     id: int
-    winnings: Optional[dict[int, int]] = Field(default_factory=dict, exclude=True)
+    winnings: Optional[dict] = Field(default_factory=dict, exclude=True)
 
     def get_winnings(self):
         return self.winnings or {}
