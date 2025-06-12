@@ -106,15 +106,15 @@ class JWTBearerAdmin(JWTBearer):
             is_token_valid = True
 
         if not payload.scopes:
-            raise invalid_token
+            raise HTTPException(status_code=403, detail="NO SCOPES")
 
         if not await aredis.exists(f"TOKEN:ADMINS:{payload.id}"):
-            raise invalid_token
+            raise HTTPException(status_code=403, detail="TOKEN NOT EXISTS")
 
         session = await aredis.get(f"TOKEN:ADMINS:{payload.id}")
 
         if token != session.decode("utf-8"):
-            raise invalid_token
+            raise HTTPException(status_code=403, detail="BAD TOKEN")
 
         return is_token_valid
 
