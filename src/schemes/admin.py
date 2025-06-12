@@ -651,23 +651,23 @@ class InstaBingoSchema(InstaBingoBase):
 
     @computed_field
     def x16_20(self) -> Union[int, float]:
-        return self.get_winnings().get(str(15), 1)
+        return self.get_winnings().get(str(16), 1)
 
     @computed_field
     def x21_25(self) -> Union[int, float]:
-        return self.get_winnings().get(str(15), 1)
+        return self.get_winnings().get(str(21), 1)
 
     @computed_field
     def x26_30(self) -> Union[int, float]:
-        return self.get_winnings().get(str(15), 1)
+        return self.get_winnings().get(str(26), 1)
 
     @computed_field
     def x31_35(self) -> Union[int, float]:
-        return self.get_winnings().get(str(15), 1)
+        return self.get_winnings().get(str(31), 1)
 
     @computed_field
     def x36_40(self) -> Union[int, float]:
-        return self.get_winnings().get(str(15), 1)
+        return self.get_winnings().get(str(36), 1)
 
 
 class InstaBingos(BaseModel):
