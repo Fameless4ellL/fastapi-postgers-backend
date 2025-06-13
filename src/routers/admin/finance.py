@@ -1,7 +1,7 @@
 import csv
 import json
 from contextlib import suppress
-from datetime import datetime
+from datetime import datetime, timedelta
 from io import StringIO
 from typing import Annotated
 
@@ -89,7 +89,8 @@ async def get_operation_list(
         stmt = stmt.where(BalanceChangeHistory.created_at >= item.date_from)
 
     if item.date_to:
-        stmt = stmt.where(BalanceChangeHistory.created_at <= item.date_to)
+        to_the_end_date = datetime.combine(item.date_to, datetime.min.time()) + timedelta(hours=23, minutes=59)
+        stmt = stmt.where(BalanceChangeHistory.created_at <= to_the_end_date)
 
     count = stmt.with_only_columns(func.count())
     count = await db.execute(count)
