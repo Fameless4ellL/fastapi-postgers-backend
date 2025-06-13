@@ -830,9 +830,18 @@ class OperationOrder(MultiValueStrEnum):
     COUNTRY_ = "-country", DBUser.country.desc()
 
 
+class OperationFilterType(MultiValueStrEnum):
+    WITHDRAWAL = "withdraw", "withdraw",
+    PURCHASE = "purchase", "ticket purchase"
+    PENALTY = "penalty", "penalty"
+    DEPOSIT = "deposit", "deposit"
+    WON = "won", "won"
+
+
 @dataclass
 class OperationFilter(DatePicker, Countries, Search):
     status: Optional[list[BalanceChangeHistory.Status]] = Query(None)
+    type: Optional[list[OperationFilterType]] = Query(None)
     order_by: list[OperationOrder] = Query(default=[OperationOrder.CREATED_])
 
 

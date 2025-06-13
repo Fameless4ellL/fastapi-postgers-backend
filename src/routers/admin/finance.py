@@ -85,6 +85,9 @@ async def get_operation_list(
     if item.countries:
         stmt = stmt.where(User.country.in_(item.countries))
 
+    if item.type:
+        stmt = stmt.where(BalanceChangeHistory.change_type.in_([i.label for i in item.type]))
+
     if item.date_from:
         stmt = stmt.where(BalanceChangeHistory.created_at >= item.date_from)
 
