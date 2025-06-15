@@ -1,4 +1,5 @@
 import datetime
+import json
 import random
 from contextlib import suppress
 from decimal import Decimal, DecimalException
@@ -7,6 +8,7 @@ from fastapi import Depends, Path, status
 from fastapi.responses import JSONResponse
 from sqlalchemy import func, select
 
+from src.globals import aredis
 from src.models.db import get_db
 from src.models.log import Action
 from src.models.user import Balance, BalanceChangeHistory, User, Wallet
@@ -21,7 +23,7 @@ from src.models.other import (
     GameView,
 )
 from src.routers import public
-from src.utils.dependencies import generate_game, get_user, nth
+from src.utils.dependencies import generate_game, get_user
 from src.utils.validators import url_for
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import joinedload
@@ -274,7 +276,7 @@ async def buy_tickets(
             content=BadResponse(message="Game not found").model_dump()
         )
 
-    if any(len(n) != game.limit_by_ticket for n in item.numbers):
+    if any(len(set(n)) != game.limit_by_ticket for n in item.numbers):
         return JSONResponse(
             status_code=status.HTTP_400_BAD_REQUEST,
             content=BadResponse(
@@ -284,6 +286,15 @@ async def buy_tickets(
                 )
             ).model_dump()
         )
+
+    for numbers in item.numbers:
+        if not all(0 < i < game.max_limit_grid for i in numbers):
+            return JSONResponse(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                content=BadResponse(
+                    message="Invalid ticket numbers, need proper number based on game settings"
+                ).model_dump()
+            )
 
     jackpot_id = None
 
@@ -400,6 +411,7 @@ async def buy_tickets(
 
     db.add_all(tickets)
     await db.commit()
+    await aredis.delete(f"BUCKET:TICKETS:{user.id}")
 
     return JSONResponse(
         status_code=status.HTTP_201_CREATED,
@@ -455,13 +467,21 @@ async def gen_tickets(
             count += 1
 
     if item.mode == TicketMode.MANUAL:
-        if any(len(n) != game.limit_by_ticket for n in item.numbers):
+        if any(len(set(n)) != game.limit_by_ticket for n in item.numbers):
             return JSONResponse(
                 status_code=status.HTTP_400_BAD_REQUEST,
                 content=BadResponse(
                     message=f"Invalid ticket numbers, need {game.limit_by_ticket} per ticket"
                 ).model_dump()
             )
+        for numbers in item.numbers:
+            if not all(0 < i < game.max_limit_grid for i in numbers):
+                return JSONResponse(
+                    status_code=status.HTTP_400_BAD_REQUEST,
+                    content=BadResponse(
+                        message="Invalid ticket numbers, need proper number based on game settings"
+                    ).model_dump()
+                )
 
         tickets = [
             dict(
@@ -474,6 +494,8 @@ async def gen_tickets(
                 created=datetime.datetime.utcnow().timestamp()
             ) for i, numbers in enumerate(item.numbers)
         ]
+
+    await aredis.set(f"BUCKET:TICKETS:{user.id}", json.dumps(tickets), ex=3600*24)
 
     return JSONResponse(
         status_code=status.HTTP_200_OK,
@@ -503,33 +525,34 @@ async def edit_ticket(
             content=BadResponse(message="Game not found").model_dump()
         )
 
-    if len(item.edited_numbers) != game.limit_by_ticket:
+    if len(set(item.edited_numbers)) != game.limit_by_ticket:
         return JSONResponse(
             status_code=status.HTTP_400_BAD_REQUEST,
             content=BadResponse(
                 message=f"Invalid ticket numbers, need {game.limit_by_ticket} per ticket"
             ).model_dump()
         )
-
-    ticket = nth(item.numbers, ticket_id - 1, None)
-    if not ticket:
+    if not all(0 < i < game.max_limit_grid for i in item.edited_numbers):
         return JSONResponse(
             status_code=status.HTTP_400_BAD_REQUEST,
-            content=BadResponse(message="Ticket not found").model_dump()
+            content=BadResponse(
+                message="Invalid ticket numbers, need proper number based on game settings"
+            ).model_dump()
         )
 
-    item.numbers[ticket_id - 1] = item.edited_numbers
-    tickets = [
-        dict(
-            id=i,
-            user_id=user.id,
-            game_instance_id=game_id,
-            numbers=numbers,
-            demo=False,
-            won=False,
-            created=datetime.datetime.utcnow().timestamp()
-        ) for i, numbers in enumerate(item.numbers)
-    ]
+    tickets = await aredis.get(f"BUCKET:TICKETS:{user.id}")
+    if not tickets:
+        return JSONResponse(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            content=BadResponse(
+                message="Please generate new tickets"
+            ).model_dump()
+        )
+    tickets = json.loads(tickets.decode("utf-8"))
+
+    for _ticket in tickets:
+        if _ticket['id'] == ticket_id:
+            _ticket['numbers'] = item.edited_numbers
 
     return JSONResponse(
         status_code=status.HTTP_200_OK,
