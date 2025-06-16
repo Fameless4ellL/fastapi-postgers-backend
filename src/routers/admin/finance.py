@@ -505,7 +505,7 @@ async def block_user(
             # If the job is finished, we can skip this operation
             continue
 
-        with suppress(InvalidJobOperation):
+        with suppress(InvalidJobOperation, AttributeError):
             job.cancel()
 
         op.status = BalanceChangeHistory.Status.BLOCKED
@@ -593,7 +593,7 @@ async def block_user(
             address = args.get("address", None)
 
             if address:
-                # Create a new withdraw operation
+                # Create a new withdrawal operation
                 deposit = BalanceChangeHistory(
                     user_id=obj_id,
                     balance_id=balance.id,
@@ -659,7 +659,7 @@ async def block_operation(
             content={"message": "Operation already finished"},
         )
 
-    with suppress(InvalidJobOperation):
+    with suppress(InvalidJobOperation, AttributeError):
         job.cancel()
 
     op.status = BalanceChangeHistory.Status.BLOCKED
