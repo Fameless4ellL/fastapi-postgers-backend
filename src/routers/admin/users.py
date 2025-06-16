@@ -126,7 +126,7 @@ async def get_user(
             content={"message": "User not found"},
         )
 
-    stmt = select(func.count(Ticket.id)).filter(User.id == user_id)
+    stmt = select(func.count(Ticket.id)).filter(Ticket.user_id == user_id)
     tickets = await db.execute(stmt)
     tickets = tickets.scalar()
     winnings = await db.execute(
