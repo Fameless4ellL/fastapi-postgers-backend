@@ -288,7 +288,7 @@ async def buy_tickets(
         )
 
     for numbers in item.numbers:
-        if not all(0 < i < game.max_limit_grid for i in numbers):
+        if not all(0 < i <= game.max_limit_grid for i in numbers):
             return JSONResponse(
                 status_code=status.HTTP_400_BAD_REQUEST,
                 content=BadResponse(
@@ -475,7 +475,7 @@ async def gen_tickets(
                 ).model_dump()
             )
         for numbers in item.numbers:
-            if not all(0 < i < game.max_limit_grid for i in numbers):
+            if not all(0 < i <= game.max_limit_grid for i in numbers):
                 return JSONResponse(
                     status_code=status.HTTP_400_BAD_REQUEST,
                     content=BadResponse(
@@ -532,7 +532,7 @@ async def edit_ticket(
                 message=f"Invalid ticket numbers, need {game.limit_by_ticket} per ticket"
             ).model_dump()
         )
-    if not all(0 < i < game.max_limit_grid for i in item.edited_numbers):
+    if not all(0 < i <= game.max_limit_grid for i in item.edited_numbers):
         return JSONResponse(
             status_code=status.HTTP_400_BAD_REQUEST,
             content=BadResponse(
