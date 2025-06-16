@@ -831,7 +831,7 @@ class OperationOrder(MultiValueStrEnum):
 
 
 class OperationFilterType(MultiValueStrEnum):
-    WITHDRAWAL = "withdraw", "withdraw",
+    WITHDRAWAL = "withdraw", "withdraw"
     PURCHASE = "purchase", "ticket purchase"
     PENALTY = "penalty", "penalty"
     DEPOSIT = "deposit", "deposit"
