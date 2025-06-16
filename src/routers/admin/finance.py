@@ -502,11 +502,11 @@ async def block_user(
     for op in operations:
         job = q.fetch_job(f"{op.change_type}_{op.id}")
 
-        if job and job.is_finished:
-            # If the job is finished, we can skip this operation
-            continue
-
         with suppress(InvalidJobOperation, AttributeError):
+            if job.is_finished:
+                # If the job is finished, we can skip this operation
+                continue
+
             job.cancel()
 
         op.status = BalanceChangeHistory.Status.BLOCKED
@@ -654,13 +654,13 @@ async def block_operation(
 
     job = q.fetch_job(f"{op.change_type}_{op.id}")
 
-    if job.is_finished:
-        return JSONResponse(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            content={"message": "Operation already finished"},
-        )
-
     with suppress(InvalidJobOperation, AttributeError):
+        if job.is_finished:
+            return JSONResponse(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                content={"message": "Operation already finished"},
+            )
+
         job.cancel()
 
     op.status = BalanceChangeHistory.Status.BLOCKED
