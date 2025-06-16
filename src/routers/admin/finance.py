@@ -671,3 +671,45 @@ async def block_operation(
         status_code=status.HTTP_200_OK,
         content={"message": "Operation blocked successfully"},
     )
+
+
+@admin.post(
+    "/operation/unblock/user/{obj_id}",
+    responses={
+        400: {"model": BadResponse},
+        200: {"model": dict},
+    },
+)
+async def unblock_user(
+    db: Annotated[AsyncSession, Depends(get_db)],
+    obj_id: Annotated[int, Path(ge=1)],
+):
+    """
+    Unblock a user
+    """
+    # Fetch user and wallet details
+    user_stmt = select(User).where(User.id == obj_id)
+    user = await db.execute(user_stmt)
+    user = user.scalars().first()
+
+    if not user:
+        return JSONResponse(
+            status_code=status.HTTP_404_NOT_FOUND,
+            content={"message": "User not found"},
+        )
+
+    if not user.is_blocked:
+        return JSONResponse(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            content={"message": "User is already unblocked"},
+        )
+
+    user.is_blocked = False
+    db.add(user)
+
+    await db.commit()
+
+    return JSONResponse(
+        status_code=status.HTTP_200_OK,
+        content={"message": "User unblocked successfully"},
+    )
