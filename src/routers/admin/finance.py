@@ -2,6 +2,7 @@ import csv
 import json
 from contextlib import suppress
 from datetime import datetime, timedelta
+from decimal import Decimal
 from io import StringIO
 from typing import Annotated
 
@@ -522,7 +523,7 @@ async def block_user(
         total_operation_amount -= penalty
 
         previous_balance = balance.balance
-        balance.balance -= penalty
+        balance.balance -= Decimal(penalty)
 
         balance_change_history = BalanceChangeHistory(
             user_id=obj_id,
@@ -553,7 +554,7 @@ async def block_user(
 
         penalty = penalty_amount
         previous_balance = balance.balance
-        balance.balance -= penalty
+        balance.balance -= Decimal(penalty)
         balance_change_history = BalanceChangeHistory(
             user_id=obj_id,
             balance_id=balance.id,
