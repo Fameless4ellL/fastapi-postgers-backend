@@ -240,10 +240,12 @@ async def get_user_games(
         .group_by(Game.id, Game.name)
     )
 
-    count = await db.execute(stmt.with_only_columns(func.count()))
-    count =  count.scalar()
+    count = stmt.with_only_columns(func.count())
+    count = await db.execute(count)
+    count = count.scalar()
 
-    result = await db.execute(stmt.offset(offset).limit(limit))
+    stmt = stmt.offset(offset).limit(limit)
+    result = await db.execute(stmt)
     game_instances = result.fetchall()
 
     data = [
