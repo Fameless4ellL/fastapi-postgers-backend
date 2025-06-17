@@ -22,6 +22,7 @@ from pydantic import (
     BeforeValidator
 )
 from pydantic_extra_types.country import CountryAlpha3
+from sqlalchemy import case
 
 from settings import settings
 from src.models.limit import LimitType, Period, LimitStatus, RiskLevel, OperationType
@@ -281,9 +282,9 @@ class GameCreate(BaseAdmin):
     kind: GameView
     currency_id: Annotated[int, AfterValidator(get_currency_by_id)]
     category: Category
-    price: Decimal = Field(default=1, gt=0, lt=10**7, decimal_places=2, max_digits=7)
+    price: Decimal = Field(default=1, gt=0, lt=10 ** 7, decimal_places=2, max_digits=7)
     description: Optional[str] = Field("", max_length=500)
-    max_win_amount: Optional[Decimal] = Field(default=8, gt=0, lt=10**7, decimal_places=2, max_digits=11)
+    max_win_amount: Optional[Decimal] = Field(default=8, gt=0, lt=10 ** 7, decimal_places=2, max_digits=11)
     prize: Union[float, str] = 0
     country: Optional[CountryAlpha3] = None
     min_ticket_count: int = 1
@@ -824,8 +825,28 @@ class OperationOrder(MultiValueStrEnum):
     AMOUNT_ = "-amount", BalanceChangeHistory.change_amount.desc()
     TYPE = "change_type", BalanceChangeHistory.change_type.asc()
     TYPE_ = "-change_type", BalanceChangeHistory.change_type.desc()
-    STATUS = "status", BalanceChangeHistory.status.asc()
-    STATUS_ = "-status", BalanceChangeHistory.status.desc()
+    STATUS = "status", case(
+        {
+            BalanceChangeHistory.Status.BLOCKED.name: 1,
+            BalanceChangeHistory.Status.CANCELED.name: 2,
+            BalanceChangeHistory.Status.INSUFFICIENT_FUNDS.name: 3,
+            BalanceChangeHistory.Status.PENDING.name: 4,
+            BalanceChangeHistory.Status.SUCCESS.name: 5,
+            BalanceChangeHistory.Status.WEB3_ERROR.name: 6
+        },
+        value=BalanceChangeHistory.status
+    )
+    STATUS_ = "-status", case(
+        {
+            BalanceChangeHistory.Status.WEB3_ERROR.name: 1,
+            BalanceChangeHistory.Status.SUCCESS.name: 2,
+            BalanceChangeHistory.Status.PENDING.name: 3,
+            BalanceChangeHistory.Status.INSUFFICIENT_FUNDS.name: 4,
+            BalanceChangeHistory.Status.CANCELED.name: 5,
+            BalanceChangeHistory.Status.BLOCKED.name: 6
+        },
+        value=BalanceChangeHistory.status
+    )
     COUNTRY = "country", DBUser.country.asc()
     COUNTRY_ = "-country", DBUser.country.desc()
 

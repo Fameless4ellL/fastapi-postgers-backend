@@ -709,7 +709,52 @@ async def unblock_user(
 
     await db.commit()
 
-    return JSONResponse(
-        status_code=status.HTTP_200_OK,
-        content={"message": "User unblocked successfully"},
+    return {"message": "User unblocked successfully"}
+
+
+@admin.post(
+    "/operation/unblock/{obj_id}",
+    responses={
+        400: {"model": BadResponse},
+        200: {"model": dict},
+    },
+)
+async def unblock_operation(
+    db: Annotated[AsyncSession, Depends(get_db)],
+    obj_id: Annotated[int, Path(ge=1)],
+):
+    stmt = (
+        select(BalanceChangeHistory)
+        .where(
+            BalanceChangeHistory.id == obj_id,
+            BalanceChangeHistory.status == BalanceChangeHistory.Status.BLOCKED
+        )
     )
+    op = await db.execute(stmt)
+    op = op.scalars().first()
+
+    if not op:
+        return JSONResponse(
+            status_code=status.HTTP_404_NOT_FOUND,
+            content={"message": "BLOCKED Operation not found"},
+        )
+
+    op.status = BalanceChangeHistory.Status.PENDING
+    db.add(op)
+    await db.commit()
+
+    if op.change_type == "withdraw":
+        q.enqueue(
+            worker.withdraw,
+            job_id=f"{op.change_type}_{op.id}",
+            history_id=op.id,
+        )
+    else:
+        q.enqueue(
+            worker.deposit,
+            history_id=op.id,
+            change_type=op.change_type,
+            job_id=f"{op.change_type}_{op.id}"
+        )
+
+    return {"message": "Operation blocked successfully"}
