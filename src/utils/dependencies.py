@@ -24,6 +24,7 @@ from web3 import Web3, middleware
 
 from settings import settings
 from src.exceptions.base import UnauthorizedError
+from src.exceptions.constants.auth import PERMISSION_DENIED
 from src.globals import aredis, q
 from src.models import Limit, LimitStatus, OperationType, LimitType
 from src.models.db import get_db
@@ -152,7 +153,7 @@ async def get_user(
 
 
 class BasePermission(ABC):
-    exception = UnauthorizedError("Permission denied")
+    exception = UnauthorizedError(PERMISSION_DENIED)
 
     @abstractmethod
     async def has_permission(self, request: Request) -> bool:
@@ -225,10 +226,16 @@ class Permission(SecurityBase):
         self,
         token: Annotated[Token, Depends(JWTBearerAdmin())]
     ):
+        err = None
         for permission in self.permissions:
             cls = permission()
-            if not await cls.has_permission(token):
-                raise cls.exception
+            if await cls.has_permission(token):
+                return
+
+            err = cls.exception
+
+        if err:
+            raise err
 
 
 async def get_admin_token(
