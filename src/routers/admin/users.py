@@ -258,7 +258,7 @@ async def get_user_games(
             date = game_instance['scheduled_datetime'].rsplit("+", 1)[0]
             game_instance['scheduled_datetime'] = (
                 datetime
-                .fromisoformat(date)
+                .strptime(date, "%Y-%m-%dT%H:%M:%S.%f")
                 .strftime("%Y-%m-%d %H:%M:%S")
             )
 
