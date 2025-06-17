@@ -22,7 +22,7 @@ from pydantic import (
     BeforeValidator
 )
 from pydantic_extra_types.country import CountryAlpha3
-from sqlalchemy import case
+from sqlalchemy import case, String, cast
 
 from settings import settings
 from src.models.limit import LimitType, Period, LimitStatus, RiskLevel, OperationType
@@ -834,7 +834,7 @@ class OperationOrder(MultiValueStrEnum):
             BalanceChangeHistory.Status.SUCCESS.name: 5,
             BalanceChangeHistory.Status.WEB3_ERROR.name: 6
         },
-        value=BalanceChangeHistory.status
+        value=cast(BalanceChangeHistory.status, String)
     )
     STATUS_ = "-status", case(
         {
@@ -845,7 +845,7 @@ class OperationOrder(MultiValueStrEnum):
             BalanceChangeHistory.Status.CANCELED.name: 5,
             BalanceChangeHistory.Status.BLOCKED.name: 6
         },
-        value=BalanceChangeHistory.status
+        value=cast(BalanceChangeHistory.status, String)
     )
     COUNTRY = "country", DBUser.country.asc()
     COUNTRY_ = "-country", DBUser.country.desc()
