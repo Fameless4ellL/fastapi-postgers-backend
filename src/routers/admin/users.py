@@ -1,3 +1,4 @@
+from datetime import datetime
 from typing import Annotated, Optional
 
 from eth_account import Account
@@ -239,9 +240,10 @@ async def get_user_games(
         .join(Ticket, Ticket.game_id == Game.id)
         .filter(Ticket.user_id == user_id)
         .group_by(Game.id, Game.name)
+        .order_by(Game.created_at.desc())
     )
 
-    count = select(func.count()).select_from(stmt.subquery())
+    count = select(func.count()).select_from(stmt.order_by(None).subquery())
     count = await db.execute(count)
     count = count.scalar()
 
@@ -252,6 +254,8 @@ async def get_user_games(
     for game_instance in game_instances:
         if not game_instance['amount']:
             game_instance['amount'] = 0
+        if game_instance['scheduled_datetime']:
+            datetime.fromisoformat(game_instance['scheduled_datetime']).strftime("%Y-%m-%d %H:%M:%S")
 
     return JSONResponse(
         status_code=status.HTTP_200_OK,
