@@ -297,7 +297,7 @@ async def upload_kyc(
 
     db.add(user)
 
-    if files:
+    if not files:
         await db.execute(
             delete(Document).where(Document.user_id == user.id)
         )
