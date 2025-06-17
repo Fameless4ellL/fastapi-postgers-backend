@@ -862,6 +862,7 @@ class OperationFilterType(MultiValueStrEnum):
 
 @dataclass
 class OperationFilter(DatePicker, Countries, Search):
+    export: bool = False,
     status: Optional[list[BalanceChangeHistory.Status]] = Query(None)
     type: Optional[list[OperationFilterType]] = Query(None)
     order_by: list[OperationOrder] = Query(default=[OperationOrder.CREATED_])

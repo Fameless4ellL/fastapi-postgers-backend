@@ -38,7 +38,6 @@ async def get_operation_list(
     db: Annotated[AsyncSession, Depends(get_db)],
     item: Annotated[OperationFilter, Depends(OperationFilter)],
     timezone: Annotated[DstTzInfo, Depends(get_timezone)],
-    export: bool = False,
     offset: int = 0,
     limit: int = 12,
 ):
@@ -90,7 +89,7 @@ async def get_operation_list(
 
     stmt = stmt.order_by(*[i.label for i in item.order_by])
 
-    if export:
+    if item.export:
         result = await db.execute(stmt)
         result = result.scalars().all()
 
