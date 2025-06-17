@@ -243,9 +243,7 @@ async def get_user_games(
     result = await db.execute(stmt.offset(offset).limit(limit))
     game_instances = result.fetchall()
 
-    count = await db.execute(
-        stmt.with_only_columns(func.count(Game.id))
-    )
+    count = await db.execute(stmt.with_only_columns(func.count()))
     count = count.scalar() or 0
 
     data = [
