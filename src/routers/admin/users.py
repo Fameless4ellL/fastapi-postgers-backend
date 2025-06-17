@@ -242,7 +242,7 @@ async def get_user_games(
     )
 
     count = select(func.count()).select_from(stmt.subquery())
-    count = db.execute(count)
+    count = await db.execute(count)
     count = count.scalar()
 
     stmt = stmt.offset(offset).limit(limit)
