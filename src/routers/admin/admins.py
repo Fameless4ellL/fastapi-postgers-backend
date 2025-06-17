@@ -147,8 +147,8 @@ async def get_admin_list(
     },
 )
 async def get_admin(
-        db: Annotated[AsyncSession, Depends(get_db)],
-        admin_id: Annotated[int, Path()],
+    db: Annotated[AsyncSession, Depends(get_db)],
+    admin_id: Annotated[int, Path()],
 ):
     """
     Get all admins

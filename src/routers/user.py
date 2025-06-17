@@ -1,6 +1,6 @@
 import json
 from decimal import Decimal
-from typing import Annotated, List
+from typing import Annotated, Union
 
 import pycountry
 from eth_account import Account
@@ -272,9 +272,9 @@ async def withdraw(
 )
 async def upload_kyc(
     token: Annotated[Token, Depends(get_user_token)],
-    db: Annotated[AsyncSession, Depends(transaction_atomic)],
+    db: Annotated[AsyncSession, Depends(get_db)],
     item: Annotated[KYC, JsonForm()],
-    files: List[UploadFile],
+    files: Union[list[UploadFile], None] = None,
     avatar: Annotated[UploadFile, File(include_in_schema=False)] = None
 ):
     """
@@ -318,7 +318,7 @@ async def upload_kyc(
 
     await db.commit()
 
-    return JSONResponse(status_code=status.HTTP_200_OK, content="OK")
+    return "OK"
 
 
 @public.get(
