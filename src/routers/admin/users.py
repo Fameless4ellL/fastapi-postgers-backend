@@ -232,17 +232,17 @@ async def get_user_games(
                 "game_name", Game.name,
                 "scheduled_datetime", Game.scheduled_datetime,
                 "tickets_purchased", func.count(Ticket.id),
-                "amount", func.sum(func.coalesce(Ticket.amount, 0))
+                "amount", func.sum(func.coalesce(Ticket.amount, 0)).filter(Ticket.won.is_(True))
             ).label("items"),
         )
         .select_from(Game)
         .join(Ticket, Ticket.game_id == Game.id)
-        .filter(Ticket.user_id == user_id, Ticket.won.is_(True))
+        .filter(Ticket.user_id == user_id)
         .group_by(Game.id, Game.name)
     )
 
-    count = stmt.with_only_columns(func.count())
-    count = await db.execute(count)
+    count = select(func.count()).select_from(stmt.subquery())
+    count = db.execute(count)
     count = count.scalar()
 
     stmt = stmt.offset(offset).limit(limit)
@@ -250,9 +250,7 @@ async def get_user_games(
     game_instances = result.scalars().all()
 
     for game_instance in game_instances:
-        if game_instance['amount']:
-            game_instance['amount'] = float(game_instance['amount'])
-        else:
+        if not game_instance['amount']:
             game_instance['amount'] = 0
 
     return JSONResponse(
