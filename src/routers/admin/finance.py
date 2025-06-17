@@ -6,7 +6,7 @@ from decimal import Decimal
 from io import StringIO
 from typing import Annotated
 
-from fastapi import Depends, status, Security, Path
+from fastapi import Depends, status, Path
 from fastapi.responses import JSONResponse
 from pytz.tzinfo import DstTzInfo
 from rq.exceptions import InvalidJobOperation
@@ -19,7 +19,7 @@ from src.globals import q
 from src.models import Currency
 from src.models.db import get_db
 from src.models.limit import Limit
-from src.models.user import User, Role, BalanceChangeHistory, Balance
+from src.models.user import User, BalanceChangeHistory, Balance
 from src.routers import admin
 from src.schemes.admin import (
     Operations,
@@ -27,21 +27,11 @@ from src.schemes.admin import (
     Operation, Limits, LimitBase, LimitCreate,
 )
 from src.utils import worker
-from src.utils.dependencies import get_admin_token, get_timezone, Token
+from src.utils.dependencies import get_timezone, Token, JWTBearerAdmin
 
 
 @admin.get(
     "/operations",
-    dependencies=[Security(
-        get_admin_token,
-        scopes=[
-            Role.SUPER_ADMIN.value,
-            Role.ADMIN.value,
-            Role.GLOBAL_ADMIN.value,
-            Role.LOCAL_ADMIN.value,
-            Role.FINANCIER.value,
-            Role.SUPPORT.value
-        ])],
     responses={200: {"model": Operations}},
 )
 async def get_operation_list(
@@ -139,16 +129,6 @@ async def get_operation_list(
 
 @admin.get(
     "/operations/{obj_id}",
-    dependencies=[Security(
-        get_admin_token,
-        scopes=[
-            Role.SUPER_ADMIN.value,
-            Role.ADMIN.value,
-            Role.GLOBAL_ADMIN.value,
-            Role.LOCAL_ADMIN.value,
-            Role.FINANCIER.value,
-            Role.SUPPORT.value
-        ])],
     responses={200: {"model": Operation}},
 )
 async def get_operation(
@@ -190,16 +170,6 @@ async def get_operation(
 
 @admin.get(
     "/limits",
-    dependencies=[Security(
-        get_admin_token,
-        scopes=[
-            Role.SUPER_ADMIN.value,
-            Role.ADMIN.value,
-            Role.GLOBAL_ADMIN.value,
-            Role.LOCAL_ADMIN.value,
-            Role.FINANCIER.value,
-            Role.SUPPORT.value
-        ])],
     responses={200: {"model": Limits}},
 )
 async def get_limit_list(
@@ -249,16 +219,6 @@ async def get_limit_list(
 
 @admin.get(
     "/limits/{obj_id}",
-    dependencies=[Security(
-        get_admin_token,
-        scopes=[
-            Role.SUPER_ADMIN.value,
-            Role.ADMIN.value,
-            Role.GLOBAL_ADMIN.value,
-            Role.LOCAL_ADMIN.value,
-            Role.FINANCIER.value,
-            Role.SUPPORT.value
-        ])],
     responses={200: {"model": LimitBase}},
 )
 async def get_limit(
@@ -302,14 +262,7 @@ async def get_limit(
 )
 async def create_limit(
     db: Annotated[AsyncSession, Depends(get_db)],
-    token: Annotated[Token, Security(get_admin_token, scopes=[
-        Role.GLOBAL_ADMIN.value,
-        Role.ADMIN.value,
-        Role.SUPER_ADMIN.value,
-        Role.LOCAL_ADMIN.value,
-        Role.FINANCIER.value,
-        Role.SUPPORT.value
-    ]),],
+    token: Annotated[Token, Depends(JWTBearerAdmin())],
     item: LimitCreate
 ):
 
@@ -334,14 +287,7 @@ async def create_limit(
     responses={200: {"model": LimitBase}},
 )
 async def update_limit(
-    token: Annotated[Token, Security(get_admin_token, scopes=[
-        Role.GLOBAL_ADMIN.value,
-        Role.ADMIN.value,
-        Role.SUPER_ADMIN.value,
-        Role.LOCAL_ADMIN.value,
-        Role.FINANCIER.value,
-        Role.SUPPORT.value
-    ]),],
+    token: Annotated[Token, Depends(JWTBearerAdmin())],
     db: Annotated[AsyncSession, Depends(get_db)],
     obj_id: Annotated[int, Path(ge=1)],
     item: LimitCreate
@@ -378,14 +324,7 @@ async def update_limit(
     responses={200: {"model": LimitBase}},
 )
 async def delete_limit(
-    token: Annotated[Token, Security(get_admin_token, scopes=[
-        Role.GLOBAL_ADMIN.value,
-        Role.ADMIN.value,
-        Role.SUPER_ADMIN.value,
-        Role.LOCAL_ADMIN.value,
-        Role.FINANCIER.value,
-        Role.SUPPORT.value
-    ]),],
+    token: Annotated[Token, Depends(JWTBearerAdmin())],
     db: Annotated[AsyncSession, Depends(get_db)],
     obj_id: Annotated[int, Path(ge=1)],
 ):
@@ -419,7 +358,7 @@ async def delete_limit(
     )
 
 
-@admin.post("/operation/block/user/{obj_id}",)
+@admin.post("/operation/block/user/{obj_id}")
 async def block_user(
     db: Annotated[AsyncSession, Depends(get_db)],
     obj_id: Annotated[int, Path(ge=1)],
@@ -670,45 +609,3 @@ async def unblock_user(
     await db.commit()
 
     return {"message": "User unblocked successfully"}
-
-
-@admin.post("/operation/unblock/{obj_id}",)
-async def unblock_operation(
-    db: Annotated[AsyncSession, Depends(get_db)],
-    obj_id: Annotated[int, Path(ge=1)],
-):
-    stmt = (
-        select(BalanceChangeHistory)
-        .where(
-            BalanceChangeHistory.id == obj_id,
-            BalanceChangeHistory.status == BalanceChangeHistory.Status.BLOCKED
-        )
-    )
-    op = await db.execute(stmt)
-    op = op.scalars().first()
-
-    if not op:
-        return JSONResponse(
-            status_code=status.HTTP_404_NOT_FOUND,
-            content={"message": "BLOCKED Operation not found"},
-        )
-
-    op.status = BalanceChangeHistory.Status.PENDING
-    db.add(op)
-    await db.commit()
-
-    if op.change_type == "withdraw":
-        q.enqueue(
-            worker.withdraw,
-            job_id=f"{op.change_type}_{op.id}",
-            history_id=op.id,
-        )
-    else:
-        q.enqueue(
-            worker.deposit,
-            history_id=op.id,
-            change_type=op.change_type,
-            job_id=f"{op.change_type}_{op.id}"
-        )
-
-    return {"message": "Operation blocked successfully"}

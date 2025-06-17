@@ -191,7 +191,7 @@ async def get_admin(
 @admin.post(
     "/admins/create",
     tags=[Action.ADMIN_CREATE],
-    responses={201: {"model": Admin},},
+    responses={201: {"model": Admin}},
 )
 async def create_admin(
     db: Annotated[AsyncSession, Depends(get_db)],

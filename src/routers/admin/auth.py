@@ -1,7 +1,7 @@
 import secrets
 from typing import Annotated
 
-from fastapi import Depends, Security, background, status, Response
+from fastapi import Depends, status, Response
 from fastapi.responses import JSONResponse
 from httpx import AsyncClient
 from passlib.exc import MalformedTokenError, TokenError
@@ -14,8 +14,8 @@ from settings import settings
 from src.globals import aredis, TotpFactory, q
 from src.models.db import get_db
 from src.models.log import Action
-from src.models.user import User, Role
-from src.routers import admin
+from src.models.user import User
+from src.routers import admin, public
 from src.schemes import AccessToken
 from src.schemes.admin import (
     ResetPassword,
@@ -25,7 +25,8 @@ from src.schemes.admin import (
     VerifyLink,
 )
 from src.utils import worker
-from src.utils.dependencies import Token, get_admin_token, http_client, get_admin, get_ip
+from src.utils.dependencies import Token, http_client, get_admin, get_ip, JWTBearerAdmin, Permission, \
+    IsNotUser, IsAuthenticated
 from src.utils.signature import (
     create_access_token,
     get_password_hash,
@@ -33,10 +34,9 @@ from src.utils.signature import (
     ACCESS_TOKEN_EXPIRE_MINUTES
 )
 
-
-@admin.post(
-    "/login",
-    tags=[Action.ADMIN_LOGIN],
+@public.post(
+    "/admin/login",
+    tags=["admin", Action.ADMIN_LOGIN],
     responses={200: {"model": AccessToken}},
 )
 async def login(
@@ -89,7 +89,7 @@ async def login(
     )
 
 
-@admin.post("/reset")
+@public.post("/admin/reset", tags=["admin"])
 async def set_reset_password(
     db: Annotated[AsyncSession, Depends(get_db)],
     ip: Annotated[str, Depends(get_ip)],
@@ -142,17 +142,16 @@ async def set_reset_password(
     return "OK"
 
 
-@admin.post("/registration",)
+@public.post("/admin/registration", tags=["admin"])
 async def set_new_user_password(
     db: Annotated[AsyncSession, Depends(get_db)],
     ip: Annotated[str, Depends(get_ip)],
     item: ResetPassword,
-    bg: background.BackgroundTasks,
 ):
-    return await set_reset_password(db, ip, item, bg)
+    return await set_reset_password(db, ip, item)
 
 
-@admin.post("/reset/password")
+@public.post("/admin/reset/password", tags=["admin"])
 async def send_reset_password(
     db: Annotated[AsyncSession, Depends(get_db)],
     item: ForgotPassword,
@@ -197,15 +196,7 @@ async def send_reset_password(
     tags=[Action.ADMIN_LOGOUT],
 )
 async def logout(
-    token: Annotated[Token, Security(get_admin_token, scopes=[
-        Role.SUPER_ADMIN.value,
-        Role.ADMIN.value,
-        Role.GLOBAL_ADMIN.value,
-        Role.LOCAL_ADMIN.value,
-        Role.FINANCIER.value,
-        Role.SUPPORT.value,
-        "auth"
-    ])],
+    token: Annotated[Token, Depends(JWTBearerAdmin())],
 ):
     """
     Admin logout
@@ -215,19 +206,15 @@ async def logout(
     return JSONResponse(status_code=status.HTTP_200_OK, content="OK")
 
 
-@admin.get("/totp")
+@public.get(
+    "/admin/totp",
+    tags=["admin"],
+    dependencies=[Depends(Permission([IsNotUser, IsAuthenticated]))]
+)
 async def get_totp(
     db: Annotated[AsyncSession, Depends(get_db)],
     client: Annotated[AsyncClient, Depends(http_client)],
-    user: Annotated[User, Security(get_admin, scopes=[
-        Role.SUPER_ADMIN.value,
-        Role.ADMIN.value,
-        Role.GLOBAL_ADMIN.value,
-        Role.LOCAL_ADMIN.value,
-        Role.FINANCIER.value,
-        Role.SUPPORT.value,
-        "auth"
-    ])],
+    user: Annotated[User, Depends(get_admin)],
 ):
     """
     Get TOTP secret
@@ -268,19 +255,15 @@ async def get_totp(
     )
 
 
-@admin.post("/totp",)
+@public.post(
+    "/admin/totp",
+    tags=["admin"],
+    dependencies=[Depends(Permission([IsNotUser, IsAuthenticated]))]
+)
 async def verify_totp(
     db: Annotated[AsyncSession, Depends(get_db)],
     item: Totp,
-    user: Annotated[User, Security(get_admin, scopes=[
-        Role.SUPER_ADMIN.value,
-        Role.ADMIN.value,
-        Role.GLOBAL_ADMIN.value,
-        Role.LOCAL_ADMIN.value,
-        Role.FINANCIER.value,
-        Role.SUPPORT.value,
-        "auth"
-    ])]
+    user: Annotated[User, Depends(get_admin)],
 ):
     """
     Verify TOTP
@@ -319,7 +302,7 @@ async def verify_totp(
     return {"access_token": access_token, "token_type": "bearer"}
 
 
-@admin.post("/verify/link")
+@public.post("/admin/verify/link")
 async def verify_link(
     ip: Annotated[str, Depends(get_ip)],
     item: VerifyLink,

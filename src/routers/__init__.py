@@ -1,8 +1,9 @@
 from contextlib import asynccontextmanager
 from aiogram import Bot, Dispatcher
-from fastapi import APIRouter, HTTPException, Depends
+from fastapi import APIRouter, Depends
 from settings import settings
 from src.models.db import DBSessionMiddleware
+from src.utils.dependencies import Permission
 
 
 @asynccontextmanager
@@ -26,7 +27,7 @@ dp = Dispatcher(bot=bot)
 dp.update.outer_middleware(DBSessionMiddleware())
 
 public = APIRouter(prefix="/v1", tags=["v1"], lifespan=lifespan)
-admin = APIRouter(prefix="/v1/admin", tags=["admin"])
+admin = APIRouter(prefix="/v1/admin", tags=["admin"], dependencies=[Depends(Permission())])
 _cron = APIRouter(
     prefix="/v1/cron",
     tags=["cron"],

@@ -1,17 +1,21 @@
 import logging
 import traceback
 import uuid
+from abc import ABC, abstractmethod
 from dataclasses import dataclass
 from datetime import datetime, timedelta
 from decimal import Decimal
 from itertools import islice
 from typing import Annotated, Optional
+from typing import Type
 
 import pytz
 import requests
 from aiohttp import client_exceptions
 from fastapi import Depends, HTTPException, status, security, Request, Header
+from fastapi.openapi.models import APIKey, APIKeyIn
 from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
+from fastapi.security.base import SecurityBase
 from httpx import AsyncClient
 from pytz.tzinfo import DstTzInfo
 from sqlalchemy import select, exists, func
@@ -20,6 +24,7 @@ from sqlalchemy.orm import joinedload
 from web3 import Web3, middleware
 
 from settings import settings
+from src.exceptions.base import UnauthorizedError
 from src.globals import aredis, q
 from src.models import Limit, LimitStatus, OperationType, LimitType
 from src.models.db import get_db
@@ -147,6 +152,89 @@ async def get_user(
     return user
 
 
+class BasePermission(ABC):
+    exception = UnauthorizedError("Permission denied")
+
+    @abstractmethod
+    async def has_permission(self, request: Request) -> bool:
+        """has permission"""
+
+
+class IsAdmin(BasePermission):
+    scope = Role.ADMIN.value
+
+    async def has_permission(
+        self,
+        token: Token,
+    ) -> bool:
+        return self.scope in token.scopes
+
+
+class IsNotUser(BasePermission):
+    scope = Role.USER.value
+
+    async def has_permission(
+        self,
+        token: Token,
+    ) -> bool:
+        return self.scope not in token.scopes
+
+
+class IsSuper(IsAdmin):
+    scope = Role.SUPER_ADMIN.value
+
+
+class IsGlobal(IsAdmin):
+    scope = Role.GLOBAL_ADMIN.value
+
+
+class IsLocal(IsAdmin):
+    scope = Role.LOCAL_ADMIN.value
+
+
+class IsSmm(IsAdmin):
+    scope = Role.SMM.value
+
+
+class IsFinancier(IsAdmin):
+    scope = Role.FINANCIER.value
+
+
+class IsSupport(IsAdmin):
+    scope = Role.SUPPORT.value
+
+
+class IsAuthenticated(IsAdmin):
+    scope = "auth"
+
+
+class IsNotAuthenticated(IsNotUser):
+    scope = "auth"
+
+
+class Permission(SecurityBase):
+    def __init__(
+        self,
+        permissions: list[Type[BasePermission]] = None
+    ):
+        self.permissions = permissions
+
+        if not self.permissions:
+            self.permissions = [IsNotUser, IsNotAuthenticated]
+
+        self.model: APIKey = APIKey(**{"in": APIKeyIn.header}, name="Authorization")
+        self.scheme_name = self.__class__.__name__
+
+    async def __call__(
+        self,
+        token: Annotated[Token, Depends(JWTBearerAdmin())]
+    ):
+        for permission in self.permissions:
+            cls = permission()
+            if not await cls.has_permission(token):
+                raise cls.exception
+
+
 async def get_admin_token(
     token: Annotated[Token, Depends(JWTBearerAdmin())],
     security_scopes: security.SecurityScopes
@@ -162,7 +250,7 @@ async def get_admin_token(
 
 
 async def get_admin(
-    token: Annotated[Token, Depends(get_admin_token)],
+    token: Annotated[Token, Depends(JWTBearerAdmin())],
     db: Annotated[AsyncSession, Depends(get_db)]
 ) -> User:
     user = await db.execute(select(User).filter(
