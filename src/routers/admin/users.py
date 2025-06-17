@@ -227,16 +227,17 @@ async def get_user_games(
 
     stmt = (
         select(
-            Game.id,
-            Game.name,
-            Game.scheduled_datetime,
-            func.count(Ticket.id).label("tickets_purchased"),
-            func.sum(func.coalesce(Ticket.amount, 0))
-            .filter(Ticket.won.is_(True))
-            .label("won_amount"),
+            func.json_build_object(
+                "game_instance_id", Game.id,
+                "game_name", Game.name,
+                "scheduled_datetime", Game.scheduled_datetime,
+                "tickets_purchased", func.count(Ticket.id),
+                "amount", func.sum(func.coalesce(Ticket.amount, 0))
+            ).label("items"),
         )
+        .select_from(Game)
         .join(Ticket, Ticket.game_id == Game.id)
-        .filter(Ticket.user_id == user_id)
+        .filter(Ticket.user_id == user_id, Ticket.won.is_(True))
         .group_by(Game.id, Game.name)
     )
 
@@ -246,26 +247,17 @@ async def get_user_games(
 
     stmt = stmt.offset(offset).limit(limit)
     result = await db.execute(stmt)
-    game_instances = result.fetchall()
+    game_instances = result.scalars().all()
 
-    data = [
-        {
-            "game_instance_id": game_instance.id,
-            "game_name": game_instance.name,
-            "scheduled_datetime": (
-                game_instance.scheduled_datetime.strftime("%Y-%m-%d %H:%M:%S")
-                if game_instance.scheduled_datetime
-                else None
-            ),
-            "tickets_purchased": game_instance.tickets_purchased,
-            "amount": float(game_instance.won_amount) if game_instance.won_amount else 0,
-        }
-        for game_instance in game_instances
-    ]
+    for game_instance in game_instances:
+        if game_instance['amount']:
+            game_instance['amount'] = float(game_instance['amount'])
+        else:
+            game_instance['amount'] = 0
 
     return JSONResponse(
         status_code=status.HTTP_200_OK,
-        content=UserGames(games=data, count=count).model_dump(),
+        content=UserGames(games=game_instances, count=count).model_dump(),
     )
 
 
