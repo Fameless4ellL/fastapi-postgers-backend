@@ -1,4 +1,3 @@
-from datetime import datetime
 from typing import Annotated, Optional
 
 from eth_account import Account
@@ -231,7 +230,7 @@ async def get_user_games(
             func.json_build_object(
                 "game_instance_id", Game.id,
                 "game_name", Game.name,
-                "scheduled_datetime", Game.scheduled_datetime,
+                "scheduled_datetime", func.to_char(Game.scheduled_datetime, "YYYY-MM-DD HH24:MI:SS"),
                 "tickets_purchased", func.count(Ticket.id),
                 "amount", func.sum(func.coalesce(Ticket.amount, 0)).filter(Ticket.won.is_(True))
             ).label("items"),
@@ -254,13 +253,6 @@ async def get_user_games(
     for game_instance in game_instances:
         if not game_instance['amount']:
             game_instance['amount'] = 0
-        if game_instance['scheduled_datetime']:
-            date = game_instance['scheduled_datetime'].rsplit("+", 1)[0]
-            game_instance['scheduled_datetime'] = (
-                datetime
-                .strptime(date, "%Y-%m-%dT%H:%M:%S")
-                .strftime("%Y-%m-%d %H:%M:%S")
-            )
 
     return JSONResponse(
         status_code=status.HTTP_200_OK,
