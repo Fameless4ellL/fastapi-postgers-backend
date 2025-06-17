@@ -595,7 +595,7 @@ async def get_user_balance(
             Currency.id,
             Currency.code,
             Network.symbol,
-            func.coalesce(func.sum(Balance.balance), 0).label("balance")
+            func.round(func.coalesce(func.sum(Balance.balance), 0), 2).label("balance")
         )
         .outerjoin(Balance, and_(Balance.currency_id == Currency.id, Balance.user_id == user_id))
         .outerjoin(Network, Currency.network_id == Network.id)
