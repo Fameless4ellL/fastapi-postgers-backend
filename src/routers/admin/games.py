@@ -12,7 +12,7 @@ from src.models.other import Currency, Game, GameStatus, GameView, TicketStatus,
 from src.models.user import Role, User
 from src.routers import admin
 from src.routers.admin import get_crud_router
-from src.schemes import BadResponse, JsonForm
+from src.schemes import JsonForm
 from src.schemes.admin import (
     GameFilter,
     GameUpload,
@@ -58,10 +58,7 @@ get_crud_router(
             Role.ADMIN.value,
             Role.SUPER_ADMIN.value
         ])],
-    responses={
-        400: {"model": BadResponse},
-        200: {"description": "Success"},
-    },
+    responses={200: {"description": "Success"},},
 )
 async def delete_game(
     db: Annotated[AsyncSession, Depends(get_db)],
@@ -114,10 +111,7 @@ async def delete_game(
             Role.ADMIN.value,
             Role.SUPER_ADMIN.value
         ])],
-    responses={
-        400: {"model": BadResponse},
-        200: {"model": PurchasedTickets},
-    },
+    responses={200: {"model": PurchasedTickets}},
 )
 async def get_purchased_tickets(
     db: Annotated[AsyncSession, Depends(get_db)],
@@ -176,10 +170,7 @@ async def get_purchased_tickets(
             Role.ADMIN.value,
             Role.SUPER_ADMIN.value
         ])],
-    responses={
-        400: {"model": BadResponse},
-        200: {"model": list[Participant]},
-    },
+    responses={200: {"model": list[Participant]}},
 )
 async def get_participants(
     db: Annotated[AsyncSession, Depends(get_db)],
@@ -236,10 +227,7 @@ async def get_participants(
             Role.ADMIN.value,
             Role.SUPER_ADMIN.value
         ])],
-    responses={
-        400: {"model": BadResponse},
-        200: {"model": list[ParticipantTickets]}
-    },
+    responses={200: {"model": list[ParticipantTickets]}},
 )
 async def get_participant_tickets(
     db: Annotated[AsyncSession, Depends(get_db)],
@@ -291,10 +279,7 @@ async def get_participant_tickets(
             Role.ADMIN.value,
             Role.SUPER_ADMIN.value
         ])],
-    responses={
-        400: {"model": BadResponse},
-        200: {"model": Winners},
-    },
+    responses={200: {"model": Winners}},
 )
 async def get_winners(
     db: Annotated[AsyncSession, Depends(get_db)],
@@ -369,10 +354,7 @@ async def get_winners(
             Role.ADMIN.value,
             Role.SUPER_ADMIN.value
         ])],
-    responses={
-        400: {"model": BadResponse},
-        200: {"description": "OK"},
-    },
+    responses={200: {"description": "OK"}},
 )
 async def set_ticket_status(
     db: Annotated[orm.Session, Depends(get_sync_db)],

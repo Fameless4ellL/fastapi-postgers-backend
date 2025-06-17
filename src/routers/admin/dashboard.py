@@ -15,7 +15,6 @@ from src.models.user import Role
 from src.routers import admin
 from src.utils.dependencies import get_admin_token, Token, get_timezone
 from src.schemes.admin import DatePicker, Countries
-from src.schemes import BadResponse
 from src.utils.datastructure import MultiValueStrEnum
 
 
@@ -96,10 +95,7 @@ class UpdateMetricVisibilityRequest(BaseModel):
 
 @admin.get(
     "/dashboard",
-    responses={
-        400: {"model": BadResponse},
-        200: {"model": Dashboard},
-    },
+    responses={200: {"model": Dashboard}},
 )
 async def dashboard(
     token: Annotated[Token, Security(get_admin_token, scopes=[
@@ -218,7 +214,6 @@ async def dashboard(
 @admin.post(
     "/dashboard/metrics/visibility",
     responses={
-        400: {"model": BadResponse},
         200: {"description": "Metric visibility updated successfully"},
     },
 )
@@ -258,7 +253,4 @@ async def update_metric_visibility(
 
     await db.commit()
 
-    return JSONResponse(
-        status_code=status.HTTP_200_OK,
-        content={"message": "Metric visibility updated successfully"}
-    )
+    return {"message": "Metric visibility updated successfully"}

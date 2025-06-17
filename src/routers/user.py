@@ -27,7 +27,7 @@ from src.models.user import (
 )
 from src.routers import public
 from src.utils.dependencies import get_user, get_currency, get_user_token, worker, transaction_atomic, Token
-from src.schemes import BadResponse, Country, JsonForm, UserBalanceList
+from src.schemes import Country, JsonForm, UserBalanceList
 from src.schemes import (
     MyGames, MyGamesType, Tickets, Withdraw
 )
@@ -37,10 +37,7 @@ from src.schemes import KYC, Notifications, Profile, Usersettings, Transactions
 @public.get(
     "/profile",
     tags=["user"],
-    responses={
-        400: {"model": BadResponse},
-        200: {"model": Profile}
-    }
+    responses={200: {"model": Profile}}
 )
 async def profile(
     user: Annotated[User, Depends(get_user)],
@@ -143,7 +140,7 @@ async def profile(
 @public.get(
     "/balance",
     tags=["user"],
-    responses={400: {"model": BadResponse}, 200: {"model": UserBalanceList}}
+    responses={200: {"model": UserBalanceList}}
 )
 async def balance(
     user: Annotated[User, Depends(get_user)],
@@ -268,7 +265,7 @@ async def withdraw(
 @public.post(
     "/upload",
     tags=["user", Action.UPDATE],
-    responses={400: {"model": BadResponse}, 200: {"model": str}}
+    responses={200: {"model": str}}
 )
 async def upload_kyc(
     token: Annotated[Token, Depends(get_user_token)],
@@ -322,8 +319,9 @@ async def upload_kyc(
 
 
 @public.get(
-    "/tickets", tags=["user"],
-    responses={400: {"model": BadResponse}, 200: {"model": Tickets}}
+    "/tickets",
+    tags=["user"],
+    responses={200: {"model": Tickets}}
 )
 async def get_tickets(
     db: Annotated[AsyncSession, Depends(get_db)],
@@ -376,8 +374,9 @@ async def get_tickets(
 
 
 @public.get(
-    "/countries", tags=["settings"],
-    responses={400: {"model": BadResponse}, 200: {"model": Country}}
+    "/countries",
+    tags=["settings"],
+    responses={200: {"model": Country}}
 )
 async def get_countries(
     q: str = Query('', description="Search query")
@@ -425,11 +424,9 @@ async def get_countries(
 
 
 @public.get(
-    "/history", tags=["user"],
-    responses={
-        400: {"model": BadResponse},
-        200: {"model": Transactions}
-    }
+    "/history",
+    tags=["user"],
+    responses={200: {"model": Transactions}}
 )
 async def get_history(
     db: Annotated[AsyncSession, Depends(get_db)],
@@ -481,8 +478,9 @@ async def get_history(
 
 
 @public.get(
-    "/mygames", tags=["user"],
-    responses={400: {"model": BadResponse}, 200: {"model": MyGames}}
+    "/mygames",
+    tags=["user"],
+    responses={200: {"model": MyGames}}
 )
 async def get_my_games(
     db: Annotated[AsyncSession, Depends(get_db)],
@@ -600,8 +598,9 @@ async def get_my_games(
 
 
 @public.get(
-    "/notifications", tags=["user"],
-    responses={400: {"model": BadResponse}, 200: {"model": Notifications}}
+    "/notifications",
+    tags=["user"],
+    responses={200: {"model": Notifications}}
 )
 async def get_notifications(
     db: Annotated[AsyncSession, Depends(get_db)],
@@ -647,8 +646,8 @@ async def get_notifications(
 
 
 @public.post(
-    "/settings", tags=["user", Action.UPDATE],
-    responses={400: {"model": BadResponse}}
+    "/settings",
+    tags=["user", Action.UPDATE],
 )
 async def set_settings(
     db: Annotated[AsyncSession, Depends(transaction_atomic)],
@@ -674,8 +673,8 @@ async def set_settings(
 
 
 @public.post(
-    "/logout", tags=["user", Action.LOGOUT],
-    responses={400: {"model": BadResponse}}
+    "/logout",
+    tags=["user", Action.LOGOUT],
 )
 async def logout(
     token: Annotated[Token, Depends(get_user_token)],

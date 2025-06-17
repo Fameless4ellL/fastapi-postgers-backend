@@ -17,7 +17,6 @@ from src.models.log import Action
 from src.models.user import User, Role
 from src.routers import admin
 from src.schemes import AccessToken
-from src.schemes import BadResponse
 from src.schemes.admin import (
     ResetPassword,
     AdminLogin,
@@ -38,10 +37,7 @@ from src.utils.signature import (
 @admin.post(
     "/login",
     tags=[Action.ADMIN_LOGIN],
-    responses={
-        400: {"model": BadResponse},
-        200: {"model": AccessToken},
-    },
+    responses={200: {"model": AccessToken}},
 )
 async def login(
     db: Annotated[AsyncSession, Depends(get_db)],
@@ -93,17 +89,11 @@ async def login(
     )
 
 
-@admin.post(
-    "/reset",
-    responses={
-        400: {"model": BadResponse},
-    },
-)
+@admin.post("/reset")
 async def set_reset_password(
     db: Annotated[AsyncSession, Depends(get_db)],
     ip: Annotated[str, Depends(get_ip)],
     item: ResetPassword,
-    bg: background.BackgroundTasks,
 ):
     """
     Reset password
@@ -149,31 +139,20 @@ async def set_reset_password(
         job_id=f"reset-password-{user.id}-{secrets.token_urlsafe(16)}",
     )
 
-    return JSONResponse(status_code=status.HTTP_200_OK, content="OK", background=bg)
+    return "OK"
 
 
-@admin.post(
-    "/registration",
-    responses={
-        400: {"model": BadResponse},
-    },
-)
+@admin.post("/registration",)
 async def set_new_user_password(
     db: Annotated[AsyncSession, Depends(get_db)],
     ip: Annotated[str, Depends(get_ip)],
     item: ResetPassword,
     bg: background.BackgroundTasks,
 ):
-    response = await set_reset_password(db, ip, item, bg)
-    return response
+    return await set_reset_password(db, ip, item, bg)
 
 
-@admin.post(
-    "/reset/password",
-    responses={
-        400: {"model": BadResponse},
-    },
-)
+@admin.post("/reset/password")
 async def send_reset_password(
     db: Annotated[AsyncSession, Depends(get_db)],
     item: ForgotPassword,
@@ -216,9 +195,6 @@ async def send_reset_password(
 @admin.post(
     "/logout",
     tags=[Action.ADMIN_LOGOUT],
-    responses={
-        400: {"model": BadResponse},
-    },
 )
 async def logout(
     token: Annotated[Token, Security(get_admin_token, scopes=[
@@ -239,16 +215,11 @@ async def logout(
     return JSONResponse(status_code=status.HTTP_200_OK, content="OK")
 
 
-@admin.get(
-    "/totp",
-    responses={
-        400: {"model": BadResponse},
-    },
-)
+@admin.get("/totp")
 async def get_totp(
     db: Annotated[AsyncSession, Depends(get_db)],
     client: Annotated[AsyncClient, Depends(http_client)],
-    admin: Annotated[User, Security(get_admin, scopes=[
+    user: Annotated[User, Security(get_admin, scopes=[
         Role.SUPER_ADMIN.value,
         Role.ADMIN.value,
         Role.GLOBAL_ADMIN.value,
@@ -261,7 +232,7 @@ async def get_totp(
     """
     Get TOTP secret
     """
-    if admin.verified:
+    if user.verified:
         return JSONResponse(
             status_code=status.HTTP_400_BAD_REQUEST,
             content={"message": "TOTP already verified"}
@@ -274,7 +245,7 @@ async def get_totp(
         "https://api.qrserver.com/v1/create-qr-code/?",
         params={
             "size": "300x300",
-            "data": totp.to_uri(label=admin.username, issuer="Bingo-Admin"),
+            "data": totp.to_uri(label=user.username, issuer="Bingo-Admin"),
         },
         headers={
             "Content-Type": "application/json",
@@ -283,8 +254,8 @@ async def get_totp(
         timeout=5
     )
 
-    admin.totp = totp.to_json()
-    await db.merge(admin)
+    user.totp = totp.to_json()
+    await db.merge(user)
     await db.commit()
 
     return Response(
@@ -297,16 +268,11 @@ async def get_totp(
     )
 
 
-@admin.post(
-    "/totp",
-    responses={
-        400: {"model": BadResponse},
-    },
-)
+@admin.post("/totp",)
 async def verify_totp(
     db: Annotated[AsyncSession, Depends(get_db)],
     item: Totp,
-    admin: Annotated[User, Security(get_admin, scopes=[
+    user: Annotated[User, Security(get_admin, scopes=[
         Role.SUPER_ADMIN.value,
         Role.ADMIN.value,
         Role.GLOBAL_ADMIN.value,
@@ -320,7 +286,7 @@ async def verify_totp(
     Verify TOTP
     """
     try:
-        TotpFactory.verify(item.code, admin.totp)
+        TotpFactory.verify(item.code, user.totp)
     except MalformedTokenError as err:
         return JSONResponse(
             status_code=status.HTTP_400_BAD_REQUEST,
@@ -332,36 +298,28 @@ async def verify_totp(
             content={"message": str(err)}
         )
 
-    if not admin.verified:
-        admin.verified = True
-        await db.merge(admin)
+    if not user.verified:
+        user.verified = True
+        await db.merge(user)
         await db.commit()
 
     data = {
-        "id": admin.id,
-        "scopes": [admin.role],
+        "id": user.id,
+        "scopes": [user.role],
     }
 
     access_token = create_access_token(data=data)
 
     await aredis.set(
-        f"TOKEN:ADMINS:{admin.id}",
+        f"TOKEN:ADMINS:{user.id}",
         access_token,
         ex=ACCESS_TOKEN_EXPIRE_MINUTES
     )
 
-    return JSONResponse(
-        status_code=200,
-        content={"access_token": access_token, "token_type": "bearer"}
-    )
+    return {"access_token": access_token, "token_type": "bearer"}
 
 
-@admin.post(
-    "/verify/link",
-    responses={
-        400: {"model": BadResponse},
-    },
-)
+@admin.post("/verify/link")
 async def verify_link(
     ip: Annotated[str, Depends(get_ip)],
     item: VerifyLink,

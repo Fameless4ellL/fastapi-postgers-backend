@@ -18,7 +18,6 @@ from src.schemes.admin import (
     ReferralCreate,
     ReferralUpdate,
 )
-from src.schemes import BadResponse
 
 
 get_crud_router(
@@ -49,9 +48,6 @@ get_crud_router(
         Role.GLOBAL_ADMIN.value,
         Role.SMM.value,
     ],)],
-    responses={
-        400: {"model": BadResponse},
-    },
 )
 async def delete_referral(
     db: Annotated[AsyncSession, Depends(get_db)],
@@ -89,10 +85,7 @@ async def delete_referral(
         Role.GLOBAL_ADMIN.value,
         Role.SMM.value,
     ],)],
-    responses={
-        400: {"model": BadResponse},
-        200: {"model": ReferralUsersList},
-    },
+    responses={200: {"model": ReferralUsersList}},
 )
 async def get_referral_users(
     db: Annotated[AsyncSession, Depends(get_db)],

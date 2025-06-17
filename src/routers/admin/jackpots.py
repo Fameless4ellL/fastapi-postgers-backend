@@ -13,7 +13,7 @@ from src.models.other import GameStatus, Jackpot, Ticket, RepeatType
 from src.models.user import User, Role
 from src.routers import admin
 from src.routers.admin import get_crud_router
-from src.schemes import BadResponse, JsonForm, ErrorMessage
+from src.schemes import JsonForm
 from src.schemes.admin import (
     GameUpload,
     JackpotBase,
@@ -48,9 +48,6 @@ get_crud_router(
             Role.LOCAL_ADMIN.value,
             Role.SUPPORT.value,
         ])],
-    responses={
-        400: {"model": ErrorMessage},
-    },
 )
 async def delete_jackpot(
     db: Annotated[AsyncSession, Depends(get_db)],
@@ -97,9 +94,6 @@ async def delete_jackpot(
             Role.LOCAL_ADMIN.value,
             Role.SUPPORT.value,
         ])],
-    responses={
-        400: {"model": BadResponse},
-    },
 )
 async def get_participants(
     db: Annotated[AsyncSession, Depends(get_db)],
@@ -154,9 +148,6 @@ async def get_participants(
             Role.LOCAL_ADMIN.value,
             Role.SUPPORT.value,
         ])],
-    responses={
-        400: {"model": BadResponse},
-    },
 )
 async def get_tickets(
     db: Annotated[AsyncSession, Depends(get_db)],
@@ -210,10 +201,7 @@ async def get_tickets(
             Role.LOCAL_ADMIN.value,
             Role.SUPPORT.value,
         ])],
-    responses={
-        400: {"model": BadResponse},
-        200: {"model": JackpotWinner},
-    },
+    responses={200: {"model": JackpotWinner}},
 )
 async def get_winner(
     db: Annotated[AsyncSession, Depends(get_db)],

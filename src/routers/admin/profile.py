@@ -18,10 +18,7 @@ from src.utils.validators import url_for
 
 @admin.get(
     "/profile",
-    responses={
-        400: {"model": BadResponse},
-        200: {"model": Profile}
-    },
+    responses={200: {"model": Profile}},
 )
 async def get_profile(
     db: Annotated[AsyncSession, Depends(get_db)],

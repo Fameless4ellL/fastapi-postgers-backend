@@ -12,7 +12,7 @@ from src.models.db import get_db
 from src.models.other import Currency, Game, GameView, Network, Ticket, Jackpot, InstaBingo
 from src.models.user import Balance, User, Role, Wallet, BalanceChangeHistory, Document
 from src.routers import admin
-from src.schemes import BadResponse, Country_by_name
+from src.schemes import Country_by_name
 from src.schemes.admin import (
     BalanceBase,
     HistoryList,
@@ -29,10 +29,7 @@ from src.utils.validators import url_for
 
 @admin.get(
     "/users",
-    responses={
-        400: {"model": BadResponse},
-        200: {"model": Users},
-    },
+    responses={200: {"model": Users}},
 )
 async def get_users(
     db: Annotated[AsyncSession, Depends(get_db)],
@@ -92,10 +89,7 @@ async def get_users(
 
 @admin.get(
     "/users/{user_id}",
-    responses={
-        400: {"model": BadResponse},
-        200: {"model": UserScheme},
-    },
+    responses={200: {"model": UserScheme}},
 )
 async def get_user(
     db: Annotated[AsyncSession, Depends(get_db)],
@@ -189,10 +183,7 @@ async def get_user(
 
 @admin.get(
     "/users/{user_id}/games",
-    responses={
-        400: {"model": BadResponse},
-        200: {"model": UserGames},
-    },
+    responses={200: {"model": UserGames}},
 )
 async def get_user_games(
     db: Annotated[AsyncSession, Depends(get_db)],
@@ -269,10 +260,7 @@ async def get_user_games(
         Role.LOCAL_ADMIN.value,
         Role.FINANCIER.value,
         Role.SUPPORT.value])],
-    responses={
-        400: {"model": BadResponse},
-        200: {"model": UserTickets},
-    },
+    responses={200: {"model": UserTickets},},
 )
 async def get_user_tickets(
     db: Annotated[AsyncSession, Depends(get_db)],
@@ -339,10 +327,7 @@ async def get_user_tickets(
         Role.LOCAL_ADMIN.value,
         Role.FINANCIER.value,
         Role.SUPPORT.value])],
-    responses={
-        400: {"model": BadResponse},
-        200: {"model": UserJackpots},
-    },
+    responses={200: {"model": UserJackpots},},
 )
 async def get_user_jackpots(
     db: Annotated[AsyncSession, Depends(get_db)],
@@ -405,10 +390,7 @@ async def get_user_jackpots(
         Role.LOCAL_ADMIN.value,
         Role.FINANCIER.value,
         Role.SUPPORT.value])],
-    responses={
-        400: {"model": BadResponse},
-        200: {"model": UserTickets},
-    },
+    responses={200: {"model": UserTickets}},
 )
 async def get_user_tickets_by_jackpots(
     db: Annotated[AsyncSession, Depends(get_db)],
@@ -476,10 +458,7 @@ async def get_user_tickets_by_jackpots(
         Role.FINANCIER.value,
         Role.SUPPORT.value
     ])],
-    responses={
-        400: {"model": BadResponse},
-        200: {"model": HistoryList},
-    },
+    responses={200: {"model": HistoryList}},
 )
 async def get_user_transactions(
     db: Annotated[AsyncSession, Depends(get_db)],
@@ -526,10 +505,7 @@ async def get_user_transactions(
         Role.FINANCIER.value,
         Role.SUPPORT.value
     ])],
-    responses={
-        400: {"model": BadResponse},
-        200: {"model": WalletBase},
-    },
+    responses={200: {"model": WalletBase}},
 )
 async def get_user_wallet(
     db: Annotated[AsyncSession, Depends(get_db)],
@@ -578,10 +554,7 @@ async def get_user_wallet(
         Role.FINANCIER.value,
         Role.SUPPORT.value
     ])],
-    responses={
-        400: {"model": BadResponse},
-        200: {"model": BalanceBase},
-    },
+    responses={200: {"model": BalanceBase}},
 )
 async def get_user_balance(
     db: Annotated[AsyncSession, Depends(get_db)],
@@ -632,9 +605,6 @@ async def get_user_balance(
         Role.FINANCIER.value,
         Role.SUPPORT.value
     ])],
-    responses={
-        400: {"model": BadResponse},
-    },
 )
 async def get_user_winings(
     db: Annotated[AsyncSession, Depends(get_db)],

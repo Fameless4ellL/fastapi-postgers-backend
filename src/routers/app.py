@@ -59,8 +59,9 @@ async def tg_login(item: WidgetLogin):
 
 
 @public.get(
-    "/games", tags=["game"],
-    responses={404: {"model": BadResponse}, 200: {"model": Games}}
+    "/games",
+    tags=["game"],
+    responses={200: {"model": Games}}
 )
 async def game_instances(
     user: Annotated[User, Depends(get_user)],
@@ -138,7 +139,7 @@ async def game_instances(
 @public.get(
     "/game/{game_id}/calc",
     tags=["game"],
-    responses={404: {"model": BadResponse}, 200: {"description": "OK"}}
+    responses={200: {"description": "OK"}}
 )
 async def calc_balance(
     game_id: Annotated[int, Path()],
@@ -180,7 +181,7 @@ async def calc_balance(
 
 @public.get(
     "/game/{game_id}", tags=["game"],
-    responses={404: {"model": BadResponse}, 200: {"model": GameInstanceModel}}
+    responses={200: {"model": GameInstanceModel}}
 )
 async def read_game(
     user: Annotated[User, Depends(get_user)],
@@ -241,7 +242,7 @@ async def read_game(
     "/game/{game_id}/tickets",
     tags=["game", Action.TRANSACTION],
     # dependencies=[Depends(LimitVerifier(OperationType.PURCHASE))],
-    responses={400: {"model": BadResponse}, 201: {"description": "OK"}}
+    responses={201: {"description": "OK"}}
 )
 async def buy_tickets(
     game_id: Annotated[int, Path()],
@@ -421,7 +422,7 @@ async def buy_tickets(
 
 @public.put(
     "/game/{game_id}/tickets", tags=["game"],
-    responses={400: {"model": BadResponse}, 200: {"model": Tickets}}
+    responses={200: {"model": Tickets}}
 )
 async def gen_tickets(
     game_id: Annotated[int, Path()],
@@ -505,7 +506,7 @@ async def gen_tickets(
 
 @public.patch(
     "/game/{game_id}/tickets/{ticket_id}", tags=["game"],
-    responses={400: {"model": BadResponse}, 200: {"model": Tickets}}
+    responses={200: {"model": Tickets}}
 )
 async def edit_ticket(
     ticket_id: Annotated[int, Path()],
@@ -562,7 +563,7 @@ async def edit_ticket(
 
 @public.get(
     "/game/{game_id}/leaderboard", tags=["game"],
-    responses={400: {"model": BadResponse}, 200: {"model": Tickets}}
+    responses={200: {"model": Tickets}}
 )
 async def get_leaderboard(
     game_id: int,
@@ -606,8 +607,9 @@ async def get_leaderboard(
 
 
 @public.get(
-    "/jackpots", tags=["Jackpot"],
-    responses={400: {"model": BadResponse}, 200: {"model": JackpotModel}}
+    "/jackpots",
+    tags=["Jackpot"],
+    responses={200: {"model": JackpotModel}}
 )
 async def get_jackpots(
     user: Annotated[User, Depends(get_user)],

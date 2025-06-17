@@ -39,10 +39,7 @@ def get_crud_router(
 
     @router.get(
         f"{prefix}",
-        responses={
-            400: {"model": BadResponse},
-            200: {"model": schema}
-        },
+        responses={200: {"model": schema}},
         name=f"get_{model.__name__}_list",
         dependencies=[Security(get_admin_token, scopes=security_scopes)]
     )
@@ -155,10 +152,7 @@ def get_crud_router(
 
     @router.get(
         f"{prefix}/{{id}}",
-        responses={
-            400: {"model": BadResponse},
-            200: {"model": get_schema}
-        },
+        responses={200: {"model": get_schema}},
         name=f"get_{model.__name__}",
         dependencies=[Security(get_admin_token, scopes=security_scopes)]
     )
@@ -193,10 +187,7 @@ def get_crud_router(
     @router.post(
         f"{prefix}/create",
         tags=[Action.ADMIN_CREATE],
-        responses={
-            400: {"model": BadResponse},
-            201: {"model": get_schema}
-        },
+        responses={201: {"model": get_schema}},
         name=f"create_{model.__name__}",
     )
     async def create_item(
@@ -300,10 +291,7 @@ def get_crud_router(
     @router.put(
         f"{prefix}/{{id}}/update",
         tags=[Action.ADMIN_UPDATE],
-        responses={
-            400: {"model": BadResponse},
-            200: {"model": get_schema}
-        },
+        responses={200: {"model": get_schema}},
         name=f"update_{model.__name__}",
         dependencies=[Security(get_admin_token, scopes=security_scopes)]
     )

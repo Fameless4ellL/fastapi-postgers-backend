@@ -28,10 +28,7 @@ from src.utils.rng import get_random
 @public.get(
     "/instabingo",
     tags=["InstaBingo"],
-    responses={
-        404: {"model": BadResponse},
-        200: {"model": InstaBingoInfo}
-    },
+    responses={200: {"model": InstaBingoInfo}},
 )
 async def get_instabingo(
     user: Annotated[User, Depends(get_user)],
@@ -83,10 +80,8 @@ async def get_instabingo(
 
 
 @public.put(
-    "/instabingo/{game_id}/check", tags=["game"],
-    responses={
-        400: {"model": BadResponse},
-    }
+    "/instabingo/{game_id}/check",
+    tags=["game"],
 )
 async def instabingo_check(
     item: BuyInstaTicket,
@@ -160,7 +155,7 @@ async def instabingo_check(
     "/instabingo/tickets",
     tags=["InstaBingo", Action.TRANSACTION],
     # dependencies=[Depends(LimitVerifier(OperationType.PURCHASE))],
-    responses={400: {"model": BadResponse}, 201: {"description": "OK"}}
+    responses={201: {"description": "OK"}}
 )
 async def buy_tickets(
     item: BuyInstaTicket,

@@ -2,7 +2,7 @@ import datetime
 import json
 import logging
 import time
-from typing import AsyncIterator
+from typing import AsyncIterator, Union
 
 from fastapi import FastAPI, Request, Response
 from contextlib import asynccontextmanager, suppress
@@ -14,6 +14,7 @@ from src.models import Action, RequestLog, UserActionLog
 from src.routers import public, admin, _cron
 from src.models import get_logs_db
 from settings import settings
+from src.schemes import BadResponse, ErrorMessage
 from src.utils.signature import decode_access_token
 from src.handler import add_exception_handlers
 
@@ -36,7 +37,7 @@ async def lifespan(app: FastAPI) -> AsyncIterator[dict[str, AsyncClient]]:
         yield {"client": client}
 
 
-fastapp = FastAPI(lifespan=lifespan)
+fastapp = FastAPI(lifespan=lifespan, responses={400: {"model": Union[ErrorMessage, BadResponse]}})
 
 fastapp.include_router(public)
 fastapp.include_router(admin)

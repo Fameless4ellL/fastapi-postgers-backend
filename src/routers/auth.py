@@ -28,10 +28,7 @@ from src.utils.signature import create_access_token, ACCESS_TOKEN_EXPIRE_MINUTES
 @public.post(
     "/register",
     tags=["auth", Action.REGISTER],
-    responses={
-        400: {"model": BadResponse},
-        200: {"model": AccessToken},
-    }
+    responses={200: {"model": AccessToken}}
 )
 async def register(
     request: Request,

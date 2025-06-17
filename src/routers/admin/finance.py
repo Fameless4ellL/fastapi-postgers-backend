@@ -21,7 +21,6 @@ from src.models.db import get_db
 from src.models.limit import Limit
 from src.models.user import User, Role, BalanceChangeHistory, Balance
 from src.routers import admin
-from src.schemes import BadResponse
 from src.schemes.admin import (
     Operations,
     OperationFilter,
@@ -43,10 +42,7 @@ from src.utils.dependencies import get_admin_token, get_timezone, Token
             Role.FINANCIER.value,
             Role.SUPPORT.value
         ])],
-    responses={
-        400: {"model": BadResponse},
-        200: {"model": Operations},
-    },
+    responses={200: {"model": Operations}},
 )
 async def get_operation_list(
     db: Annotated[AsyncSession, Depends(get_db)],
@@ -153,10 +149,7 @@ async def get_operation_list(
             Role.FINANCIER.value,
             Role.SUPPORT.value
         ])],
-    responses={
-        400: {"model": BadResponse},
-        200: {"model": Operation},
-    },
+    responses={200: {"model": Operation}},
 )
 async def get_operation(
     db: Annotated[AsyncSession, Depends(get_db)],
@@ -207,10 +200,7 @@ async def get_operation(
             Role.FINANCIER.value,
             Role.SUPPORT.value
         ])],
-    responses={
-        400: {"model": BadResponse},
-        200: {"model": Limits},
-    },
+    responses={200: {"model": Limits}},
 )
 async def get_limit_list(
     db: Annotated[AsyncSession, Depends(get_db)],
@@ -269,10 +259,7 @@ async def get_limit_list(
             Role.FINANCIER.value,
             Role.SUPPORT.value
         ])],
-    responses={
-        400: {"model": BadResponse},
-        200: {"model": LimitBase},
-    },
+    responses={200: {"model": LimitBase}},
 )
 async def get_limit(
     db: Annotated[AsyncSession, Depends(get_db)],
@@ -311,10 +298,7 @@ async def get_limit(
 
 @admin.post(
     "/limit",
-    responses={
-        400: {"model": BadResponse},
-        200: {"model": LimitBase},
-    },
+    responses={200: {"model": LimitBase}},
 )
 async def create_limit(
     db: Annotated[AsyncSession, Depends(get_db)],
@@ -347,10 +331,7 @@ async def create_limit(
 
 @admin.put(
     "/limits/{obj_id}",
-    responses={
-        400: {"model": BadResponse},
-        200: {"model": LimitBase},
-    },
+    responses={200: {"model": LimitBase}},
 )
 async def update_limit(
     token: Annotated[Token, Security(get_admin_token, scopes=[
@@ -394,10 +375,7 @@ async def update_limit(
 
 @admin.delete(
     "/limits/{obj_id}",
-    responses={
-        400: {"model": BadResponse},
-        200: {"model": LimitBase},
-    },
+    responses={200: {"model": LimitBase}},
 )
 async def delete_limit(
     token: Annotated[Token, Security(get_admin_token, scopes=[
@@ -441,13 +419,7 @@ async def delete_limit(
     )
 
 
-@admin.post(
-    "/operation/block/user/{obj_id}",
-    responses={
-        400: {"model": BadResponse},
-        200: {"model": dict},
-    },
-)
+@admin.post("/operation/block/user/{obj_id}",)
 async def block_user(
     db: Annotated[AsyncSession, Depends(get_db)],
     obj_id: Annotated[int, Path(ge=1)],
@@ -625,13 +597,7 @@ async def block_user(
     )
 
 
-@admin.post(
-    "/operation/block/{obj_id}",
-    responses={
-        400: {"model": BadResponse},
-        200: {"model": dict},
-    },
-)
+@admin.post("/operation/block/{obj_id}")
 async def block_operation(
     db: Annotated[AsyncSession, Depends(get_db)],
     obj_id: Annotated[int, Path(ge=1)],
@@ -673,13 +639,7 @@ async def block_operation(
     )
 
 
-@admin.post(
-    "/operation/unblock/user/{obj_id}",
-    responses={
-        400: {"model": BadResponse},
-        200: {"model": dict},
-    },
-)
+@admin.post("/operation/unblock/user/{obj_id}")
 async def unblock_user(
     db: Annotated[AsyncSession, Depends(get_db)],
     obj_id: Annotated[int, Path(ge=1)],
@@ -712,13 +672,7 @@ async def unblock_user(
     return {"message": "User unblocked successfully"}
 
 
-@admin.post(
-    "/operation/unblock/{obj_id}",
-    responses={
-        400: {"model": BadResponse},
-        200: {"model": dict},
-    },
-)
+@admin.post("/operation/unblock/{obj_id}",)
 async def unblock_operation(
     db: Annotated[AsyncSession, Depends(get_db)],
     obj_id: Annotated[int, Path(ge=1)],

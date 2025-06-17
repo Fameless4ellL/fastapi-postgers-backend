@@ -9,7 +9,6 @@ from src.models.db import get_db
 from src.models.log import Action
 from src.models.user import Role, Kyc
 from src.routers import admin
-from src.schemes import BadResponse
 from src.schemes.admin import (
     KycBase,
     KycCreate,
@@ -31,10 +30,7 @@ from src.utils.dependencies import get_admin_token
             Role.FINANCIER.value,
             Role.SUPPORT.value
         ])],
-    responses={
-        400: {"model": BadResponse},
-        200: {"model": list[KycBase]}
-    },
+    responses={200: {"model": list[KycBase]}},
 )
 async def get_kyc_list(
     db: Annotated[AsyncSession, Depends(get_db)],
@@ -70,9 +66,6 @@ async def get_kyc_list(
             Role.FINANCIER.value,
             Role.SUPPORT.value
         ])],
-    responses={
-        400: {"model": BadResponse},
-    },
 )
 async def create_kyc_list(
     db: Annotated[AsyncSession, Depends(get_db)],
@@ -114,9 +107,6 @@ async def create_kyc_list(
             Role.FINANCIER.value,
             Role.SUPPORT.value
         ])],
-    responses={
-        400: {"model": BadResponse},
-    },
 )
 async def detele_kyc_list(
     db: Annotated[AsyncSession, Depends(get_db)],
@@ -157,9 +147,6 @@ async def detele_kyc_list(
             Role.FINANCIER.value,
             Role.SUPPORT.value
         ])],
-    responses={
-        400: {"model": BadResponse},
-    },
 )
 async def update_kyc_list(
         db: Annotated[AsyncSession, Depends(get_db)],

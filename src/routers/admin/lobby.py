@@ -5,7 +5,6 @@ from fastapi.responses import JSONResponse
 from src.models.user import Role
 from src.routers import admin
 from src.utils.dependencies import Token, get_admin_token
-from src.schemes import BadResponse
 
 
 sidebars = {
@@ -63,9 +62,6 @@ sidebars = {
 
 @admin.get(
     "/sidebar",
-    responses={
-        400: {"model": BadResponse},
-    },
 )
 async def sidebar(
     token: Annotated[Token, Security(get_admin_token, scopes=[

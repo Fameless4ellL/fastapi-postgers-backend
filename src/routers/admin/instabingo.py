@@ -56,9 +56,6 @@ get_crud_router(
             Role.FINANCIER.value,
             Role.SUPPORT.value
         ])],
-    responses={
-        400: {"model": BadResponse},
-    },
 )
 async def get_instabingo_default(
     db: Annotated[Session, Depends(get_sync_db)],
@@ -117,10 +114,7 @@ async def get_instabingo_default(
             Role.FINANCIER.value,
             Role.SUPPORT.value
         ])],
-    responses={
-        400: {"model": BadResponse},
-        200: {"model": InstaBingoList}
-    },
+    responses={200: {"model": InstaBingoList}},
 )
 async def get_instabingo_tickets_list(
     db: Annotated[AsyncSession, Depends(get_db)],
@@ -200,9 +194,6 @@ async def get_instabingo_tickets_list(
             Role.FINANCIER.value,
             Role.SUPPORT.value
         ])],
-    responses={
-        400: {"model": BadResponse},
-    },
 )
 async def get_instabingo_ticket(
     db: Annotated[AsyncSession, Depends(get_db)],
@@ -269,9 +260,6 @@ async def get_instabingo_ticket(
             Role.FINANCIER.value,
             Role.SUPPORT.value
         ])],
-    responses={
-        400: {"model": BadResponse},
-    },
 )
 async def get_generated_numbers(
     db: Annotated[AsyncSession, Depends(get_db)],
@@ -309,9 +297,6 @@ async def get_generated_numbers(
             Role.FINANCIER.value,
             Role.SUPPORT.value
         ])],
-    responses={
-        400: {"model": BadResponse},
-    },
 )
 async def set_instabingo_as_deleted(
     db: Annotated[AsyncSession, Depends(get_db)],

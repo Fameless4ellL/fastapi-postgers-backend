@@ -16,7 +16,7 @@ from src.models.other import Network, Currency
 from src.models.user import User, Role, Document
 from src.routers import admin
 from src.routers.admin import get_crud_router
-from src.schemes import BadResponse, JsonForm
+from src.schemes import JsonForm
 from src.schemes.admin import (
     Admin,
     AdminCreate,
@@ -62,10 +62,7 @@ get_crud_router(
 
 @admin.get(
     "/admins",
-    responses={
-        400: {"model": BadResponse},
-        200: {"model": Admins},
-    },
+    responses={200: {"model": Admins},},
 )
 async def get_admin_list(
     db: Annotated[AsyncSession, Depends(get_db)],
@@ -141,10 +138,7 @@ async def get_admin_list(
         Role.SUPER_ADMIN.value,
         Role.ADMIN.value,
     ])],
-    responses={
-        400: {"model": BadResponse},
-        200: {"model": Profile},
-    },
+    responses={200: {"model": Profile},},
 )
 async def get_admin(
     db: Annotated[AsyncSession, Depends(get_db)],
@@ -197,10 +191,7 @@ async def get_admin(
 @admin.post(
     "/admins/create",
     tags=[Action.ADMIN_CREATE],
-    responses={
-        400: {"model": BadResponse},
-        201: {"model": Admin},
-    },
+    responses={201: {"model": Admin},},
 )
 async def create_admin(
     db: Annotated[AsyncSession, Depends(get_db)],
@@ -308,10 +299,7 @@ async def create_admin(
         Role.SUPER_ADMIN.value,
         Role.ADMIN.value,
     ])],
-    responses={
-        400: {"model": BadResponse},
-        201: {"model": Admin},
-    },
+    responses={201: {"model": Admin},},
 )
 async def update_admin(
     db: Annotated[AsyncSession, Depends(get_db)],
@@ -393,9 +381,6 @@ async def update_admin(
 @admin.delete(
     "/admins/{admin_id}",
     tags=[Action.ADMIN_DELETE],
-    responses={
-        400: {"model": BadResponse},
-    },
 )
 async def delete_admin(
         db: Annotated[AsyncSession, Depends(get_db)],
