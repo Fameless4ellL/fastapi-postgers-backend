@@ -255,7 +255,12 @@ async def get_user_games(
         if not game_instance['amount']:
             game_instance['amount'] = 0
         if game_instance['scheduled_datetime']:
-            datetime.fromisoformat(game_instance['scheduled_datetime']).strftime("%Y-%m-%d %H:%M:%S")
+            date = game_instance['scheduled_datetime'].rsplit("+", 1)[0]
+            game_instance['scheduled_datetime'] = (
+                datetime
+                .fromisoformat(date)
+                .strftime("%Y-%m-%d %H:%M:%S")
+            )
 
     return JSONResponse(
         status_code=status.HTTP_200_OK,
