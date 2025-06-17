@@ -51,6 +51,7 @@ async def get_operation_list(
                 "id", BalanceChangeHistory.id,
                 "user_id", User.id,
                 "username", User.username,
+                "user_is_blocked", User.is_blocked,
                 "country", User.country,
                 "sum", BalanceChangeHistory.change_amount,
                 "amount", BalanceChangeHistory.count,
@@ -61,6 +62,7 @@ async def get_operation_list(
         )
         .select_from(BalanceChangeHistory)
         .join(User, User.id == BalanceChangeHistory.user_id)
+        .filter(BalanceChangeHistory.status != BalanceChangeHistory.Status.BLOCKED)
     )
 
     if item.filter:

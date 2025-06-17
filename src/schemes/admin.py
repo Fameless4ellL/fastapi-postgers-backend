@@ -801,6 +801,7 @@ class Operation(BaseModel):
     id: int
     user_id: int
     username: Optional[str] = None
+    user_is_blocked: Optional[bool] = None
     country: Country
     sum: float
     transaction_type: Optional[str] = None
