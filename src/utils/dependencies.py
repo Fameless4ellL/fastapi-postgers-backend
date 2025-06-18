@@ -1,6 +1,7 @@
 import logging
 import traceback
 import uuid
+import warnings
 from abc import ABC, abstractmethod
 from dataclasses import dataclass
 from datetime import datetime, timedelta
@@ -25,6 +26,7 @@ from settings import settings
 from src.exceptions.base import UnauthorizedError
 from src.exceptions.constants.auth import PERMISSION_DENIED, NO_SCOPE, BAD_TOKEN, TOKEN_NOT_FOUND, INVALID_AUTH, \
     INVALID_SCHEME
+from src.exceptions.user import UserExceptions
 from src.globals import aredis, q
 from src.models import Limit, LimitStatus, OperationType, LimitType
 from src.models.db import get_db
@@ -234,6 +236,14 @@ async def get_admin_token(
     token: Annotated[Token, Depends(JWTBearerAdmin())],
     security_scopes: security.SecurityScopes
 ) -> Token:
+    warnings.warn(
+        (
+            "get_admin_token() is deprecated and will be removed in a future release."
+            " Use JWTBearerAdmin() instead.",
+        ),
+        DeprecationWarning,
+        stacklevel=2
+    )
     for scope in token.scopes:
         if scope not in security_scopes.scopes:
             raise HTTPException(
@@ -253,12 +263,7 @@ async def get_admin(
         User.role != Role.USER.value
     ))
     user = user.scalar()
-
-    if user is None:
-        raise HTTPException(
-            status_code=status.HTTP_401_UNAUTHORIZED, detail="User not found"
-        )
-
+    await UserExceptions.raise_exception_user_not_found(user)
     return user
 
 

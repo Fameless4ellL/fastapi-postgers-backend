@@ -110,10 +110,7 @@ async def get_participants(
     participants = await db.execute(stmt.offset(offset).limit(limit))
     participants = participants.scalars().all()
 
-    return JSONResponse(
-        status_code=status.HTTP_200_OK,
-        content={"count": count, "data": participants}
-    )
+    return {"count": count, "data": participants}
 
 
 @admin.get("/jackpots/{obj_id}/ticket/{user_id}")
@@ -153,9 +150,7 @@ async def get_tickets(
     tickets = await db.execute(stmt.offset(offset).limit(limit))
     tickets = tickets.scalars().all()
 
-    return JSONResponse(
-        status_code=status.HTTP_200_OK, content={"count": count, "data": tickets}
-    )
+    return {"count": count, "data": tickets}
 
 
 @admin.get(
@@ -208,6 +203,4 @@ async def get_winner(
 
     data["tickets_pcs"] = tickets_pcs
 
-    return JSONResponse(
-        status_code=status.HTTP_200_OK, content=data
-    )
+    return data
