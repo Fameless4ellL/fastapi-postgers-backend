@@ -189,7 +189,7 @@ async def get_limit_list(
                 "type", func.lower(Limit.type.cast(String)),
                 "value", Limit.value,
                 "currency", Currency.code,
-                "operation_type", func.lower(Limit.operation_type.cast(String)),
+                "operation_type", Limit.operation_type,
                 "period", func.lower(Limit.period.cast(String)),
                 "kyc", Limit.kyc,
                 "status", func.lower(Limit.status.cast(String)),
@@ -212,10 +212,7 @@ async def get_limit_list(
     result = await db.execute(stmt)
     result = result.scalars().all()
 
-    return JSONResponse(
-        status_code=status.HTTP_200_OK,
-        content=Limits(items=result, count=count).model_dump(mode="json"),
-    )
+    return Limits(items=result, count=count)
 
 
 @admin.get(

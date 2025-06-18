@@ -862,7 +862,7 @@ class OperationFilterType(MultiValueStrEnum):
 
 @dataclass
 class OperationFilter(DatePicker, Countries, Search):
-    export: bool = False,
+    export: bool = False
     status: Optional[list[BalanceChangeHistory.Status]] = Query(None)
     type: Optional[list[OperationFilterType]] = Query(None)
     order_by: list[OperationOrder] = Query(default=[OperationOrder.CREATED_])
@@ -873,7 +873,10 @@ class LimitBase(BaseModel):
     type: LimitType
     value: Decimal
     currency: Optional[str] = None
-    operation_type: OperationType
+    operation_type: Annotated[
+        OperationType,
+        BeforeValidator(lambda v: getattr(OperationFilterType, v, OperationType.ALL))
+    ]
     period: Period
     kyc: Optional[bool] = False
     status: LimitStatus
