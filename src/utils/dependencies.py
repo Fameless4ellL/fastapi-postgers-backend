@@ -13,6 +13,7 @@ import pytz
 import requests
 from aiohttp import client_exceptions
 from fastapi import Depends, HTTPException, status, security, Request, Header
+from fastapi.openapi.models import APIKey, APIKeyIn
 from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
 from fastapi.security.base import SecurityBase
 from httpx import AsyncClient
@@ -221,6 +222,9 @@ class Permission(SecurityBase):
 
         if not self.permissions:
             self.permissions = [IsNotUser, IsNotAuthenticated]
+
+        self.model: APIKey = APIKey(**{"in": APIKeyIn.header}, name="Authorization")
+        self.scheme_name = self.__class__.__name__
 
     async def __call__(
         self,

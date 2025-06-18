@@ -298,20 +298,20 @@ async def upload_kyc(
         await db.execute(
             delete(Document).where(Document.user_id == user.id)
         )
+    else:
+        for file in files:
+            if not file.content_type.startswith("image"):
+                return JSONResponse(
+                    status_code=status.HTTP_400_BAD_REQUEST,
+                    content="Invalid file type"
+                )
 
-    for file in files:
-        if not file.content_type.startswith("image"):
-            return JSONResponse(
-                status_code=status.HTTP_400_BAD_REQUEST,
-                content="Invalid file type"
+            file.filename = f"{user.id}_{file.filename}"
+            doc = Document(
+                user_id=user.id,
+                file=file
             )
-
-        file.filename = f"{user.id}_{file.filename}"
-        doc = Document(
-            user_id=user.id,
-            file=file
-        )
-        db.add(doc)
+            db.add(doc)
 
     await db.commit()
 
