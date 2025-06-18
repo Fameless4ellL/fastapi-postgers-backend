@@ -1,4 +1,4 @@
-from fastapi import Depends, Path, status, Security
+from fastapi import Depends, Path, status
 from fastapi.responses import JSONResponse
 from typing import Annotated
 
@@ -7,7 +7,6 @@ from src.models.log import Action
 from src.models.user import BalanceChangeHistory, Role, ReferralLink, User
 from src.routers import admin
 from src.routers.admin import get_crud_router
-from src.utils.dependencies import get_admin_token
 from sqlalchemy.ext.asyncio import AsyncSession
 from src.models.db import get_db
 from src.schemes.admin import (
@@ -41,13 +40,6 @@ get_crud_router(
 @admin.delete(
     "/referrals/{referral_id}",
     tags=[Action.ADMIN_DELETE],
-    dependencies=[Security(get_admin_token, scopes=[
-        Role.SUPER_ADMIN.value,
-        Role.ADMIN.value,
-        Role.LOCAL_ADMIN.value,
-        Role.GLOBAL_ADMIN.value,
-        Role.SMM.value,
-    ],)],
 )
 async def delete_referral(
     db: Annotated[AsyncSession, Depends(get_db)],
@@ -78,13 +70,6 @@ async def delete_referral(
 
 @admin.get(
     "/referrals/{referral_id}/users",
-    dependencies=[Security(get_admin_token, scopes=[
-        Role.SUPER_ADMIN.value,
-        Role.ADMIN.value,
-        Role.LOCAL_ADMIN.value,
-        Role.GLOBAL_ADMIN.value,
-        Role.SMM.value,
-    ],)],
     responses={200: {"model": ReferralUsersList}},
 )
 async def get_referral_users(

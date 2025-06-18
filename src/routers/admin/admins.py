@@ -1,7 +1,7 @@
 import random
 from typing import Annotated, Union
 
-from fastapi import Depends, Path, status, Security, UploadFile
+from fastapi import Depends, Path, status, UploadFile
 from fastapi.exceptions import RequestValidationError
 from fastapi.responses import JSONResponse
 from rq import Retry
@@ -35,7 +35,15 @@ from src.schemes.admin import (
     AdminRoles
 )
 from src.utils import worker
-from src.utils.dependencies import Token, get_admin_token, is_field_unique
+from src.utils.dependencies import (
+    Token,
+    is_field_unique,
+    Permission,
+    IsSuper,
+    IsAdmin,
+    IsGlobal,
+    JWTBearerAdmin
+)
 from src.utils.validators import url_for
 
 get_crud_router(
@@ -62,19 +70,13 @@ get_crud_router(
 
 @admin.get(
     "/admins",
+    dependencies=[Depends(Permission([IsSuper, IsAdmin, IsGlobal]))],
     responses={200: {"model": Admins},},
 )
 async def get_admin_list(
     db: Annotated[AsyncSession, Depends(get_db)],
     item: Annotated[AdminFilter, Depends(AdminFilter)],
-    token: Annotated[Token, Security(
-        get_admin_token,
-        scopes=[
-            Role.SUPER_ADMIN.value,
-            Role.ADMIN.value,
-            Role.GLOBAL_ADMIN.value,
-        ]
-    )],
+    token: Annotated[Token, Depends(JWTBearerAdmin())],
     offset: int = 0,
     limit: int = 10,
 ):
@@ -134,10 +136,7 @@ async def get_admin_list(
 
 @admin.get(
     "/admins/{admin_id}",
-    dependencies=[Security(get_admin_token, scopes=[
-        Role.SUPER_ADMIN.value,
-        Role.ADMIN.value,
-    ])],
+    dependencies=[Depends(Permission([IsSuper, IsAdmin]))],
     responses={200: {"model": Profile},},
 )
 async def get_admin(
@@ -191,18 +190,12 @@ async def get_admin(
 @admin.post(
     "/admins/create",
     tags=[Action.ADMIN_CREATE],
+    dependencies=[Depends(Permission([IsSuper, IsAdmin, IsGlobal]))],
     responses={201: {"model": Admin}},
 )
 async def create_admin(
     db: Annotated[AsyncSession, Depends(get_db)],
-    token: Annotated[Token, Security(
-        get_admin_token,
-        scopes=[
-            Role.SUPER_ADMIN.value,
-            Role.ADMIN.value,
-            Role.GLOBAL_ADMIN.value,
-        ]
-    )],
+    token: Annotated[Token, Depends(JWTBearerAdmin())],
     item: Annotated[AdminCreate, JsonForm()],
     avatar: UploadFile,
     documents: list[UploadFile],
@@ -295,10 +288,7 @@ async def create_admin(
 @admin.put(
     "/admins/{admin_id}/update",
     tags=[Action.ADMIN_UPDATE],
-    dependencies=[Security(get_admin_token, scopes=[
-        Role.SUPER_ADMIN.value,
-        Role.ADMIN.value,
-    ])],
+    dependencies=[Depends(Permission([IsSuper, IsAdmin]))],
     responses={201: {"model": Admin},},
 )
 async def update_admin(
@@ -381,17 +371,12 @@ async def update_admin(
 @admin.delete(
     "/admins/{admin_id}",
     tags=[Action.ADMIN_DELETE],
+    dependencies=[Depends(Permission([IsSuper, IsAdmin]))],
 )
 async def delete_admin(
-        db: Annotated[AsyncSession, Depends(get_db)],
-        token: Annotated[Token, Security(
-            get_admin_token,
-            scopes=[
-                Role.SUPER_ADMIN.value,
-                Role.ADMIN.value,
-            ]
-        )],
-        admin_id: Annotated[int, Path()],
+    db: Annotated[AsyncSession, Depends(get_db)],
+    token: Annotated[Token, Depends(JWTBearerAdmin())],
+    admin_id: Annotated[int, Path()],
 ):
     """
     Delete admin
@@ -402,27 +387,25 @@ async def delete_admin(
             content={"message": "You can't delete yourself"},
         )
 
-    admin = await db.execute(select(User).filter(User.id == admin_id))
-    admin = admin.scalar()
+    _admin = await db.execute(select(User).filter(User.id == admin_id))
+    _admin = _admin.scalar()
 
-    if not admin:
+    if not _admin:
         return JSONResponse(
             status_code=status.HTTP_400_BAD_REQUEST,
             content={"message": "Admin not found"},
         )
 
     scope = next(iter(token.scopes), None)
-    if scope == Role.ADMIN.value and admin.role in {Role.SUPER_ADMIN.value, Role.ADMIN.value}:
+    if scope == Role.ADMIN.value and _admin.role in {Role.SUPER_ADMIN.value, Role.ADMIN.value}:
         return JSONResponse(
             status_code=status.HTTP_400_BAD_REQUEST,
             content={"message": "You can't delete this admin"},
         )
 
-    admin.active = not admin.active
-    db.add(admin)
+    _admin.active = not _admin.active
+    db.add(_admin)
     await db.commit()
-    await aredis.delete(f"TOKEN:ADMINS:{admin.id}")
+    await aredis.delete(f"TOKEN:ADMINS:{_admin.id}")
 
-    return JSONResponse(
-        status_code=status.HTTP_200_OK, content="OK"
-    )
+    return "OK"

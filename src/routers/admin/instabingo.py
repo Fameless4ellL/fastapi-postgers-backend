@@ -1,6 +1,6 @@
 from typing import Annotated
 
-from fastapi import Depends, Path, status, Security
+from fastapi import Depends, Path, status
 from fastapi.responses import JSONResponse
 from sqlalchemy import select, func, or_, String
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -22,7 +22,6 @@ from src.schemes.admin import (
     Empty,
     Countries
 )
-from src.utils.dependencies import get_admin_token
 
 get_crud_router(
     model=InstaBingo,
@@ -44,19 +43,7 @@ get_crud_router(
 )
 
 
-@admin.get(
-    "/instabingo/default",
-    dependencies=[Security(
-        get_admin_token,
-        scopes=[
-            Role.SUPER_ADMIN.value,
-            Role.ADMIN.value,
-            Role.GLOBAL_ADMIN.value,
-            Role.LOCAL_ADMIN.value,
-            Role.FINANCIER.value,
-            Role.SUPPORT.value
-        ])],
-)
+@admin.get("/instabingo/default",)
 async def get_instabingo_default(
     db: Annotated[Session, Depends(get_sync_db)],
 ):
@@ -104,16 +91,6 @@ async def get_instabingo_default(
 
 @admin.get(
     "/instabingos",
-    dependencies=[Security(
-        get_admin_token,
-        scopes=[
-            Role.SUPER_ADMIN.value,
-            Role.ADMIN.value,
-            Role.GLOBAL_ADMIN.value,
-            Role.LOCAL_ADMIN.value,
-            Role.FINANCIER.value,
-            Role.SUPPORT.value
-        ])],
     responses={200: {"model": InstaBingoList}},
 )
 async def get_instabingo_tickets_list(
@@ -182,19 +159,7 @@ async def get_instabingo_tickets_list(
     )
 
 
-@admin.get(
-    "/instabingo/{game_id}",
-    dependencies=[Security(
-        get_admin_token,
-        scopes=[
-            Role.SUPER_ADMIN.value,
-            Role.ADMIN.value,
-            Role.GLOBAL_ADMIN.value,
-            Role.LOCAL_ADMIN.value,
-            Role.FINANCIER.value,
-            Role.SUPPORT.value
-        ])],
-)
+@admin.get("/instabingo/{game_id}")
 async def get_instabingo_ticket(
     db: Annotated[AsyncSession, Depends(get_db)],
     game_id: Annotated[int, Path()],
@@ -248,19 +213,7 @@ async def get_instabingo_ticket(
     )
 
 
-@admin.get(
-    "/instabingo/{game_id}/gnumbers",
-    dependencies=[Security(
-        get_admin_token,
-        scopes=[
-            Role.SUPER_ADMIN.value,
-            Role.ADMIN.value,
-            Role.GLOBAL_ADMIN.value,
-            Role.LOCAL_ADMIN.value,
-            Role.FINANCIER.value,
-            Role.SUPPORT.value
-        ])],
-)
+@admin.get("/instabingo/{game_id}/gnumbers")
 async def get_generated_numbers(
     db: Annotated[AsyncSession, Depends(get_db)],
     game_id: Annotated[int, Path()],
@@ -285,19 +238,7 @@ async def get_generated_numbers(
     )
 
 
-@admin.delete(
-    "/bingo/{instabingo_id}",
-    dependencies=[Security(
-        get_admin_token,
-        scopes=[
-            Role.SUPER_ADMIN.value,
-            Role.ADMIN.value,
-            Role.GLOBAL_ADMIN.value,
-            Role.LOCAL_ADMIN.value,
-            Role.FINANCIER.value,
-            Role.SUPPORT.value
-        ])],
-)
+@admin.delete("/bingo/{instabingo_id}")
 async def set_instabingo_as_deleted(
     db: Annotated[AsyncSession, Depends(get_db)],
     instabingo_id: Annotated[int, Path()],

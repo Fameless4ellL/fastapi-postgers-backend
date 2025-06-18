@@ -1,6 +1,6 @@
 from typing import Annotated, Literal, Optional
 
-from fastapi import Depends, Path, Security, status, Query
+from fastapi import Depends, Path, status, Query
 from fastapi.responses import JSONResponse
 from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -10,7 +10,7 @@ from src.globals import q
 from src.models.db import get_db
 from src.models.log import Action
 from src.models.other import GameStatus, Jackpot, Ticket, RepeatType
-from src.models.user import User, Role
+from src.models.user import User
 from src.routers import admin
 from src.routers.admin import get_crud_router
 from src.schemes import JsonForm
@@ -22,7 +22,6 @@ from src.schemes.admin import (
     JackpotUpdate,
     JackpotFilter, JackpotWinner,
 )
-from src.utils.dependencies import get_admin_token
 
 get_crud_router(
     model=Jackpot,
@@ -39,15 +38,6 @@ get_crud_router(
 @admin.delete(
     "/jackpots/{game_id}",
     tags=[Action.ADMIN_DELETE],
-    dependencies=[Security(
-        get_admin_token,
-        scopes=[
-            Role.SUPER_ADMIN.value,
-            Role.GLOBAL_ADMIN.value,
-            Role.ADMIN.value,
-            Role.LOCAL_ADMIN.value,
-            Role.SUPPORT.value,
-        ])],
 )
 async def delete_jackpot(
     db: Annotated[AsyncSession, Depends(get_db)],
@@ -83,18 +73,7 @@ async def delete_jackpot(
     )
 
 
-@admin.get(
-    "/jackpots/{game_id}/participants",
-    dependencies=[Security(
-        get_admin_token,
-        scopes=[
-            Role.SUPER_ADMIN.value,
-            Role.GLOBAL_ADMIN.value,
-            Role.ADMIN.value,
-            Role.LOCAL_ADMIN.value,
-            Role.SUPPORT.value,
-        ])],
-)
+@admin.get("/jackpots/{game_id}/participants")
 async def get_participants(
     db: Annotated[AsyncSession, Depends(get_db)],
     game_id: Annotated[int, Path()],
@@ -137,18 +116,7 @@ async def get_participants(
     )
 
 
-@admin.get(
-    "/jackpots/{obj_id}/ticket/{user_id}",
-    dependencies=[Security(
-        get_admin_token,
-        scopes=[
-            Role.SUPER_ADMIN.value,
-            Role.GLOBAL_ADMIN.value,
-            Role.ADMIN.value,
-            Role.LOCAL_ADMIN.value,
-            Role.SUPPORT.value,
-        ])],
-)
+@admin.get("/jackpots/{obj_id}/ticket/{user_id}")
 async def get_tickets(
     db: Annotated[AsyncSession, Depends(get_db)],
     obj_id: Annotated[int, Path(ge=0)],
@@ -192,15 +160,6 @@ async def get_tickets(
 
 @admin.get(
     "/jackpots/{obj_id}/winner",
-    dependencies=[Security(
-        get_admin_token,
-        scopes=[
-            Role.SUPER_ADMIN.value,
-            Role.GLOBAL_ADMIN.value,
-            Role.ADMIN.value,
-            Role.LOCAL_ADMIN.value,
-            Role.SUPPORT.value,
-        ])],
     responses={200: {"model": JackpotWinner}},
 )
 async def get_winner(

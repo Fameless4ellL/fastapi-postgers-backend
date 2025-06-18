@@ -1,11 +1,10 @@
 from typing import Annotated
-from fastapi import status, Security
+from fastapi import status, Depends
 from fastapi.responses import JSONResponse
 
 from src.models.user import Role
 from src.routers import admin
-from src.utils.dependencies import Token, get_admin_token
-
+from src.utils.dependencies import Token, JWTBearerAdmin
 
 sidebars = {
     Role.SUPPORT.value: [
@@ -60,19 +59,8 @@ sidebars = {
 }
 
 
-@admin.get(
-    "/sidebar",
-)
-async def sidebar(
-    token: Annotated[Token, Security(get_admin_token, scopes=[
-        Role.GLOBAL_ADMIN.value,
-        Role.ADMIN.value,
-        Role.SUPER_ADMIN.value,
-        Role.LOCAL_ADMIN.value,
-        Role.FINANCIER.value,
-        Role.SUPPORT.value
-    ]),]
-):
+@admin.get("/sidebar")
+async def sidebar(token: Annotated[Token, Depends(JWTBearerAdmin())]):
     """
     Получение информации о боковой панели администратора
     """

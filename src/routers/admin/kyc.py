@@ -1,13 +1,13 @@
 from typing import Annotated
 
-from fastapi import Depends, status, Security
+from fastapi import Depends, status
 from fastapi.responses import JSONResponse
 from sqlalchemy import select, insert, delete
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from src.models.db import get_db
 from src.models.log import Action
-from src.models.user import Role, Kyc
+from src.models.user import Kyc
 from src.routers import admin
 from src.schemes.admin import (
     KycBase,
@@ -15,21 +15,10 @@ from src.schemes.admin import (
     KycDelete,
     KycList,
 )
-from src.utils.dependencies import get_admin_token
 
 
 @admin.get(
     "/kyc",
-    dependencies=[Security(
-        get_admin_token,
-        scopes=[
-            Role.SUPER_ADMIN.value,
-            Role.ADMIN.value,
-            Role.GLOBAL_ADMIN.value,
-            Role.LOCAL_ADMIN.value,
-            Role.FINANCIER.value,
-            Role.SUPPORT.value
-        ])],
     responses={200: {"model": list[KycBase]}},
 )
 async def get_kyc_list(
@@ -56,16 +45,6 @@ async def get_kyc_list(
 @admin.post(
     "/kyc/create",
     tags=[Action.ADMIN_CREATE],
-    dependencies=[Security(
-        get_admin_token,
-        scopes=[
-            Role.SUPER_ADMIN.value,
-            Role.ADMIN.value,
-            Role.GLOBAL_ADMIN.value,
-            Role.LOCAL_ADMIN.value,
-            Role.FINANCIER.value,
-            Role.SUPPORT.value
-        ])],
 )
 async def create_kyc_list(
     db: Annotated[AsyncSession, Depends(get_db)],
@@ -97,16 +76,6 @@ async def create_kyc_list(
 @admin.delete(
     "/kyc",
     tags=[Action.ADMIN_DELETE],
-    dependencies=[Security(
-        get_admin_token,
-        scopes=[
-            Role.SUPER_ADMIN.value,
-            Role.ADMIN.value,
-            Role.GLOBAL_ADMIN.value,
-            Role.LOCAL_ADMIN.value,
-            Role.FINANCIER.value,
-            Role.SUPPORT.value
-        ])],
 )
 async def detele_kyc_list(
     db: Annotated[AsyncSession, Depends(get_db)],
@@ -137,16 +106,6 @@ async def detele_kyc_list(
 @admin.put(
     "/kyc",
     tags=[Action.ADMIN_UPDATE],
-    dependencies=[Security(
-        get_admin_token,
-        scopes=[
-            Role.SUPER_ADMIN.value,
-            Role.ADMIN.value,
-            Role.GLOBAL_ADMIN.value,
-            Role.LOCAL_ADMIN.value,
-            Role.FINANCIER.value,
-            Role.SUPPORT.value
-        ])],
 )
 async def update_kyc_list(
         db: Annotated[AsyncSession, Depends(get_db)],

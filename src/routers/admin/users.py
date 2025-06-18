@@ -2,7 +2,7 @@ from typing import Annotated, Optional
 
 from eth_account import Account
 from eth_account.signers.local import LocalAccount
-from fastapi import Depends, Path, Query, status, Security
+from fastapi import Depends, Path, Query, status
 from fastapi.responses import JSONResponse
 from sqlalchemy import and_, func, select, or_, String
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -23,7 +23,7 @@ from src.schemes.admin import (
     UserGames,
     WalletBase,
 )
-from src.utils.dependencies import Token, get_admin_token
+from src.utils.dependencies import Token, JWTBearerAdmin
 from src.utils.validators import url_for
 
 
@@ -33,14 +33,7 @@ from src.utils.validators import url_for
 )
 async def get_users(
     db: Annotated[AsyncSession, Depends(get_db)],
-    token: Annotated[Token, Security(get_admin_token, scopes=[
-        Role.GLOBAL_ADMIN.value,
-        Role.ADMIN.value,
-        Role.SUPER_ADMIN.value,
-        Role.LOCAL_ADMIN.value,
-        Role.FINANCIER.value,
-        Role.SUPPORT.value
-    ]),],
+    token: Annotated[Token, Depends(JWTBearerAdmin())],
     query: Annotated[Optional[str], Query(...)] = None,
     countries: Optional[list[Country_by_name]] = Query(None),
     offset: int = 0,
@@ -93,14 +86,7 @@ async def get_users(
 )
 async def get_user(
     db: Annotated[AsyncSession, Depends(get_db)],
-    token: Annotated[Token, Security(get_admin_token, scopes=[
-        Role.GLOBAL_ADMIN.value,
-        Role.ADMIN.value,
-        Role.SUPER_ADMIN.value,
-        Role.LOCAL_ADMIN.value,
-        Role.FINANCIER.value,
-        Role.SUPPORT.value
-    ]),],
+    token: Annotated[Token, Depends(JWTBearerAdmin())],
     user_id: Annotated[int, Path()],
 ):
     """
@@ -187,14 +173,7 @@ async def get_user(
 )
 async def get_user_games(
     db: Annotated[AsyncSession, Depends(get_db)],
-    token: Annotated[Token, Security(get_admin_token, scopes=[
-        Role.GLOBAL_ADMIN.value,
-        Role.ADMIN.value,
-        Role.SUPER_ADMIN.value,
-        Role.LOCAL_ADMIN.value,
-        Role.FINANCIER.value,
-        Role.SUPPORT.value
-    ]),],
+    token: Annotated[Token, Depends(JWTBearerAdmin())],
     user_id: Annotated[int, Path()],
     offset: int = 0,
     limit: int = 10,
@@ -253,13 +232,6 @@ async def get_user_games(
 
 @admin.get(
     "/users/{user_id}/games/{game_id}",
-    dependencies=[Security(get_admin_token, scopes=[
-        Role.GLOBAL_ADMIN.value,
-        Role.ADMIN.value,
-        Role.SUPER_ADMIN.value,
-        Role.LOCAL_ADMIN.value,
-        Role.FINANCIER.value,
-        Role.SUPPORT.value])],
     responses={200: {"model": UserTickets},},
 )
 async def get_user_tickets(
@@ -320,13 +292,6 @@ async def get_user_tickets(
 
 @admin.get(
     "/users/{user_id}/jackpots",
-    dependencies=[Security(get_admin_token, scopes=[
-        Role.GLOBAL_ADMIN.value,
-        Role.ADMIN.value,
-        Role.SUPER_ADMIN.value,
-        Role.LOCAL_ADMIN.value,
-        Role.FINANCIER.value,
-        Role.SUPPORT.value])],
     responses={200: {"model": UserJackpots},},
 )
 async def get_user_jackpots(
@@ -383,13 +348,6 @@ async def get_user_jackpots(
 
 @admin.get(
     "/users/{user_id}/jackpots/{game_id}",
-    dependencies=[Security(get_admin_token, scopes=[
-        Role.GLOBAL_ADMIN.value,
-        Role.ADMIN.value,
-        Role.SUPER_ADMIN.value,
-        Role.LOCAL_ADMIN.value,
-        Role.FINANCIER.value,
-        Role.SUPPORT.value])],
     responses={200: {"model": UserTickets}},
 )
 async def get_user_tickets_by_jackpots(
@@ -450,14 +408,6 @@ async def get_user_tickets_by_jackpots(
 
 @admin.get(
     "/users/{user_id}/transactions",
-    dependencies=[Security(get_admin_token, scopes=[
-        Role.GLOBAL_ADMIN.value,
-        Role.ADMIN.value,
-        Role.SUPER_ADMIN.value,
-        Role.LOCAL_ADMIN.value,
-        Role.FINANCIER.value,
-        Role.SUPPORT.value
-    ])],
     responses={200: {"model": HistoryList}},
 )
 async def get_user_transactions(
@@ -497,14 +447,6 @@ async def get_user_transactions(
 
 @admin.get(
     "/users/{user_id}/wallet",
-    dependencies=[Security(get_admin_token, scopes=[
-        Role.GLOBAL_ADMIN.value,
-        Role.ADMIN.value,
-        Role.SUPER_ADMIN.value,
-        Role.LOCAL_ADMIN.value,
-        Role.FINANCIER.value,
-        Role.SUPPORT.value
-    ])],
     responses={200: {"model": WalletBase}},
 )
 async def get_user_wallet(
@@ -546,14 +488,6 @@ async def get_user_wallet(
 
 @admin.get(
     "/users/{user_id}/balance",
-    dependencies=[Security(get_admin_token, scopes=[
-        Role.GLOBAL_ADMIN.value,
-        Role.ADMIN.value,
-        Role.SUPER_ADMIN.value,
-        Role.LOCAL_ADMIN.value,
-        Role.FINANCIER.value,
-        Role.SUPPORT.value
-    ])],
     responses={200: {"model": BalanceBase}},
 )
 async def get_user_balance(
@@ -595,17 +529,7 @@ async def get_user_balance(
     )
 
 
-@admin.get(
-    "/users/{user_id}/winings",
-    dependencies=[Security(get_admin_token, scopes=[
-        Role.GLOBAL_ADMIN.value,
-        Role.ADMIN.value,
-        Role.SUPER_ADMIN.value,
-        Role.LOCAL_ADMIN.value,
-        Role.FINANCIER.value,
-        Role.SUPPORT.value
-    ])],
-)
+@admin.get("/users/{user_id}/winings")
 async def get_user_winings(
     db: Annotated[AsyncSession, Depends(get_db)],
     user_id: Annotated[int, Path()],

@@ -1,6 +1,6 @@
 from typing import Annotated, Literal
 
-from fastapi import Depends, Path, status, Security
+from fastapi import Depends, Path, status
 from fastapi.responses import JSONResponse
 from sqlalchemy import select, func, orm, exists, Text
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -25,7 +25,7 @@ from src.schemes.admin import (
     Participant,
     ParticipantTickets,
 )
-from src.utils.dependencies import get_admin_token
+from src.utils.dependencies import Permission, IsSuper, IsAdmin, IsGlobal, IsLocal
 
 get_crud_router(
     model=Game,
@@ -50,15 +50,8 @@ get_crud_router(
 @admin.delete(
     "/games/{game_id}",
     tags=[Action.ADMIN_DELETE],
-    dependencies=[Security(
-        get_admin_token,
-        scopes=[
-            Role.GLOBAL_ADMIN.value,
-            Role.LOCAL_ADMIN.value,
-            Role.ADMIN.value,
-            Role.SUPER_ADMIN.value
-        ])],
-    responses={200: {"description": "Success"},},
+    dependencies=[Depends(Permission([IsSuper, IsAdmin, IsGlobal, IsLocal]))],
+    responses={200: {"description": "Success"}},
 )
 async def delete_game(
     db: Annotated[AsyncSession, Depends(get_db)],
@@ -103,14 +96,6 @@ async def delete_game(
 
 @admin.get(
     "/games/{game_id}/purchased",
-    dependencies=[Security(
-        get_admin_token,
-        scopes=[
-            Role.GLOBAL_ADMIN.value,
-            Role.LOCAL_ADMIN.value,
-            Role.ADMIN.value,
-            Role.SUPER_ADMIN.value
-        ])],
     responses={200: {"model": PurchasedTickets}},
 )
 async def get_purchased_tickets(
@@ -162,14 +147,6 @@ async def get_purchased_tickets(
 
 @admin.get(
     "/games/{game_id}/participants",
-    dependencies=[Security(
-        get_admin_token,
-        scopes=[
-            Role.GLOBAL_ADMIN.value,
-            Role.LOCAL_ADMIN.value,
-            Role.ADMIN.value,
-            Role.SUPER_ADMIN.value
-        ])],
     responses={200: {"model": list[Participant]}},
 )
 async def get_participants(
@@ -219,14 +196,6 @@ async def get_participants(
 
 @admin.get(
     "/games/{game_id}/participants/{user_id}",
-    dependencies=[Security(
-        get_admin_token,
-        scopes=[
-            Role.GLOBAL_ADMIN.value,
-            Role.LOCAL_ADMIN.value,
-            Role.ADMIN.value,
-            Role.SUPER_ADMIN.value
-        ])],
     responses={200: {"model": list[ParticipantTickets]}},
 )
 async def get_participant_tickets(
@@ -271,14 +240,6 @@ async def get_participant_tickets(
 
 @admin.get(
     "/games/{game_id}/winners",
-    dependencies=[Security(
-        get_admin_token,
-        scopes=[
-            Role.GLOBAL_ADMIN.value,
-            Role.LOCAL_ADMIN.value,
-            Role.ADMIN.value,
-            Role.SUPER_ADMIN.value
-        ])],
     responses={200: {"model": Winners}},
 )
 async def get_winners(
@@ -346,14 +307,6 @@ async def get_winners(
 @admin.put(
     "/games/{game_id}/winners/{ticket_id}",
     tags=[Action.ADMIN_UPDATE],
-    dependencies=[Security(
-        get_admin_token,
-        scopes=[
-            Role.GLOBAL_ADMIN.value,
-            Role.LOCAL_ADMIN.value,
-            Role.ADMIN.value,
-            Role.SUPER_ADMIN.value
-        ])],
     responses={200: {"description": "OK"}},
 )
 async def set_ticket_status(

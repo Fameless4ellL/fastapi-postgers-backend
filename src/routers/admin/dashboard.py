@@ -3,7 +3,7 @@ from datetime import timedelta
 from operator import methodcaller
 from typing import Annotated, Union, Literal, Optional
 
-from fastapi import status, Security, Depends
+from fastapi import status, Depends
 from fastapi.responses import JSONResponse
 from pydantic import BaseModel, Field
 from pytz.tzinfo import DstTzInfo
@@ -11,9 +11,8 @@ from sqlalchemy import select, func
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from src.models import get_logs_db, Metric, HiddenMetric, get_db, User
-from src.models.user import Role
 from src.routers import admin
-from src.utils.dependencies import get_admin_token, Token, get_timezone
+from src.utils.dependencies import Token, get_timezone, JWTBearerAdmin
 from src.schemes.admin import DatePicker, Countries
 from src.utils.datastructure import MultiValueStrEnum
 
@@ -98,14 +97,7 @@ class UpdateMetricVisibilityRequest(BaseModel):
     responses={200: {"model": Dashboard}},
 )
 async def dashboard(
-    token: Annotated[Token, Security(get_admin_token, scopes=[
-        Role.GLOBAL_ADMIN.value,
-        Role.ADMIN.value,
-        Role.SUPER_ADMIN.value,
-        Role.LOCAL_ADMIN.value,
-        Role.FINANCIER.value,
-        Role.SUPPORT.value
-    ]),],
+    token: Annotated[Token, Depends(JWTBearerAdmin())],
     timezone: Annotated[DstTzInfo, Depends(get_timezone)],
     _db: Annotated[AsyncSession, Depends(get_db)],
     db: Annotated[AsyncSession, Depends(get_logs_db)],
@@ -218,12 +210,7 @@ async def dashboard(
     },
 )
 async def update_metric_visibility(
-    token: Annotated[Token, Security(get_admin_token, scopes=[
-        Role.GLOBAL_ADMIN.value,
-        Role.ADMIN.value,
-        Role.SUPER_ADMIN.value,
-        Role.LOCAL_ADMIN.value,
-    ])],
+    token: Annotated[Token, Depends(JWTBearerAdmin())],
     db: Annotated[AsyncSession, Depends(get_logs_db)],
     request: UpdateMetricVisibilityRequest,
 ):

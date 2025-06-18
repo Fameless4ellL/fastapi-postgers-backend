@@ -13,9 +13,7 @@ import pytz
 import requests
 from aiohttp import client_exceptions
 from fastapi import Depends, HTTPException, status, security, Request, Header
-from fastapi.openapi.models import APIKey, APIKeyIn
 from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
-from fastapi.security.base import SecurityBase
 from httpx import AsyncClient
 from pytz.tzinfo import DstTzInfo
 from sqlalchemy import select, exists, func
@@ -25,7 +23,8 @@ from web3 import Web3, middleware
 
 from settings import settings
 from src.exceptions.base import UnauthorizedError
-from src.exceptions.constants.auth import PERMISSION_DENIED
+from src.exceptions.constants.auth import PERMISSION_DENIED, NO_SCOPE, BAD_TOKEN, TOKEN_NOT_FOUND, INVALID_AUTH, \
+    INVALID_SCHEME
 from src.globals import aredis, q
 from src.models import Limit, LimitStatus, OperationType, LimitType
 from src.models.db import get_db
@@ -44,12 +43,6 @@ logging.basicConfig(
 )
 logger = logging.getLogger(__name__)
 
-invalid_token = HTTPException(
-    status_code=status.HTTP_401_UNAUTHORIZED,
-    detail="Invalid token",
-    headers={"WWW-Authenticate": "Bearer"},
-)
-
 
 @dataclass(frozen=True)
 class Token:
@@ -61,20 +54,20 @@ class Token:
 
 
 class JWTBearer(HTTPBearer):
+    redis_key: str = "TOKEN:USERS:{id}"
+
     def __init__(self, auto_error: bool = True):
         super().__init__(auto_error=auto_error)
 
     async def __call__(self, request: Request):
         credentials: HTTPAuthorizationCredentials = await super().__call__(request)
         if not credentials:
-            raise HTTPException(status_code=403, detail="Invalid authorization code.")
+            raise UnauthorizedError(INVALID_AUTH)
 
         if str(credentials.scheme).lower() != "bearer":
-            raise HTTPException(status_code=403, detail="Invalid authentication scheme.")
+            raise UnauthorizedError(INVALID_SCHEME)
 
-        if not await self.verify(credentials.credentials):
-            raise HTTPException(status_code=403, detail="Invalid token or expired token.")
-        return self.get_token(credentials.credentials)
+        return await self.verify(credentials.credentials)
 
     @staticmethod
     def get_token(token: str) -> Token:
@@ -85,44 +78,46 @@ class JWTBearer(HTTPBearer):
 
         return payload
 
-    async def verify(self, token: str) -> bool:
-        is_token_valid: bool = False
+    async def verify(self, token: str) -> Token:
+        """
+        Verifies the validity of a session token using Redis.
 
+        This method checks whether a given token exists and matches the expected value
+        stored in Redis for the user's session. If the token is missing or invalid,
+        it raises an UnauthorizedError.
+
+        Args:
+            token (str): The JWT or session token to be validated.
+
+        Returns:
+            Token: The decoded token payload object upon successful validation.
+
+        Raises:
+            UnauthorizedError: If the token is not found or does not match the session in Redis.
+        """
         payload = self.get_token(token)
-        if payload:
-            is_token_valid = True
 
-        if not await aredis.exists(f"TOKEN:USERS:{payload.id}"):
-            raise invalid_token
+        if not await aredis.exists(self.redis_key.format(id=payload.id)):
+            raise UnauthorizedError(TOKEN_NOT_FOUND)
 
-        session = await aredis.get(f"TOKEN:USERS:{payload.id}")
+        session = await aredis.get(self.redis_key.format(id=payload.id))
 
         if token != session.decode("utf-8"):
-            raise invalid_token
+            raise UnauthorizedError(BAD_TOKEN)
 
-        return is_token_valid
+        return payload
 
 
 class JWTBearerAdmin(JWTBearer):
-    async def verify(self, token: str) -> bool:
-        is_token_valid: bool = False
+    redis_key: str = "TOKEN:ADMINS:{id}"
 
-        payload = JWTBearerAdmin.get_token(token)
-        if payload:
-            is_token_valid = True
+    async def verify(self, token: str) -> Token:
+        payload = await super().verify(token)
 
         if not payload.scopes:
-            raise HTTPException(status_code=403, detail="NO SCOPES")
+            raise UnauthorizedError(NO_SCOPE)
 
-        if not await aredis.exists(f"TOKEN:ADMINS:{payload.id}"):
-            raise HTTPException(status_code=403, detail="TOKEN NOT EXISTS")
-
-        session = await aredis.get(f"TOKEN:ADMINS:{payload.id}")
-
-        if token != session.decode("utf-8"):
-            raise HTTPException(status_code=403, detail="BAD TOKEN")
-
-        return is_token_valid
+        return payload
 
 
 async def get_user_token(
@@ -213,23 +208,20 @@ class IsNotAuthenticated(IsNotUser):
     scope = "auth"
 
 
-class Permission(SecurityBase):
+class Permission(JWTBearerAdmin):
     def __init__(
         self,
         permissions: list[Type[BasePermission]] = None
     ):
+        super().__init__()
         self.permissions = permissions
 
         if not self.permissions:
             self.permissions = [IsNotUser, IsNotAuthenticated]
 
-        self.model: APIKey = APIKey(**{"in": APIKeyIn.header}, name="Authorization")
-        self.scheme_name = self.__class__.__name__
+    async def __call__(self, request: Request):
+        token = await super().__call__(request)
 
-    async def __call__(
-        self,
-        token: Annotated[Token, Depends(JWTBearerAdmin())]
-    ):
         err = None
         for permission in self.permissions:
             cls = permission()
@@ -240,6 +232,8 @@ class Permission(SecurityBase):
 
         if err:
             raise err
+
+        return token
 
 
 async def get_admin_token(
