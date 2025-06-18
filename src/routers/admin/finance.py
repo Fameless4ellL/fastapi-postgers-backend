@@ -431,7 +431,7 @@ async def block_user(
         # вычитая сумму штрафа из суммы транзакции(ий),
         # ставших причиной блокировки.
 
-        penalty = total_operation_amount - penalty_amount
+        penalty = total_operation_amount - Decimal(penalty_amount)
         total_operation_amount -= penalty
 
         previous_balance = balance.balance
