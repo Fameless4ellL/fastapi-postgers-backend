@@ -120,14 +120,8 @@ class JWTBearerAdmin(JWTBearer):
         return payload
 
 
-async def get_user_token(
-    token: Annotated[Token, Depends(JWTBearer())],
-) -> Token:
-    return token
-
-
 async def get_user(
-    token: Annotated[Token, Depends(get_user_token)],
+    token: Annotated[Token, Depends(JWTBearer())],
     db: Annotated[AsyncSession, Depends(get_db)]
 ) -> User:
     user = await db.execute(

@@ -570,10 +570,7 @@ async def block_operation(
     db.add(op)
     await db.commit()
 
-    return JSONResponse(
-        status_code=status.HTTP_200_OK,
-        content={"message": "Operation blocked successfully"},
-    )
+    return {"message": "Operation blocked successfully"}
 
 
 @admin.post("/operation/unblock/user/{obj_id}")

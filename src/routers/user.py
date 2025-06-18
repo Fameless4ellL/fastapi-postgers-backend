@@ -26,7 +26,7 @@ from src.models.user import (
     Document
 )
 from src.routers import public
-from src.utils.dependencies import get_user, get_currency, get_user_token, worker, transaction_atomic, Token
+from src.utils.dependencies import get_user, get_currency, worker, transaction_atomic, Token, JWTBearer
 from src.schemes import Country, JsonForm, UserBalanceList
 from src.schemes import (
     MyGames, MyGamesType, Tickets, Withdraw
@@ -268,7 +268,7 @@ async def withdraw(
     responses={200: {"model": str}}
 )
 async def upload_kyc(
-    token: Annotated[Token, Depends(get_user_token)],
+    token: Annotated[Token, Depends(JWTBearer())],
     db: Annotated[AsyncSession, Depends(get_db)],
     item: Annotated[KYC, JsonForm()],
     files: Union[list[UploadFile], None] = None,
@@ -598,7 +598,7 @@ async def get_my_games(
 )
 async def get_notifications(
     db: Annotated[AsyncSession, Depends(get_db)],
-    user: Annotated[User, Depends(get_user_token)],
+    token: Annotated[Token, Depends(JWTBearer())],
     skip: int = 0,
     limit: int = 10,
 ):
@@ -616,10 +616,10 @@ async def get_notifications(
             )
         )
         .select_from(Notification)
-        .filter(Notification.user_id == user.id)
+        .filter(Notification.user_id == token.id)
         .order_by(Notification.created_at.desc())
     )
-    count_stmt = select(func.count(Notification.id)).filter(Notification.user_id == user.id)
+    count_stmt = select(func.count(Notification.id)).filter(Notification.user_id == token.id)
     count_result = await db.execute(count_stmt)
     count = count_result.scalar()
 
@@ -628,7 +628,7 @@ async def get_notifications(
 
     await db.execute(
         update(Notification)
-        .where(Notification.user_id == user.id)
+        .where(Notification.user_id == token.id)
         .values(read=True)
     )
     await db.commit()
@@ -645,7 +645,7 @@ async def get_notifications(
 )
 async def set_settings(
     db: Annotated[AsyncSession, Depends(transaction_atomic)],
-    token: Annotated[Token, Depends(get_user_token)],
+    token: Annotated[Token, Depends(JWTBearer())],
     item: Usersettings,
 ):
     """
@@ -671,7 +671,7 @@ async def set_settings(
     tags=["user", Action.LOGOUT],
 )
 async def logout(
-    token: Annotated[Token, Depends(get_user_token)],
+    token: Annotated[Token, Depends(JWTBearer())],
 ):
     """
     Удаление токена из дб
