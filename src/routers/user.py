@@ -302,11 +302,16 @@ async def upload_kyc(
         for file in files:
             if not file.content_type:
                 extension = file.filename.split(".")[-1]
-                if extension not in {"heic", "pdf"}:
+                if extension not in {"heic"}:
                     return JSONResponse(
                         status_code=status.HTTP_400_BAD_REQUEST,
                         content="Invalid file type"
                     )
+            elif not file.content_type.startswith("application/pdf"):
+                return JSONResponse(
+                    status_code=status.HTTP_400_BAD_REQUEST,
+                    content="Invalid file type"
+                )
             else:
                 if not file.content_type.startswith("image"):
                     return JSONResponse(
