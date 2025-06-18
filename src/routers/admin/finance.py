@@ -194,14 +194,14 @@ async def get_limit_list(
                 "kyc", Limit.kyc,
                 "status", func.lower(Limit.status.cast(String)),
                 "risk", func.lower(Limit.risk.cast(String)),
-                "is_deleted", Limit.is_deleted,
                 "created_at", Limit.created_at,
                 "updated_at", Limit.updated_at,
-                "last_edited", Limit.last_edited,
+                "last_editer", Limit.last_edited,
             )
         )
         .select_from(Limit)
         .join(Currency, Currency.id == Limit.currency_id)
+        .filter(Limit.is_deleted.is_(False))
     )
     count = stmt.with_only_columns(func.count())
     count = await db.execute(count)
@@ -236,14 +236,14 @@ async def get_limit(
                 "status", func.lower(Limit.status.cast(String)),
                 "risk", func.lower(Limit.risk.cast(String)),
                 "created_at", Limit.created_at,
-                "is_deleted", Limit.is_deleted,
                 "updated_at", Limit.updated_at,
-                "last_edited", Limit.last_edited,
+                "last_editer", Limit.last_edited,
             )
         )
         .select_from(Limit)
         .join(Currency, Currency.id == Limit.currency_id)
-        .where(Limit.id == obj_id)
+        .filter(Limit.id == obj_id)
+        .filter(Limit.is_deleted.is_(False))
     )
     result = await db.execute(stmt)
     result = result.scalars().first()

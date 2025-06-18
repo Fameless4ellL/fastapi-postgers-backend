@@ -881,10 +881,9 @@ class LimitBase(BaseModel):
     kyc: Optional[bool] = False
     status: LimitStatus
     risk: Optional[RiskLevel] = None
-    is_deleted: Optional[bool] = False
     created_at: datetime
     updated_at: datetime
-    last_edited: Optional[int] = None
+    last_editer: Optional[int] = None
 
 
 class Limits(BaseModel):
