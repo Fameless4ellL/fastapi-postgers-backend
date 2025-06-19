@@ -2,13 +2,13 @@ import json
 from decimal import Decimal
 
 import pycountry
-from typing import Annotated, Optional
+from typing import Annotated, Optional, Union
 from pydantic import BaseModel, computed_field, AfterValidator, Field
 from pydantic_extra_types.country import CountryAlpha3
 from pydantic_extra_types.language_code import LanguageAlpha2
 
 from src.models import BalanceChangeHistory
-from src.utils.validators import url_for
+from src.utils.validators import url_for, url_for_encoded
 
 
 class UserBalance(BaseModel):
@@ -40,11 +40,20 @@ class Address(BaseModel):
 
 class Docs(BaseModel):
     id: Optional[int] = None
-    file: Annotated[
-        Optional[str],
-        AfterValidator(lambda x: url_for("static/kyc", path=x) if x is not None else None)
-    ] = None
+    filename: Optional[str] = None
     created_at: Optional[float] = None
+
+    @computed_field
+    def data(self) -> Union[str, None]:
+        if self.filename is not None:
+            return url_for_encoded("static/kyc", path=self.filename)
+        return
+
+    @computed_field
+    def file(self) -> Union[str, None]:
+        if self.filename is not None:
+            return url_for("static/kyc", path=self.filename)
+        return
 
 
 class KYCProfile(KYC):

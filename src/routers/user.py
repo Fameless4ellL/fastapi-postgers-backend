@@ -28,7 +28,7 @@ from src.models.user import (
 from src.routers import public
 from src.utils import worker
 from src.utils.dependencies import get_user, get_currency, Token, JWTBearer
-from src.schemes import Country, JsonForm, UserBalanceList
+from src.schemes import Country, JsonForm, UserBalanceList, KYCProfile
 from src.schemes import (
     MyGames, MyGamesType, Tickets, Withdraw
 )
@@ -135,6 +135,37 @@ async def profile(
     return JSONResponse(
         status_code=status.HTTP_200_OK,
         content=data.model_dump()
+    )
+
+
+@public.get(
+    "/kyc",
+    tags=["user"],
+    response_model=KYCProfile
+)
+async def get_kyc(
+    user: Annotated[User, Depends(get_user)],
+    db: Annotated[AsyncSession, Depends(get_db)],
+):
+    stmt = (
+        select(
+            func.json_build_object(
+                "id", Document.id,
+                "filename", Document.file,
+                "created_at", func.date_part('epoch', Document.created_at)
+            )
+        )
+        .select_from(Document)
+        .filter(Document.user_id == user.id)
+    )
+    data = await db.execute(stmt)
+    data = data.scalars().all()
+
+    return KYCProfile(
+        first_name=user.firstname,
+        last_name=user.lastname,
+        patronomic=user.patronomic,
+        documents=data
     )
 
 

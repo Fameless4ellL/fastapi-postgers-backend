@@ -1,4 +1,7 @@
-from typing import Any
+import base64
+import mimetypes
+import os
+from typing import Any, Union
 
 from fastapi import HTTPException
 from sqlalchemy import select
@@ -42,3 +45,21 @@ def url_for(name: str, **path_params: Any) -> str:
     return f"{settings.back_url}/{name}/" + "/".join(
         str(value) for value in path_params.values()
     )
+
+
+def url_for_encoded(name: str, **path_params: Any) -> Union[str, None]:
+    """
+    Generate an encoded data from file for the given endpoint name and path parameters.
+    """
+    filename = name + "/" + "/".join(str(value) for value in path_params.values())
+    if not os.path.isfile(filename):
+        return
+
+    content_type, _ = mimetypes.guess_type(filename)
+    if content_type != 'application/pdf':
+        return
+
+    with open(filename, "rb") as file:
+        encoded = base64.b64encode(file.read()).decode("utf-8")
+
+    return encoded
