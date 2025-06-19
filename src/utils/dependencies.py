@@ -1,10 +1,9 @@
 import logging
 import traceback
-import uuid
 import warnings
 from abc import ABC, abstractmethod
 from dataclasses import dataclass
-from datetime import datetime, timedelta
+from datetime import datetime
 from decimal import Decimal
 from itertools import islice
 from typing import Annotated, Optional
@@ -19,20 +18,24 @@ from httpx import AsyncClient
 from pytz.tzinfo import DstTzInfo
 from sqlalchemy import select, exists, func
 from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy.orm import joinedload
 from web3 import Web3, middleware
 
 from settings import settings
 from src.exceptions.base import UnauthorizedError
-from src.exceptions.constants.auth import PERMISSION_DENIED, NO_SCOPE, BAD_TOKEN, TOKEN_NOT_FOUND, INVALID_AUTH, \
+from src.exceptions.constants.auth import (
+    PERMISSION_DENIED,
+    NO_SCOPE,
+    BAD_TOKEN,
+    TOKEN_NOT_FOUND,
+    INVALID_AUTH,
     INVALID_SCHEME
+)
 from src.exceptions.user import UserExceptions
-from src.globals import aredis, q
+from src.globals import aredis
 from src.models import Limit, LimitStatus, OperationType, LimitType
 from src.models.db import get_db
-from src.models.other import Game, GameStatus, GameType, Network, Currency
+from src.models.other import Network, Currency
 from src.models.user import User, Role, BalanceChangeHistory
-from src.utils import worker
 from src.utils.signature import decode_access_token
 from src.utils.web3 import AWSHTTPProvider
 
@@ -326,7 +329,8 @@ async def get_timezone(
 
     try:
         response = await client.get(
-            f"http://ip-api.com/json/{ip}?fields=timezone"
+            f"http://ip-api.com/json/{ip}?fields=timezone",
+            timeout=5
         )
         response.raise_for_status()
         data = response.json()
@@ -362,61 +366,6 @@ async def get_w3(
     w3.eth.default_account = acct.address
 
     return w3
-
-
-async def generate_game(
-    db: AsyncSession, _type: GameType = GameType.GLOBAL, country: str = None
-):
-    """
-    creating a new game instance based on Game
-    """
-    game = await db.execute(
-        select(Game).filter(
-            Game.repeat.is_(True),
-            Game.status == GameStatus.PENDING,
-            Game.game_type == _type,
-            Game.country == country
-        )
-    )
-    game = game.scalars().first()
-
-    if not game:
-        currency = await db.execute(
-            select(Currency)
-        )
-        currency = currency.scalar()
-
-        game = Game(
-            name=f"game #{str(uuid.uuid4())}",
-            game_type=_type,
-            currency_id=currency.id,
-            description="Default game",
-            country=country,
-            repeat=True,
-            repeat_days=[0, 1, 2, 3, 4, 5, 6],
-            scheduled_datetime=datetime.now() + timedelta(days=1),
-        )
-
-        db.add(game)
-        await db.commit()
-        await db.refresh(game)
-
-    stmt = select(Game).filter(
-        Game.id == game.id
-    ).options(
-        joinedload(Game.currency)
-    )
-    game = await db.execute(stmt)
-    game = game.scalar()
-
-    q.enqueue_at(
-        game.scheduled_datetime,
-        worker.proceed_game,
-        game_id=game.id,
-        job_id=f"proceed_game_{game.id}",
-    )
-
-    return game
 
 
 def nth(iterable, n, default=None):

@@ -23,7 +23,7 @@ from src.models.other import (
     GameView,
 )
 from src.routers import public
-from src.utils.dependencies import generate_game, get_user
+from src.utils.dependencies import get_user
 from src.utils.validators import url_for
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import joinedload
@@ -112,28 +112,7 @@ async def game_instances(
     count_result = await db.execute(stmt)
     count = count_result.scalar()
 
-    if not data and count == 0:
-        # create a new game
-        _game = await generate_game(db, _type, user.country)
-
-        data = [{
-            "id": _game.id,
-            "name": _game.name,
-            "currency": _game.currency.code if _game.currency else None,
-            "image": url_for("static", path=_game.image),
-            "status": _game.status.value,
-            "price": float(_game.price),
-            "prize": float(_game.prize) if _game.prize.isnumeric() else _game.prize,
-            "max_limit_grid": _game.max_limit_grid,
-            "endtime": _game.scheduled_datetime.timestamp(),
-            "created": _game.created_at.timestamp()
-        }]
-        count = 1
-
-    return JSONResponse(
-        status_code=status.HTTP_200_OK,
-        content=Games(games=data, count=count).model_dump()
-    )
+    return Games(games=data, count=count)
 
 
 @public.get(

@@ -55,7 +55,7 @@ case "$1" in
         migrate
         ;;
     revert)
-        migrate
+        revert
         ;;
     *)
         echo "Invalid command: $1"
