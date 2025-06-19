@@ -26,3 +26,15 @@ INVALID_SCHEME = ErrorMessage(
     message="Invalid authentication scheme",
     code_error="InvalidToken"
 )
+INVALID_PASSWORD = ErrorMessage(
+    message="Invalid password",
+    code_error="InvalidPassword"
+)
+IDENTICAL_PASSWORD = ErrorMessage(
+    message="New password is the same as old password",
+    code_error="IdenticalPassword"
+)
+LINK_EXPIRED = ErrorMessage(
+    message="link expired",
+    code_error="ExpiredLink"
+)

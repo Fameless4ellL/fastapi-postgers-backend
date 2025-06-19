@@ -10,3 +10,7 @@ USER_IS_BLOCKED = ErrorMessage(
     message="User is blocked",
     code_error="UserIsBlocked"
 )
+USER_VERIFY_FAILED = ErrorMessage(
+    message="TOTP already verified",
+    code_error="UserVerifyFailed"
+)

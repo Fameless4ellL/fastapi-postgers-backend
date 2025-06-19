@@ -11,6 +11,8 @@ from sqlalchemy import select, or_
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from settings import settings
+from src.exceptions.base import BadRequestError
+from src.exceptions.user import UserExceptions
 from src.globals import aredis, TotpFactory, q
 from src.models.db import get_db
 from src.models.log import Action
@@ -30,7 +32,6 @@ from src.utils.dependencies import Token, http_client, get_admin, get_ip, JWTBea
 from src.utils.signature import (
     create_access_token,
     get_password_hash,
-    verify_password,
     ACCESS_TOKEN_EXPIRE_MINUTES
 )
 
@@ -56,19 +57,8 @@ async def login(
     )
     userdb = await db.execute(stmt)
     userdb = userdb.scalar()
-    if not userdb:
-        return JSONResponse(
-            status_code=status.HTTP_404_NOT_FOUND,
-            content={"message": "User not found"}
-        )
-
-    if not verify_password(
-        user.password.get_secret_value(), userdb.password
-    ):
-        return JSONResponse(
-            status_code=400,
-            content={"message": "Invalid phone number or password"}
-        )
+    await UserExceptions.raise_exception_user_not_found(userdb)
+    await UserExceptions.wrong_password(userdb, user.password.get_secret_value())
 
     data = {
         "id": userdb.id,
@@ -112,17 +102,8 @@ async def set_reset_password(
     user = await db.execute(stmt)
     user = user.scalar()
 
-    if not user:
-        return JSONResponse(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            content={"message": "User not found"},
-        )
-
-    if user.password == item.password.get_secret_value():
-        return JSONResponse(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            content={"message": "New password is the same as old password"},
-        )
+    await UserExceptions.raise_exception_user_not_found(user)
+    await UserExceptions.identical_password(user, item.password.get_secret_value())
 
     hashed_password = get_password_hash(item.password.get_secret_value())
     user.password = hashed_password
@@ -166,11 +147,7 @@ async def send_reset_password(
     user = await db.execute(stmt)
     user = user.scalar()
 
-    if not user:
-        return JSONResponse(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            content={"message": "Email is not valid"},
-        )
+    await UserExceptions.raise_exception_user_not_found(user)
 
     code = secrets.token_urlsafe(16)
     await aredis.set(f"EMAIL:{code}", user.email, ex=60 * 15)
@@ -188,7 +165,7 @@ async def send_reset_password(
         job_id=f"reset-password-{user.id}-{code}",
     )
 
-    return JSONResponse(status_code=status.HTTP_200_OK, content="Email has been sent")
+    return "Email has been sent"
 
 
 @admin.post(
@@ -202,8 +179,7 @@ async def logout(
     Admin logout
     """
     await aredis.delete(f"TOKEN:ADMINS:{token.id}")
-
-    return JSONResponse(status_code=status.HTTP_200_OK, content="OK")
+    return "OK"
 
 
 @public.get(
@@ -219,11 +195,7 @@ async def get_totp(
     """
     Get TOTP secret
     """
-    if user.verified:
-        return JSONResponse(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            content={"message": "TOTP already verified"}
-        )
+    await UserExceptions.totp_verified(user)
 
     totp: TOTP = TotpFactory.new()
 
@@ -271,15 +243,9 @@ async def verify_totp(
     try:
         TotpFactory.verify(item.code, user.totp)
     except MalformedTokenError as err:
-        return JSONResponse(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            content={"message": str(err)}
-        )
+        raise BadRequestError(err) from err
     except TokenError as err:
-        return JSONResponse(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            content={"message": str(err)}
-        )
+        raise BadRequestError(err) from err
 
     if not user.verified:
         user.verified = True
@@ -320,7 +286,4 @@ async def verify_link(
     await aredis.set(f"IP:EMAIL:{ip}", email.decode('utf-8'), ex=60 * 10)
     await aredis.delete(f"EMAIL:{item.code}")
 
-    return JSONResponse(
-        status_code=status.HTTP_200_OK,
-        content={"message": "OK"},
-    )
+    return {"message": "OK"}

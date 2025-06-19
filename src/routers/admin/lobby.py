@@ -1,6 +1,5 @@
 from typing import Annotated
-from fastapi import status, Depends
-from fastapi.responses import JSONResponse
+from fastapi import Depends
 
 from src.models.user import Role
 from src.routers import admin
@@ -66,5 +65,4 @@ async def sidebar(token: Annotated[Token, Depends(JWTBearerAdmin())]):
     """
     role = next(iter(token.scopes))
     data = sidebars.get(role, sidebars['default'])
-
-    return JSONResponse(content=data, status_code=status.HTTP_200_OK)
+    return data

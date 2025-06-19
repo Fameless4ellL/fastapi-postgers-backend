@@ -1,7 +1,6 @@
 from typing import Annotated, Literal, Optional
 
-from fastapi import Depends, Path, status, Query
-from fastapi.responses import JSONResponse
+from fastapi import Depends, Path, Query
 from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -68,9 +67,7 @@ async def delete_jackpot(
     db.add(game)
     await db.commit()
 
-    return JSONResponse(
-        status_code=status.HTTP_200_OK, content="Success"
-    )
+    return "Success"
 
 
 @admin.get("/jackpots/{game_id}/participants")

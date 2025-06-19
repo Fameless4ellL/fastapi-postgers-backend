@@ -9,6 +9,7 @@ from sqlalchemy import func, select, or_, delete, String
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from settings import settings
+from src.exceptions.user import UserExceptions
 from src.globals import aredis, q
 from src.models.db import get_db
 from src.models.log import Action
@@ -128,10 +129,7 @@ async def get_admin_list(
         }
         for a in admins
     ]
-    return JSONResponse(
-        status_code=status.HTTP_200_OK,
-        content=Admins(admins=data, count=count).model_dump(mode="json"),
-    )
+    return Admins(admins=data, count=count)
 
 
 @admin.get(
@@ -149,12 +147,7 @@ async def get_admin(
     stmt = select(User).filter(User.id == admin_id, User.role != "user")
     user = await db.execute(stmt)
     user = user.scalar()
-
-    if not user:
-        return JSONResponse(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            content={"message": "Admin not found"},
-        )
+    await UserExceptions.raise_exception_user_not_found(user)
 
     docs = await db.execute(
         select(Document)
@@ -182,9 +175,7 @@ async def get_admin(
         "avatar": url_for('static/avatars', filename=user.avatar_v1.name) if user.avatar_v1 else None,
         "document": documents
     }
-    return JSONResponse(
-        status_code=status.HTTP_200_OK, content=Profile(**data).model_dump()
-    )
+    return Profile(**data)
 
 
 @admin.post(
@@ -280,9 +271,7 @@ async def create_admin(
         job_id=f"send_mail({new_admin.email})"
     )
 
-    return JSONResponse(
-        status_code=status.HTTP_201_CREATED, content="OK",
-    )
+    return "OK"
 
 
 @admin.put(
@@ -301,17 +290,12 @@ async def update_admin(
     """
     Update admin
     """
-    admin = await db.execute(select(User).filter(User.id == admin_id))
-    admin = admin.scalar()
-
-    if not admin:
-        return JSONResponse(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            content={"message": "Admin not found"},
-        )
+    _admin = await db.execute(select(User).filter(User.id == admin_id))
+    _admin = _admin.scalar()
+    await UserExceptions.raise_exception_user_not_found(_admin)
 
     errors = [
-        (name, await is_field_unique(db, User, field_name=name, field_value=value, exclude_id=admin.id))
+        (name, await is_field_unique(db, User, field_name=name, field_value=value, exclude_id=_admin.id))
         for name, value in [
             ("email", item.email),
             ("phone_number", item.phone_number),
@@ -333,12 +317,12 @@ async def update_admin(
         )
 
     for key, value in item.model_dump().items():
-        setattr(admin, key, value)
+        setattr(_admin, key, value)
 
     if avatar:
-        admin.avatar_v1 = avatar
+        _admin.avatar_v1 = avatar
     if documents:
-        stmt = delete(Document).filter_by(user_id=admin.id)
+        stmt = delete(Document).filter_by(user_id=_admin.id)
         await db.execute(stmt)
 
         for file in documents:
@@ -353,19 +337,17 @@ async def update_admin(
                     ]
                 )
 
-            file.filename = f"{admin.id}_{file.filename}"
+            file.filename = f"{_admin.id}_{file.filename}"
             doc = Document(
-                user_id=admin.id,
+                user_id=_admin.id,
                 file=file
             )
             db.add(doc)
 
-    db.add(admin)
+    db.add(_admin)
     await db.commit()
 
-    return JSONResponse(
-        status_code=status.HTTP_201_CREATED, content="OK"
-    )
+    return "OK"
 
 
 @admin.delete(
@@ -376,7 +358,7 @@ async def update_admin(
 async def delete_admin(
     db: Annotated[AsyncSession, Depends(get_db)],
     token: Annotated[Token, Depends(JWTBearerAdmin())],
-    admin_id: Annotated[int, Path()],
+    admin_id: Annotated[int, Path(gt=0)],
 ):
     """
     Delete admin
@@ -389,12 +371,7 @@ async def delete_admin(
 
     _admin = await db.execute(select(User).filter(User.id == admin_id))
     _admin = _admin.scalar()
-
-    if not _admin:
-        return JSONResponse(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            content={"message": "Admin not found"},
-        )
+    await UserExceptions.raise_exception_user_not_found(_admin)
 
     scope = next(iter(token.scopes), None)
     if scope == Role.ADMIN.value and _admin.role in {Role.SUPER_ADMIN.value, Role.ADMIN.value}:

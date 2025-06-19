@@ -15,7 +15,9 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from starlette.responses import StreamingResponse
 
 from settings import settings
+from src.exceptions.balance import BalanceExceptions
 from src.exceptions.limit import LimitExceptions
+from src.exceptions.operation import HistoryExceptions
 from src.exceptions.user import UserExceptions
 from src.globals import q
 from src.models import Currency
@@ -162,6 +164,8 @@ async def get_operation(
     result = await db.execute(stmt)
     result = result.scalars().first()
 
+    await HistoryExceptions.operation_not_found(result)
+
     return Operation(**result)
 
 
@@ -244,6 +248,8 @@ async def get_limit(
     result = await db.execute(stmt)
     result = result.scalars().first()
 
+    await LimitExceptions.limit_not_found(result)
+
     return LimitBase(**result)
 
 
@@ -287,11 +293,7 @@ async def update_limit(
     result = await db.execute(stmt)
     result = result.scalars().first()
 
-    if not result:
-        return JSONResponse(
-            status_code=status.HTTP_404_NOT_FOUND,
-            content={"message": "Limit not found"},
-        )
+    await LimitExceptions.limit_not_found(result)
 
     for attr, value in item.model_dump().items():
         setattr(result, attr, value)
@@ -358,11 +360,7 @@ async def block_user(
     balance = await db.execute(balance_stmt)
     balance = balance.scalars().first()
 
-    if not balance:
-        return JSONResponse(
-            status_code=status.HTTP_404_NOT_FOUND,
-            content={"message": "Balance not found"},
-        )
+    await BalanceExceptions.balance_not_found(balance)
 
     currency = await db.execute(
         select(Currency)
@@ -500,10 +498,7 @@ async def block_user(
 
     await db.commit()
 
-    return JSONResponse(
-        status_code=status.HTTP_200_OK,
-        content={"message": "User blocked successfully"},
-    )
+    return {"message": "User blocked successfully"}
 
 
 @admin.post("/operation/block/{obj_id}")
@@ -520,22 +515,12 @@ async def block_operation(
     )
     op = await db.execute(stmt)
     op = op.scalars().first()
-
-    if not op:
-        return JSONResponse(
-            status_code=status.HTTP_404_NOT_FOUND,
-            content={"message": "PENDING Operation not found"},
-        )
+    await HistoryExceptions.operation_not_found(op)
 
     job = q.fetch_job(f"{op.change_type}_{op.id}")
 
     with suppress(InvalidJobOperation, AttributeError):
-        if job.is_finished:
-            return JSONResponse(
-                status_code=status.HTTP_400_BAD_REQUEST,
-                content={"message": "Operation already finished"},
-            )
-
+        await HistoryExceptions.operation_is_finished(job)
         job.cancel()
 
     op.status = BalanceChangeHistory.Status.BLOCKED
@@ -558,17 +543,8 @@ async def unblock_user(
     user = await db.execute(user_stmt)
     user = user.scalars().first()
 
-    if not user:
-        return JSONResponse(
-            status_code=status.HTTP_404_NOT_FOUND,
-            content={"message": "User not found"},
-        )
-
-    if not user.is_blocked:
-        return JSONResponse(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            content={"message": "User is already unblocked"},
-        )
+    await UserExceptions.raise_exception_user_not_found(user)
+    await UserExceptions.user_is_blocked(user)
 
     user.is_blocked = False
     db.add(user)

@@ -189,9 +189,7 @@ async def get_participants(
         "date": ticket.created_at.strftime("%Y-%m-%d %H:%M:%S")
     } for ticket in tickets]
 
-    return JSONResponse(
-        status_code=status.HTTP_200_OK, content=data
-    )
+    return data
 
 
 @admin.get(
@@ -233,9 +231,7 @@ async def get_participant_tickets(
         "date": ticket.created_at.strftime("%Y-%m-%d %H:%M:%S")
     } for ticket in tickets]
 
-    return JSONResponse(
-        status_code=status.HTTP_200_OK, content=data
-    )
+    return data
 
 
 @admin.get(
@@ -298,10 +294,7 @@ async def get_winners(
     tickets = await db.execute(tickets.offset(offset).limit(limit))
     tickets = tickets.scalars().all()
 
-    return JSONResponse(
-        status_code=status.HTTP_200_OK,
-        content={"count": count, "items": tickets}
-    )
+    return {"count": count, "items": tickets}
 
 
 @admin.put(
@@ -334,6 +327,4 @@ async def set_ticket_status(
     ticket.status = TicketStatus.COMPLETED
     db.commit()
 
-    return JSONResponse(
-        status_code=status.HTTP_200_OK, content="OK"
-    )
+    return "OK"

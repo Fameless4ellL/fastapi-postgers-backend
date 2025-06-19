@@ -66,7 +66,7 @@ class TestAdminUsers:
             "v1/admin/users/99999",
             headers={"Authorization": f"Bearer {admin_token}"},
         )
-        assert response.status_code == status.HTTP_400_BAD_REQUEST
+        assert response.status_code == status.HTTP_404_NOT_FOUND
         assert response.json()["message"] == "User not found"
 
     async def test_retrieves_user_games(
@@ -92,7 +92,7 @@ class TestAdminUsers:
             "v1/admin/users/99999/games?offset=0&limit=10",
             headers={"Authorization": f"Bearer {admin_token}"},
         )
-        assert response.status_code == status.HTTP_400_BAD_REQUEST
+        assert response.status_code == status.HTTP_404_NOT_FOUND
         assert response.json()["message"] == "User not found"
 
     async def test_retrieves_user_tickets(

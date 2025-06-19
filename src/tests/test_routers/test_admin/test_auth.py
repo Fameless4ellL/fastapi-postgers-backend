@@ -57,8 +57,8 @@ class TestAuth:
         )
 
         data = response.json()
-        assert response.status_code == 400
-        assert data["message"] == "Invalid phone number or password"
+        assert response.status_code == 401
+        assert data["message"] == "Invalid password"
 
     async def test_logout(
         self,

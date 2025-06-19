@@ -36,10 +36,7 @@ async def get_kyc_list(
         "country": item.country
     } for item in data]
 
-    return JSONResponse(
-        content=KycList(items=data).model_dump(),
-        status_code=status.HTTP_200_OK
-    )
+    return KycList(items=data)
 
 
 @admin.post(
@@ -67,10 +64,7 @@ async def create_kyc_list(
     stmt = Kyc.__table__.insert().values([{"country": country} for country in item.countries])
     await db.execute(stmt)
     await db.commit()
-    return JSONResponse(
-        content={"message": "Countries created successfully"},
-        status_code=status.HTTP_200_OK
-    )
+    return {"message": "Countries created successfully"}
 
 
 @admin.delete(
@@ -97,10 +91,7 @@ async def detele_kyc_list(
     stmt = Kyc.__table__.delete().where(Kyc.country.in_(item.countries))
     await db.execute(stmt)
     await db.commit()
-    return JSONResponse(
-        content={"message": "Countries deleted successfully"},
-        status_code=status.HTTP_200_OK
-    )
+    return {"message": "Countries deleted successfully"}
 
 
 @admin.put(
@@ -124,7 +115,4 @@ async def update_kyc_list(
         await db.execute(stmt)
         await db.commit()
 
-    return JSONResponse(
-        content={"message": "KYC list updated successfully"},
-        status_code=status.HTTP_200_OK
-    )
+    return {"message": "KYC list updated successfully"}

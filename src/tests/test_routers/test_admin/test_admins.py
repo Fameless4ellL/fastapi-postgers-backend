@@ -71,8 +71,8 @@ class TestAdminPage:
             "v1/admin/admins/99999",
             headers={"Authorization": f"Bearer {admin_token}"},
         )
-        assert response.status_code == 400
-        assert response.json()["message"] == "Admin not found"
+        assert response.status_code == 404
+        assert response.json()["message"] == "User not found"
 
     async def test_creates_admin_fail(
         self,
@@ -160,7 +160,7 @@ class TestAdminPage:
             headers={"Authorization": f"Bearer {admin_token}"},
         )
         print(response.json())
-        assert response.status_code == 201
+        assert response.status_code == 200
         assert response.json() == "OK"
 
     async def test_fails_to_update_nonexistent_admin(
@@ -192,8 +192,8 @@ class TestAdminPage:
             data=payload,
             headers={"Authorization": f"Bearer {admin_token}"},
         )
-        assert response.status_code == 400
-        assert response.json()["message"] == "Admin not found"
+        assert response.status_code == 404
+        assert response.json()["message"] == "User not found"
 
     async def test_deletes_admin_successfully(
         self,

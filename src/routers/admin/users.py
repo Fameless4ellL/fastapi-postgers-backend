@@ -2,11 +2,11 @@ from typing import Annotated, Optional
 
 from eth_account import Account
 from eth_account.signers.local import LocalAccount
-from fastapi import Depends, Path, Query, status
-from fastapi.responses import JSONResponse
+from fastapi import Depends, Path, Query
 from sqlalchemy import and_, func, select, or_, String
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from src.exceptions.user import UserExceptions
 from src.globals import aredis
 from src.models.db import get_db
 from src.models.other import Currency, Game, GameView, Network, Ticket, Jackpot, InstaBingo
@@ -74,10 +74,7 @@ async def get_users(
         }
         for user in users
     ]
-    return JSONResponse(
-        status_code=status.HTTP_200_OK,
-        content=Users(users=data, count=count).model_dump(),
-    )
+    return Users(users=data, count=count)
 
 
 @admin.get(
@@ -87,7 +84,7 @@ async def get_users(
 async def get_user(
     db: Annotated[AsyncSession, Depends(get_db)],
     token: Annotated[Token, Depends(JWTBearerAdmin())],
-    user_id: Annotated[int, Path()],
+    user_id: Annotated[int, Path(gt=0)],
 ):
     """
     Get all users
@@ -99,12 +96,7 @@ async def get_user(
 
     user = await db.execute(stmt)
     user = user.scalars().first()
-
-    if not user:
-        return JSONResponse(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            content={"message": "User not found"},
-        )
+    await UserExceptions.raise_exception_user_not_found(user)
 
     stmt = select(func.count(Ticket.id)).filter(Ticket.user_id == user_id)
     tickets = await db.execute(stmt)
@@ -162,9 +154,7 @@ async def get_user(
             "material": list(material_winnings)
         },
     }
-    return JSONResponse(
-        status_code=status.HTTP_200_OK, content=UserScheme(**data).model_dump()
-    )
+    return UserScheme(**data)
 
 
 @admin.get(
@@ -188,12 +178,7 @@ async def get_user_games(
 
     user = await db.execute(stmt)
     user = user.scalars().first()
-
-    if not user:
-        return JSONResponse(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            content={"message": "User not found"},
-        )
+    await UserExceptions.raise_exception_user_not_found(user)
 
     stmt = (
         select(
@@ -224,10 +209,7 @@ async def get_user_games(
         if not game_instance['amount']:
             game_instance['amount'] = 0
 
-    return JSONResponse(
-        status_code=status.HTTP_200_OK,
-        content=UserGames(games=game_instances, count=count).model_dump(),
-    )
+    return UserGames(games=game_instances, count=count)
 
 
 @admin.get(
@@ -284,10 +266,7 @@ async def get_user_tickets(
         for ticket in tickets
     ]
 
-    return JSONResponse(
-        status_code=status.HTTP_200_OK,
-        content={"tickets": data, "count": len(data)},
-    )
+    return {"tickets": data, "count": count}
 
 
 @admin.get(
@@ -340,10 +319,7 @@ async def get_user_jackpots(
         for game_instance in game_instances
     ]
 
-    return JSONResponse(
-        status_code=status.HTTP_200_OK,
-        content=UserJackpots(jackpots=data, count=count).model_dump(),
-    )
+    return UserJackpots(jackpots=data, count=count)
 
 
 @admin.get(
@@ -400,10 +376,7 @@ async def get_user_tickets_by_jackpots(
         for ticket in tickets
     ]
 
-    return JSONResponse(
-        status_code=status.HTTP_200_OK,
-        content={"tickets": data, "count": len(data)},
-    )
+    return {"tickets": data, "count": count}
 
 
 @admin.get(
@@ -421,11 +394,10 @@ async def get_user_transactions(
     """
     stmt = select(BalanceChangeHistory).filter(BalanceChangeHistory.user_id == user_id)
 
-    result = await db.execute(stmt.order_by(
-    ).offset(offset).limit(limit))
+    result = await db.execute(stmt.order_by(BalanceChangeHistory.created_at.desc()).offset(offset).limit(limit))
     history = result.scalars().all()
 
-    count = await db.execute(stmt.with_only_columns(func.count(BalanceChangeHistory.id)))
+    count = await db.execute(stmt.order_by(None).with_only_columns(func.count(BalanceChangeHistory.id)))
     count = count.scalar() or 0
 
     data = [
@@ -439,10 +411,7 @@ async def get_user_transactions(
         for h in history
     ]
 
-    return JSONResponse(
-        status_code=status.HTTP_200_OK,
-        content=HistoryList(items=data, count=count).model_dump(mode='json'),
-    )
+    return HistoryList(items=data, count=count)
 
 
 @admin.get(
@@ -480,10 +449,7 @@ async def get_user_wallet(
         "date_and_time": wallet.created_at.strftime("%Y-%m-%d %H:%M:%S"),
     }
 
-    return JSONResponse(
-        status_code=status.HTTP_200_OK,
-        content=data,
-    )
+    return data
 
 
 @admin.get(
@@ -523,10 +489,7 @@ async def get_user_balance(
 
         total += float(b.balance)
 
-    return JSONResponse(
-        status_code=status.HTTP_200_OK,
-        content={"balances": data, "total": total},
-    )
+    return {"balances": data, "total": total}
 
 
 @admin.get("/users/{user_id}/winings")
@@ -616,7 +579,4 @@ async def get_user_winings(
             "type": game_name,
             "amount": str(amount),
         })
-    return JSONResponse(
-        status_code=status.HTTP_200_OK,
-        content={"tickets": data, "count": count},
-    )
+    return {"tickets": data, "count": count}

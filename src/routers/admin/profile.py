@@ -22,16 +22,7 @@ from src.utils.validators import url_for
 )
 async def get_profile(
     db: Annotated[AsyncSession, Depends(get_db)],
-    user: Annotated[User, Security(get_admin, scopes=[
-        Role.SUPER_ADMIN.value,
-        Role.ADMIN.value,
-        Role.GLOBAL_ADMIN.value,
-        Role.LOCAL_ADMIN.value,
-        Role.FINANCIER.value,
-        Role.SUPPORT.value,
-        'auth'
-    ])],
-
+    user: Annotated[User, Depends(get_admin)],
 ):
     """
     Получение профиля пользователя
@@ -64,7 +55,4 @@ async def get_profile(
         "document": documents,
     }
 
-    return JSONResponse(
-        content=Profile(**data).model_dump(),
-        status_code=status.HTTP_200_OK
-    )
+    return Profile(**data)
