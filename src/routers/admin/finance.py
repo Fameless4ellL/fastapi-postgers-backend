@@ -15,6 +15,8 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from starlette.responses import StreamingResponse
 
 from settings import settings
+from src.exceptions.limit import LimitExceptions
+from src.exceptions.user import UserExceptions
 from src.globals import q
 from src.models import Currency
 from src.models.db import get_db
@@ -122,10 +124,7 @@ async def get_operation_list(
     result = await db.execute(stmt)
     result = result.scalars().all()
 
-    return JSONResponse(
-        status_code=status.HTTP_200_OK,
-        content=Operations(items=result, count=count).model_dump(mode="json"),
-    )
+    return Operations(items=result, count=count)
 
 
 @admin.get(
@@ -163,10 +162,7 @@ async def get_operation(
     result = await db.execute(stmt)
     result = result.scalars().first()
 
-    return JSONResponse(
-        status_code=status.HTTP_200_OK,
-        content=Operation(**result).model_dump(mode="json"),
-    )
+    return Operation(**result)
 
 
 @admin.get(
@@ -271,10 +267,7 @@ async def create_limit(
     db.add(limit)
     await db.commit()
 
-    return JSONResponse(
-        status_code=status.HTTP_201_CREATED,
-        content="Limit created successfully",
-    )
+    return "Limit created successfully"
 
 
 @admin.put(
@@ -308,10 +301,7 @@ async def update_limit(
     db.add(result)
     await db.commit()
 
-    return JSONResponse(
-        status_code=status.HTTP_201_CREATED,
-        content="Limit updated successfully",
-    )
+    return "Limit updated successfully"
 
 
 @admin.delete(
@@ -325,22 +315,13 @@ async def delete_limit(
 ):
     stmt = (
         select(Limit)
-        .where(Limit.id == obj_id)
+        .filter(Limit.id == obj_id)
+        .filter(Limit.is_deleted.is_(False))
     )
     result = await db.execute(stmt)
     result = result.scalars().first()
 
-    if not result:
-        return JSONResponse(
-            status_code=status.HTTP_404_NOT_FOUND,
-            content={"message": "Limit not found"},
-        )
-
-    if result.is_deleted:
-        return JSONResponse(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            content={"message": "Cannot delete deleted item"},
-        )
+    await LimitExceptions.limit_not_found(result)
 
     result.is_deleted = True
     result.last_edited = token.id
@@ -363,21 +344,15 @@ async def block_user(
     Block a user based on suspicious operations.
     """
     # Fetch user and wallet details
-    user_stmt = select(User).where(User.id == obj_id)
+    user_stmt = (
+        select(User)
+        .filter(User.id == obj_id)
+    )
     user = await db.execute(user_stmt)
     user = user.scalars().first()
 
-    if not user:
-        return JSONResponse(
-            status_code=status.HTTP_404_NOT_FOUND,
-            content={"message": "User not found"},
-        )
-
-    if user.is_blocked:
-        return JSONResponse(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            content={"message": "User is already blocked"},
-        )
+    await UserExceptions.raise_exception_user_not_found(user)
+    await UserExceptions.user_is_blocked(user)
 
     balance_stmt = select(Balance).where(Balance.user_id == obj_id)
     balance = await db.execute(balance_stmt)

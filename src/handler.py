@@ -9,7 +9,9 @@ from src.exceptions.base import (
     BadRequestError, ConflictError,
     ForbiddenError, NotFoundError,
     UnauthorizedError,
-    ValuePydanticError
+    ValuePydanticError,
+    UnavailableServiceError,
+    TooManyRequestsError
 )
 
 
@@ -89,6 +91,26 @@ def add_exception_handlers(app: FastAPI) -> None:
             request: Request,
             exc: BadRequestError,
             status_code: status = status.HTTP_400_BAD_REQUEST) -> JSONResponse:
+        return JSONResponse(
+            status_code=status_code,
+            content=jsonable_encoder(exc.name),
+        )
+
+    @app.exception_handler(UnavailableServiceError)
+    async def service_unavaulable(
+            request: Request,
+            exc: UnavailableServiceError,
+            status_code: status = status.HTTP_503_SERVICE_UNAVAILABLE) -> JSONResponse:
+        return JSONResponse(
+            status_code=status_code,
+            content=jsonable_encoder(exc.name),
+        )
+
+    @app.exception_handler(TooManyRequestsError)
+    async def too_many_request_exception_handler(
+            request: Request,
+            exc: TooManyRequestsError,
+            status_code: status = status.HTTP_429_TOO_MANY_REQUESTS) -> JSONResponse:
         return JSONResponse(
             status_code=status_code,
             content=jsonable_encoder(exc.name),

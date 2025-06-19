@@ -26,7 +26,8 @@ from src.models.user import (
     Document
 )
 from src.routers import public
-from src.utils.dependencies import get_user, get_currency, worker, transaction_atomic, Token, JWTBearer
+from src.utils import worker
+from src.utils.dependencies import get_user, get_currency, Token, JWTBearer
 from src.schemes import Country, JsonForm, UserBalanceList
 from src.schemes import (
     MyGames, MyGamesType, Tickets, Withdraw
@@ -644,7 +645,7 @@ async def get_notifications(
     tags=["user", Action.UPDATE],
 )
 async def set_settings(
-    db: Annotated[AsyncSession, Depends(transaction_atomic)],
+    db: Annotated[AsyncSession, Depends(get_db)],
     token: Annotated[Token, Depends(JWTBearer())],
     item: Usersettings,
 ):

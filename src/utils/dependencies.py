@@ -12,7 +12,7 @@ from typing import Type
 import pytz
 import requests
 from aiohttp import client_exceptions
-from fastapi import Depends, HTTPException, status, security, Request, Header
+from fastapi import Depends, status, security, Request, Header
 from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
 from httpx import AsyncClient
 from pytz.tzinfo import DstTzInfo
@@ -21,7 +21,8 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from web3 import Web3, middleware
 
 from settings import settings
-from src.exceptions.base import UnauthorizedError
+from src.exceptions.api import ApiException
+from src.exceptions.base import UnauthorizedError, ForbiddenError
 from src.exceptions.constants.auth import (
     PERMISSION_DENIED,
     NO_SCOPE,
@@ -30,6 +31,9 @@ from src.exceptions.constants.auth import (
     INVALID_AUTH,
     INVALID_SCHEME
 )
+from src.exceptions.currency import CurrencyExceptions
+from src.exceptions.limit import LimitExceptions
+from src.exceptions.network import NetworkExceptions
 from src.exceptions.user import UserExceptions
 from src.globals import aredis
 from src.models import Limit, LimitStatus, OperationType, LimitType
@@ -133,17 +137,8 @@ async def get_user(
         select(User).filter(User.id == token.id)
     )
     user = user.scalar()
-    # TODO improve err raise
-    if user is None:
-        raise HTTPException(
-            status_code=status.HTTP_401_UNAUTHORIZED, detail="User not found"
-        )
-
-    if user.is_blocked:
-        raise HTTPException(
-            status_code=status.HTTP_403_FORBIDDEN, detail="User is blocked"
-        )
-
+    await UserExceptions.raise_exception_user_not_found(user)
+    await UserExceptions.user_is_blocked(user)
     return user
 
 
@@ -242,17 +237,14 @@ async def get_admin_token(
     warnings.warn(
         (
             "get_admin_token() is deprecated and will be removed in a future release."
-            " Use JWTBearerAdmin() instead.",
+            " Use JWTBearerAdmin() instead."
         ),
         DeprecationWarning,
         stacklevel=2
     )
     for scope in token.scopes:
         if scope not in security_scopes.scopes:
-            raise HTTPException(
-                status_code=status.HTTP_401_UNAUTHORIZED,
-                detail="Not enough permissions"
-            )
+            raise UnauthorizedError(PERMISSION_DENIED)
 
     return token
 
@@ -276,12 +268,7 @@ async def get_network(
 ) -> Network:
     net = await db.execute(select(Network).filter(Network.symbol == network))
     net = net.scalar()
-
-    if net is None:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND, detail="Network not found"
-        )
-
+    await NetworkExceptions.network_not_found(net)
     return net
 
 
@@ -295,12 +282,7 @@ async def get_currency(
         Currency.network_id == network.id
     ))
     cur = cur.scalar()
-
-    if cur is None:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND, detail="Currency not found"
-        )
-
+    await CurrencyExceptions.currency_not_found(cur)
     return cur
 
 
@@ -348,17 +330,13 @@ async def get_w3(
 ) -> Web3:
     try:
         w3 = Web3(AWSHTTPProvider(network.rpc_url))
-        if not w3.is_connected():
-            raise HTTPException(
-                status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
-                detail="Network is not connected"
-            )
-    except client_exceptions.ClientError:
+        await NetworkExceptions.network_is_not_connected(w3)
+    except client_exceptions.ClientError as exc:
         traceback.print_exc()
-        raise HTTPException(
+        raise ApiException(
             status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
-            detail="Network is not available"
-        )
+            name="Network is not available"
+        ) from exc
 
     acct = w3.eth.account.from_key(settings.private_key)
 
@@ -533,11 +511,7 @@ class LimitVerifier:
                 continue
 
             _limit = self._handlers.get(limit.type)
-            if not _limit:
-                raise HTTPException(
-                    status_code=status.HTTP_400_BAD_REQUEST,
-                    detail=f"Unsupported limit type: {limit.type}"
-                )
+            await LimitExceptions.limit_type_is_not_supported(_limit)
 
             _limit = _limit(
                 db=self.db,
@@ -547,10 +521,7 @@ class LimitVerifier:
             )
             _, err = await _limit.check()
             if err:
-                raise HTTPException(
-                    status_code=status.HTTP_403_FORBIDDEN,
-                    detail=err
-                )
+                raise ForbiddenError(err)
 
         return True
 
