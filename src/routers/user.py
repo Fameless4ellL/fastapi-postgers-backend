@@ -72,7 +72,7 @@ async def profile(
                 "documents", func.array_agg(
                     func.json_build_object(
                         "id", Document.id,
-                        "file", Document.file,
+                        "filename", Document.file,
                         "created_at", func.date_part('epoch', Document.created_at)
                     )
                 )
