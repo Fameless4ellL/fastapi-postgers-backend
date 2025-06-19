@@ -24,6 +24,7 @@ class OperationType(Enum):
     ALL = "all"
     WITHDRAWAL = "withdraw"
     PURCHASE = "purchase"
+    DEPOSIT = "deposit"
 
 
 class Period(MultiValueStrEnum):

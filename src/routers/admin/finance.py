@@ -176,7 +176,7 @@ async def get_operation(
 async def get_limit_list(
     db: Annotated[AsyncSession, Depends(get_db)],
     offset: int = 0,
-    limit: int = 10,
+    limit: int = 12,
 ):
     """
     Пользователь должен иметь возможность просмотра списка лимитов,
@@ -230,7 +230,7 @@ async def get_limit(
                 "type", func.lower(Limit.type.cast(String)),
                 "value", Limit.value,
                 "currency", Currency.code,
-                "operation_type", func.lower(Limit.operation_type.cast(String)),
+                "operation_type", Limit.operation_type,
                 "period", func.lower(Limit.period.cast(String)),
                 "kyc", Limit.kyc,
                 "status", func.lower(Limit.status.cast(String)),
@@ -248,10 +248,7 @@ async def get_limit(
     result = await db.execute(stmt)
     result = result.scalars().first()
 
-    return JSONResponse(
-        status_code=status.HTTP_200_OK,
-        content=LimitBase(**result).model_dump(mode="json"),
-    )
+    return LimitBase(**result)
 
 
 @admin.post(
