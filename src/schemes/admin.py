@@ -879,7 +879,7 @@ class LimitBase(BaseModel):
     ]
     period: Period
     kyc: Optional[bool] = False
-    status: Optional[bool] = False
+    status: Optional[bool] = True
     risk: Optional[RiskLevel] = None
     created_at: datetime
     updated_at: datetime

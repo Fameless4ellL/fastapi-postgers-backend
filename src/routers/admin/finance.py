@@ -10,7 +10,7 @@ from fastapi import Depends, status, Path
 from fastapi.responses import JSONResponse
 from pytz.tzinfo import DstTzInfo
 from rq.exceptions import InvalidJobOperation
-from sqlalchemy import func, select, String
+from sqlalchemy import func, select, String, not_
 from sqlalchemy.ext.asyncio import AsyncSession
 from starlette.responses import StreamingResponse
 
@@ -192,7 +192,7 @@ async def get_limit_list(
                 "operation_type", Limit.operation_type,
                 "period", func.lower(Limit.period.cast(String)),
                 "kyc", Limit.kyc,
-                "status", Limit.is_deleted,
+                "status", not_(Limit.is_deleted),
                 "risk", func.lower(Limit.risk.cast(String)),
                 "created_at", Limit.created_at,
                 "updated_at", Limit.updated_at,
@@ -232,7 +232,7 @@ async def get_limit(
                 "operation_type", Limit.operation_type,
                 "period", func.lower(Limit.period.cast(String)),
                 "kyc", Limit.kyc,
-                "status", Limit.is_deleted,
+                "status", not_(Limit.is_deleted),
                 "risk", func.lower(Limit.risk.cast(String)),
                 "created_at", Limit.created_at,
                 "updated_at", Limit.updated_at,
@@ -304,7 +304,7 @@ async def update_limit(
     return "Limit updated successfully"
 
 
-@admin.put(
+@admin.patch(
     "/limits/{obj_id}",
     responses={200: {"model": LimitBase}},
 )
