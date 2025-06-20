@@ -38,7 +38,7 @@ from src.schemes import KYC, Notifications, Profile, Usersettings, Transactions
 @public.get(
     "/profile",
     tags=["user"],
-    responses={200: {"model": Profile}}
+    response_model=Profile,
 )
 async def profile(
     user: Annotated[User, Depends(get_user)],
@@ -47,7 +47,7 @@ async def profile(
     """
     Получение информации о пользователе
     """
-    profile = (
+    _profile = (
         select(
             func.json_build_object(
                 "id", User.id,
@@ -68,14 +68,7 @@ async def profile(
                     ).scalar_subquery()
                 ),
                 "address", Wallet.address,
-                "balance", Balance.balance,
-                "documents", func.array_agg(
-                    func.json_build_object(
-                        "id", Document.id,
-                        "filename", Document.file,
-                        "created_at", func.date_part('epoch', Document.created_at)
-                    )
-                )
+                "balance", func.round(func.coalesce(Balance.balance, 0), 2)
             )
         )
         .select_from(User)
@@ -83,23 +76,11 @@ async def profile(
         .join(Wallet, Wallet.user_id == User.id, isouter=True)
         .join(Document, Document.user_id == User.id, isouter=True)
         .filter(User.id == user.id)
-        .group_by(
-            User.id,
-            User.username,
-            User.firstname,
-            User.lastname,
-            User.language_code,
-            User.country,
-            User.telegram,
-            User.phone_number,
-            Wallet.address,
-            Balance.balance
-        )
     )
-    profile = await db.execute(profile)
-    profile = profile.scalar()
+    _profile = await db.execute(_profile)
+    _profile = _profile.scalar()
 
-    if not profile["address"]:
+    if not _profile["address"]:
         acc: LocalAccount = Account.create()
 
         wallet = Wallet(
@@ -112,30 +93,14 @@ async def profile(
 
         await aredis.sadd("BLOCKER:WALLETS", wallet.address)
 
-        profile["address"] = wallet.address
+        _profile["address"] = wallet.address
 
-    kyc = {}
-    if profile["documents"]:
-        kyc = {"kyc":{
-            "first_name": profile['firstname'],
-            "patronomic": profile['patronomic'],
-            "last_name": profile['lastname'],
-            "documents": profile['documents'],
-        }}
-
-    profile["address"] = {
-        "base58": to_base58check_address(profile["address"]),
-        "evm": profile["address"],
+    _profile["address"] = {
+        "base58": to_base58check_address(_profile["address"]),
+        "evm": _profile["address"],
     }
-    data = Profile(
-        **profile,
-        **kyc,
-    )
 
-    return JSONResponse(
-        status_code=status.HTTP_200_OK,
-        content=data.model_dump()
-    )
+    return _profile
 
 
 @public.get(
@@ -172,7 +137,7 @@ async def get_kyc(
 @public.get(
     "/balance",
     tags=["user"],
-    responses={200: {"model": UserBalanceList}}
+    response_model=UserBalanceList
 )
 async def balance(
     user: Annotated[User, Depends(get_user)],
@@ -202,10 +167,7 @@ async def balance(
     if not data:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="No balances found")
 
-    return JSONResponse(
-        status_code=status.HTTP_200_OK,
-        content=UserBalanceList(items=data).model_dump(mode='json')
-    )
+    return dict(items=data)
 
 
 @public.post(
@@ -291,7 +253,7 @@ async def withdraw(
         job_id=f"withdraw_{history.id}",
     )
 
-    return JSONResponse(status_code=status.HTTP_200_OK, content="OK")
+    return "OK"
 
 
 @public.post(
