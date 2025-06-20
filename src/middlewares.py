@@ -69,13 +69,16 @@ class RequestMiddleware(BaseHTTPMiddleware):
         db: AsyncSession
     ):
         route = next(
-            route
-            for route in request.app.routes
-            if (
-                not isinstance(request_log.response, str)
-                and route.path == request.url.path
-                and next(iter(route.methods), "") == request.method
-            )
+            (
+                route
+                for route in request.app.routes
+                if (
+                    not isinstance(request_log.response, str)
+                    and route.path == request.url.path
+                    and next(iter(route.methods), "") == request.method
+                )
+            ),
+            None
         )
         if not route:
             return
