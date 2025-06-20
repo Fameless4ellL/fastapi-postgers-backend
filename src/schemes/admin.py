@@ -25,7 +25,7 @@ from pydantic_extra_types.country import CountryAlpha3
 from sqlalchemy import case, String, cast
 
 from settings import settings
-from src.models.limit import LimitType, Period, LimitStatus, RiskLevel, OperationType
+from src.models.limit import LimitType, Period, RiskLevel, OperationType
 from src.models.other import GameStatus, GameType, GameView, JackpotType, RepeatType, TicketStatus
 from src.models.user import BalanceChangeHistory, Role, User as DBUser
 from src.utils.validators import get_currency_by_id, get_first_currency
@@ -879,7 +879,7 @@ class LimitBase(BaseModel):
     ]
     period: Period
     kyc: Optional[bool] = False
-    status: LimitStatus
+    status: Optional[bool] = False
     risk: Optional[RiskLevel] = None
     created_at: datetime
     updated_at: datetime
@@ -897,7 +897,6 @@ class LimitCreate(BaseModel):
     operation_type: OperationType
     period: Period
     kyc: bool = False
-    status: LimitStatus
     risk: RiskLevel
 
 

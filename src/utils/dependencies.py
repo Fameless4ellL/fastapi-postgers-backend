@@ -36,7 +36,7 @@ from src.exceptions.limit import LimitExceptions
 from src.exceptions.network import NetworkExceptions
 from src.exceptions.user import UserExceptions
 from src.globals import aredis
-from src.models import Limit, LimitStatus, OperationType, LimitType
+from src.models import Limit, OperationType, LimitType
 from src.models.db import get_db
 from src.models.other import Network, Currency
 from src.models.user import User, Role, BalanceChangeHistory
@@ -531,7 +531,6 @@ class LimitVerifier:
         """
         stmt = select(Limit).filter(
             Limit.kyc == self.user.kyc,
-            Limit.status == LimitStatus.ACTIVE,
             Limit.is_deleted.is_(False),
         )
         db = await self.db.execute(stmt)

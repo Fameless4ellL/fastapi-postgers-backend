@@ -192,7 +192,7 @@ async def get_limit_list(
                 "operation_type", Limit.operation_type,
                 "period", func.lower(Limit.period.cast(String)),
                 "kyc", Limit.kyc,
-                "status", func.lower(Limit.status.cast(String)),
+                "status", Limit.is_deleted,
                 "risk", func.lower(Limit.risk.cast(String)),
                 "created_at", Limit.created_at,
                 "updated_at", Limit.updated_at,
@@ -201,13 +201,12 @@ async def get_limit_list(
         )
         .select_from(Limit)
         .join(Currency, Currency.id == Limit.currency_id)
-        .filter(Limit.is_deleted.is_(False))
     )
     count = stmt.with_only_columns(func.count())
     count = await db.execute(count)
     count = count.scalar()
 
-    stmt = stmt.order_by(Limit.status.asc(), Limit.created_at.desc())
+    stmt = stmt.order_by(Limit.is_deleted.asc(), Limit.created_at.desc())
     stmt = stmt.offset(offset).limit(limit)
     result = await db.execute(stmt)
     result = result.scalars().all()
@@ -233,7 +232,7 @@ async def get_limit(
                 "operation_type", Limit.operation_type,
                 "period", func.lower(Limit.period.cast(String)),
                 "kyc", Limit.kyc,
-                "status", func.lower(Limit.status.cast(String)),
+                "status", Limit.is_deleted,
                 "risk", func.lower(Limit.risk.cast(String)),
                 "created_at", Limit.created_at,
                 "updated_at", Limit.updated_at,
@@ -243,7 +242,6 @@ async def get_limit(
         .select_from(Limit)
         .join(Currency, Currency.id == Limit.currency_id)
         .filter(Limit.id == obj_id)
-        .filter(Limit.is_deleted.is_(False))
     )
     result = await db.execute(stmt)
     result = result.scalars().first()
@@ -306,7 +304,7 @@ async def update_limit(
     return "Limit updated successfully"
 
 
-@admin.delete(
+@admin.put(
     "/limits/{obj_id}",
     responses={200: {"model": LimitBase}},
 )
@@ -318,14 +316,13 @@ async def delete_limit(
     stmt = (
         select(Limit)
         .filter(Limit.id == obj_id)
-        .filter(Limit.is_deleted.is_(False))
     )
     result = await db.execute(stmt)
     result = result.scalars().first()
 
     await LimitExceptions.limit_not_found(result)
 
-    result.is_deleted = True
+    result.is_deleted = not result.is_deleted
     result.last_edited = token.id
     db.add(result)
     await db.commit()

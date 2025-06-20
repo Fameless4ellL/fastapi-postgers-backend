@@ -40,11 +40,6 @@ class Period(MultiValueStrEnum):
     YEAR = "year", datetime.timedelta(days=365)
 
 
-class LimitStatus(Enum):
-    ACTIVE = "active"
-    INACTIVE = "inactive"
-
-
 class RiskLevel(Enum):
     CRITICAL = "critical"  # Hard Limit
     NORMAL = "normal"  # Lockout Limit
@@ -62,7 +57,6 @@ class Limit(Base):
     operation_type: Mapped[OperationType] = Column(SqlEnum(OperationType), nullable=False, doc="Type of operations")
     period: Mapped[Period] = Column(SqlEnum(Period), nullable=False, doc="Limit validity period")
     kyc: Mapped[bool] = Column(Boolean, default=False)
-    status: Mapped[LimitStatus] = Column(SqlEnum(LimitStatus), nullable=False, default=LimitStatus.ACTIVE, doc="Limit status")
     risk: Mapped[RiskLevel] = Column(SqlEnum(RiskLevel), nullable=True, doc="Criticality indicator")
     created_at: Mapped[datetime.datetime] = Column(DateTime, default=datetime.datetime.now, doc="Date the limit was added")
     updated_at: Mapped[datetime.datetime] = Column(
