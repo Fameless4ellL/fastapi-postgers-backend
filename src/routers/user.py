@@ -281,11 +281,10 @@ async def upload_kyc(
 
     db.add(user)
 
-    if not files:
+    if files:
         await db.execute(
             delete(Document).where(Document.user_id == user.id)
         )
-    else:
         for file in files:
             file.filename = f"{user.id}_{file.filename}"
             doc = Document(
