@@ -167,7 +167,7 @@ async def balance(
     if not data:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="No balances found")
 
-    return dict(items=data)
+    return {"items": data}
 
 
 @public.post(
@@ -262,7 +262,7 @@ async def withdraw(
     responses={200: {"model": str}}
 )
 async def upload_kyc(
-    token: Annotated[Token, Depends(JWTBearer())],
+    user: Annotated[User, Depends(get_user)],
     db: Annotated[AsyncSession, Depends(get_db)],
     item: Annotated[KYC, JsonForm()],
     files: Union[list[UploadFile], None] = None,
@@ -271,13 +271,6 @@ async def upload_kyc(
     """
     Загрузка документа
     """
-    user = select(User).filter(User.id == token.id)
-    user = await db.execute(user)
-    user = user.scalar()
-
-    if not user:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="User not found")
-
     user.firstname = item.first_name
     user.lastname = item.last_name
     user.patronomic = item.patronomic
@@ -456,12 +449,9 @@ async def get_history(
     )
     count = count_result.scalar()
 
-    return JSONResponse(
-        status_code=status.HTTP_200_OK,
-        content=Transactions(
-            items=data,
-            count=count
-        ).model_dump(mode='json')
+    return Transactions(
+        items=data,
+        count=count
     )
 
 
@@ -579,16 +569,13 @@ async def get_my_games(
     items = await db.execute(stmt.offset(skip).limit(limit))
     items = items.scalars().fetchall()
 
-    return JSONResponse(
-        status_code=status.HTTP_200_OK,
-        content=MyGames(games=items, count=count).model_dump()
-    )
+    return MyGames(games=items, count=count)
 
 
 @public.get(
     "/notifications",
     tags=["user"],
-    responses={200: {"model": Notifications}}
+    response_model=Notifications
 )
 async def get_notifications(
     db: Annotated[AsyncSession, Depends(get_db)],
@@ -627,10 +614,7 @@ async def get_notifications(
     )
     await db.commit()
 
-    return JSONResponse(
-        status_code=status.HTTP_200_OK,
-        content=Notifications(items=notifications, count=count).model_dump(mode="json")
-    )
+    return {"items": notifications, "count": count}
 
 
 @public.post(
@@ -639,24 +623,16 @@ async def get_notifications(
 )
 async def set_settings(
     db: Annotated[AsyncSession, Depends(get_db)],
-    token: Annotated[Token, Depends(JWTBearer())],
+    user: Annotated[User, Depends(get_user)],
     item: Usersettings,
 ):
     """
     Изменение настроек пользователя
     """
-    user = select(User).filter(User.id == token.id)
-    user = await db.execute(user)
-    user = user.scalar()
-
-    if not user:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="User not found")
-
     user.language_code = item.locale
     user.country = item.country
     db.add(user)
     await db.commit()
-
     return "OK"
 
 
@@ -671,5 +647,4 @@ async def logout(
     Удаление токена из дб
     """
     await aredis.delete(f"TOKEN:USERS:{token.id}")
-
     return "OK"
