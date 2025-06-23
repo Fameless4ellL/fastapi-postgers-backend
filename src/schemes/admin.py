@@ -893,7 +893,7 @@ class Limits(BaseModel):
 
 class LimitCreate(BaseModel):
     type: LimitType
-    value: Decimal
+    value: Annotated[Decimal, Field(decimal_places=2, ge=0, lt=10 ** 7, max_digits=7)]
     operation_type: OperationType
     period: Period
     kyc: bool = False
