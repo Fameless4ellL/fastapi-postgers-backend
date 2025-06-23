@@ -266,7 +266,7 @@ async def upload_kyc(
     db: Annotated[AsyncSession, Depends(get_db)],
     item: Annotated[KYC, JsonForm()],
     files: Union[list[UploadFile], None] = None,
-    avatar: Annotated[UploadFile, File(include_in_schema=False)] = None
+    avatar: Annotated[UploadFile, File(include_in_schema=True)] = None
 ):
     """
     Загрузка документа
@@ -276,7 +276,6 @@ async def upload_kyc(
     user.patronomic = item.patronomic
 
     if avatar:
-        avatar.filename = f"{user.id}_{avatar.filename}"
         user.avatar_v1 = avatar
 
     db.add(user)

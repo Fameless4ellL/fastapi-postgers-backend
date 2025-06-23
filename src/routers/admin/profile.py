@@ -51,7 +51,7 @@ async def get_profile(
         "active": user.active,
         "twofa": bool(user.verified),
         "kyc": user.kyc,
-        "avatar": url_for('static/avatars', filename=user.avatar_v1.name) if user.avatar_v1 else None,
+        "avatar": user.avatar_v1,
         "document": documents,
     }
 

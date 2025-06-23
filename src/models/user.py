@@ -11,6 +11,7 @@ from sqlalchemy.orm import relationship, Mapped
 from src.globals import TotpFactory
 from .custom_types import FileType
 from .db import Base
+from .storage import MinioStorage
 
 
 class Role(Enum):
@@ -49,7 +50,7 @@ class User(Base):
 
     kyc: Mapped[bool] = Column(Boolean, default=False)
 
-    _avatar_v1: Mapped[FileType] = Column(FileType(storage=FileSystemStorage(path="/app/static/avatars")))
+    _avatar_v1: Mapped[FileType] = Column(FileType(storage=MinioStorage(bucket="avatars")))
 
     totp: Mapped[str] = Column(String(256), nullable=True, default=TotpFactory.new().to_json())
     verified: Mapped[bool] = Column(Boolean, default=False)
