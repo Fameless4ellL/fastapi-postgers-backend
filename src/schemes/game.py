@@ -5,7 +5,6 @@ from annotated_types import Len
 from enum import Enum
 
 from src.models import GameType, GameView
-from src.schemes.base import Image
 
 CommaList = Annotated[str, AfterValidator(lambda x: set(x.split(",")))]
 
@@ -108,7 +107,7 @@ class Tickets(BaseModel):
 class MyGame(Game):
     game_id: int
     status: Annotated[str, AfterValidator(lambda x: x.lower())]
-    image: Optional[Image] = None
+    image: Optional[str] = None
     max_limit_grid: Optional[int] = None
     won: Optional[bool] = False
     demo: Optional[bool] = False

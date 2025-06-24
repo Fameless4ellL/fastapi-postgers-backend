@@ -138,3 +138,4 @@ dmypy.json
 .static/
 .vscode/
 .idea/
+/.minio/

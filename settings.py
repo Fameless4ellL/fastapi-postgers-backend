@@ -43,12 +43,22 @@ class Settings(BaseSettings):
     database_url: str = "postgresql+{mode}://{user}:{password}@{database}/postgres"
 
 
+class Minio(BaseSettings):
+    model_config = SettingsConfigDict(env_prefix='MINIO_')
+
+    endpoint: str = "localhost:9000"
+    secure: bool = False
+    access_key: str = "AKIA3RYC6GBNMSHQQLBB"
+    secret_key: str = "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"
+
+
 class AWS(BaseSettings):
     model_config = SettingsConfigDict(env_prefix='AWS_')
 
     access_key: str = "AKIA3RYC6GBNMSHQQLBB"
     secret_key: str = "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"
     region: str = "us-east-1"
+    minio: Minio = Minio()
 
 
 aws = AWS()

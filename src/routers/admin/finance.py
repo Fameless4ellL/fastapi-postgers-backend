@@ -6,8 +6,7 @@ from decimal import Decimal
 from io import StringIO
 from typing import Annotated
 
-from fastapi import Depends, status, Path
-from fastapi.responses import JSONResponse
+from fastapi import Depends, Path
 from pytz.tzinfo import DstTzInfo
 from rq.exceptions import InvalidJobOperation
 from sqlalchemy import func, select, String, not_
@@ -216,7 +215,7 @@ async def get_limit_list(
 
 @admin.get(
     "/limits/{obj_id}",
-    responses={200: {"model": LimitBase}},
+    response_model=LimitBase,
 )
 async def get_limit(
     db: Annotated[AsyncSession, Depends(get_db)],
@@ -248,13 +247,10 @@ async def get_limit(
 
     await LimitExceptions.limit_not_found(result)
 
-    return LimitBase(**result)
+    return result
 
 
-@admin.post(
-    "/limit",
-    responses={200: {"model": LimitBase}},
-)
+@admin.post("/limit")
 async def create_limit(
     db: Annotated[AsyncSession, Depends(get_db)],
     token: Annotated[Token, Depends(JWTBearerAdmin())],
@@ -274,10 +270,7 @@ async def create_limit(
     return "Limit created successfully"
 
 
-@admin.put(
-    "/limits/{obj_id}",
-    responses={200: {"model": LimitBase}},
-)
+@admin.put("/limits/{obj_id}")
 async def update_limit(
     token: Annotated[Token, Depends(JWTBearerAdmin())],
     db: Annotated[AsyncSession, Depends(get_db)],
@@ -304,11 +297,8 @@ async def update_limit(
     return "Limit updated successfully"
 
 
-@admin.patch(
-    "/limits/{obj_id}",
-    responses={200: {"model": LimitBase}},
-)
-async def delete_limit(
+@admin.patch("/limits/{obj_id}")
+async def set_status_limit(
     token: Annotated[Token, Depends(JWTBearerAdmin())],
     db: Annotated[AsyncSession, Depends(get_db)],
     obj_id: Annotated[int, Path(ge=1)],
@@ -327,10 +317,7 @@ async def delete_limit(
     db.add(result)
     await db.commit()
 
-    return JSONResponse(
-        status_code=status.HTTP_201_CREATED,
-        content="Limit updated successfully",
-    )
+    return "Limit updated successfully"
 
 
 @admin.post("/operation/block/user/{obj_id}")

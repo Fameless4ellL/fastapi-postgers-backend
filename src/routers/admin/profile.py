@@ -1,19 +1,16 @@
 from typing import Annotated
 
-from fastapi import status, Security, Depends
-from fastapi.responses import JSONResponse
+from fastapi import Depends
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from src.models import get_db
-from src.models.user import Role, User, Document
+from src.models.user import User, Document
 from src.routers import admin
-from src.schemes import BadResponse
 from src.schemes.admin import (
     Profile,
 )
 from src.utils.dependencies import get_admin
-from src.utils.validators import url_for
 
 
 @admin.get(
@@ -34,10 +31,7 @@ async def get_profile(
         .limit(4)
     )
     documents = docs.scalars().all()
-    documents = [
-        url_for("static/kyc", path=doc.file.name)
-        for doc in documents
-    ]
+    documents = [doc.file for doc in documents]
 
     data = {
         "id": user.id,
@@ -51,7 +45,7 @@ async def get_profile(
         "active": user.active,
         "twofa": bool(user.verified),
         "kyc": user.kyc,
-        "avatar": url_for('static/avatars', filename=user.avatar_v1.name) if user.avatar_v1 else None,
+        "avatar": user.avatar_v1,
         "document": documents,
     }
 

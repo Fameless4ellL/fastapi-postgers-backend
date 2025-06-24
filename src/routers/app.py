@@ -1,14 +1,15 @@
 import datetime
 import json
+import mimetypes
 import random
 from contextlib import suppress
 from decimal import Decimal, DecimalException
 from typing import Annotated, Optional
 from fastapi import Depends, Path, status
-from fastapi.responses import JSONResponse
+from fastapi.responses import JSONResponse, Response
 from sqlalchemy import func, select
 
-from src.globals import aredis
+from src.globals import aredis, storage
 from src.models.db import get_db
 from src.models.log import Action
 from src.models.user import Balance, BalanceChangeHistory, User, Wallet
@@ -24,7 +25,6 @@ from src.models.other import (
 )
 from src.routers import public
 from src.utils.dependencies import get_user
-from src.utils.validators import url_for
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import joinedload
 from src.schemes import BadResponse
@@ -56,6 +56,27 @@ async def tg_login(item: WidgetLogin):
         )
 
     return JSONResponse(status_code=status.HTTP_200_OK, content="OK")
+
+
+@public.get("/file/games")
+def get_file(path: str):
+    response = None
+    try:
+        response = storage.get_object("games", path)
+        data = response.data
+        content_type, _ = mimetypes.guess_type(path)
+
+    except Exception:
+        return Response(status_code=404, content="Image not found")
+    finally:
+        if response:
+            response.close()
+            response.release_conn()
+
+    return Response(
+        content=data,
+        media_type=content_type or "application/octet-stream"
+    )
 
 
 @public.get(
@@ -91,7 +112,7 @@ async def game_instances(
     data = [{
         "id": g.id,
         "name": g.name,
-        "image": url_for("static", path=g.image),
+        "image": g.image,
         "currency": g.currency.code if g.currency else None,
         "status": g.status.value,
         "price": float(g.price),
@@ -199,7 +220,7 @@ async def read_game(
         "description": game.description,
         "currency": game.currency.code if game.currency else None,
         "status": game.status.value,
-        "image": url_for("static", path=game.image),
+        "image": game.image,
         "game_type": game.game_type,
         "kind": game.kind,
         "limit_by_ticket": game.limit_by_ticket,
@@ -633,7 +654,7 @@ async def get_jackpots(
             "id": j.id,
             "status": j.status.value,
             "endtime": j.scheduled_datetime.timestamp(),
-            "image": url_for("static", path=j.image),
+            "image": j.image,
             "amount": float(j.total_tickets or 0),
             "percentage": float(j.percentage),
             "created": j.created_at.timestamp()

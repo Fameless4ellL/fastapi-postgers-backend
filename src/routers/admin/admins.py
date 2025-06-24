@@ -45,7 +45,6 @@ from src.utils.dependencies import (
     IsGlobal,
     JWTBearerAdmin
 )
-from src.utils.validators import url_for
 
 get_crud_router(
     model=Network,
@@ -135,7 +134,7 @@ async def get_admin_list(
 @admin.get(
     "/admins/{admin_id}",
     dependencies=[Depends(Permission([IsSuper, IsAdmin]))],
-    responses={200: {"model": Profile},},
+    response_model=Profile,
 )
 async def get_admin(
     db: Annotated[AsyncSession, Depends(get_db)],
@@ -156,10 +155,7 @@ async def get_admin(
         .limit(5)
     )
     documents = docs.scalars().all()
-    documents = [
-        url_for("static/kyc", path=doc.file.name)
-        for doc in documents
-    ]
+    documents = [doc.file for doc in documents]
 
     data = {
         "id": user.id,
@@ -172,10 +168,10 @@ async def get_admin(
         "role": user.role,
         "active": user.active,
         "kyc": user.kyc,
-        "avatar": url_for('static/avatars', filename=user.avatar_v1.name) if user.avatar_v1 else None,
+        "avatar": user.avatar_v1,
         "document": documents
     }
-    return Profile(**data)
+    return data
 
 
 @admin.post(

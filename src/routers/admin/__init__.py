@@ -224,22 +224,8 @@ def get_crud_router(
         if model.__name__ == "Game":
             file = getattr(file, "image", None)
             if file:
-
-                directory = "static"
-                os.makedirs(directory, exist_ok=True)
-
-                # Save file to disk
-                filename, file_extension = os.path.splitext(file.filename)
-                filename = filename.replace(" ", "_")
-                new_item.image = f"{filename}_{new_item.id}{file_extension}"
+                new_item.image = file
                 db.add(new_item)
-
-                file_path = os.path.join(
-                    directory,
-                    f"{filename}_{new_item.id}{file_extension}"
-                )
-                with open(file_path, "wb") as f:
-                    f.write(await file.read())
 
             q.enqueue_at(
                 datetime=new_item.scheduled_datetime,
@@ -251,21 +237,8 @@ def get_crud_router(
         if model.__name__ == "Jackpot":
             file = getattr(file, "image", None)
             if file:
-                directory = "static"
-                os.makedirs(directory, exist_ok=True)
-
-                # Save file to disk
-                filename, file_extension = os.path.splitext(file.filename)
-                filename = filename.replace(" ", "_")
-                new_item.image = f"{filename}_{new_item.id}{file_extension}"
+                new_item.image = file
                 db.add(new_item)
-
-                file_path = os.path.join(
-                    directory,
-                    f"{filename}_{new_item.id}{file_extension}"
-                )
-                with open(file_path, "wb") as f:
-                    f.write(await file.read())
 
             q.enqueue_at(
                 new_item.scheduled_datetime,
@@ -283,10 +256,7 @@ def get_crud_router(
 
         await db.commit()
 
-        return JSONResponse(
-            status_code=status.HTTP_201_CREATED,
-            content=get_schema.model_validate(new_item).model_dump(mode='json')
-        )
+        return get_schema.model_validate(new_item)
 
     @router.put(
         f"{prefix}/{{id}}/update",
@@ -344,29 +314,7 @@ def get_crud_router(
             file = files.image
 
             if file:
-                directory = "static"
-                os.makedirs(directory, exist_ok=True)
-                filename, file_extension = os.path.splitext(file.filename)
-                filename = filename.replace(" ", "_")
-
-                # Delete old file if it exists
-                if db_item.image:
-                    old_file_path = os.path.join(
-                        directory,
-                        f"{db_item.image}_{db_item.id}"
-                    )
-                    if os.path.exists(old_file_path):
-                        os.remove(old_file_path)
-
-                # Save file to disk
-                db_item.image = f"{filename}_{db_item.id}{file_extension}"
-
-                file_path = os.path.join(
-                    directory,
-                    f"{filename}_{db_item.id}{file_extension}"
-                )
-                with open(file_path, "wb") as f:
-                    f.write(await file.read())
+                db_item.image = file
 
         if model.__name__ == "Game":
             if item.scheduled_datetime:
@@ -384,37 +332,13 @@ def get_crud_router(
             file = files.image
 
             if file:
-
-                directory = "static"
-                os.makedirs(directory, exist_ok=True)
-                filename, file_extension = os.path.splitext(file.filename)
-                filename = filename.replace(" ", "_")
-
-                # Delete old file if it exists
-                if db_item.image:
-                    old_file_path = os.path.join(
-                        directory,
-                        f"{db_item.image}_{db_item.id}"
-                    )
-                    if os.path.exists(old_file_path):
-                        os.remove(old_file_path)
-
-                # Save file to disk
-                db_item.image = f"{filename}_{db_item.id}{file_extension}"
-
-                file_path = os.path.join(
-                    directory,
-                    f"{filename}_{db_item.id}{file_extension}"
-                )
-                with open(file_path, "wb") as f:
-                    f.write(await file.read())
+                db_item.image = file
 
         db.add(db_item)
         await db.commit()
-        return JSONResponse(
-            status_code=status.HTTP_200_OK,
-            content=get_schema.model_validate(db_item).model_dump(mode='json')
-        )
+        await db.refresh(db_item)
+
+        return get_schema.model_validate(db_item)
 
 
 from .admins import *

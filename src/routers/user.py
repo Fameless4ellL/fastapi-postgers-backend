@@ -12,6 +12,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.sql import sqltypes
 from tronpy.keys import to_base58check_address
 
+from settings import settings
 from src.globals import aredis, q
 from src.models.db import get_db
 from src.models.log import Action
@@ -114,24 +115,29 @@ async def get_kyc(
 ):
     stmt = (
         select(
-            func.json_build_object(
-                "id", Document.id,
-                "filename", Document.file,
-                "created_at", func.date_part('epoch', Document.created_at)
-            )
+            Document.id,
+            Document.file,
+            func.date_part('epoch', Document.created_at).label('epoch')
         )
         .select_from(Document)
         .filter(Document.user_id == user.id)
     )
     data = await db.execute(stmt)
-    data = data.scalars().all()
+    data = data.fetchall()
 
-    return KYCProfile(
-        first_name=user.firstname,
-        last_name=user.lastname,
-        patronomic=user.patronomic,
-        documents=data
-    )
+    data = {
+        "first_name": user.firstname,
+        "last_name": user.lastname,
+        "patronomic": user.patronomic,
+        "documents": [{
+            "id": obj.id,
+            "file": obj.file,
+            "filename": obj.file.name if obj.file else None,
+            "created_at": obj.epoch
+        } for obj in data]
+    }
+
+    return data
 
 
 @public.get(
@@ -266,7 +272,7 @@ async def upload_kyc(
     db: Annotated[AsyncSession, Depends(get_db)],
     item: Annotated[KYC, JsonForm()],
     files: Union[list[UploadFile], None] = None,
-    avatar: Annotated[UploadFile, File(include_in_schema=False)] = None
+    avatar: Annotated[UploadFile, File(include_in_schema=True)] = None
 ):
     """
     Загрузка документа
@@ -276,7 +282,6 @@ async def upload_kyc(
     user.patronomic = item.patronomic
 
     if avatar:
-        avatar.filename = f"{user.id}_{avatar.filename}"
         user.avatar_v1 = avatar
 
     db.add(user)
@@ -286,11 +291,8 @@ async def upload_kyc(
             delete(Document).where(Document.user_id == user.id)
         )
         for file in files:
-            file.filename = f"{user.id}_{file.filename}"
-            doc = Document(
-                user_id=user.id,
-                file=file
-            )
+            file.filename = f"{user.id}/{file.filename}"
+            doc = Document(user_id=user.id, file=file)
             db.add(doc)
 
     await db.commit()
@@ -508,7 +510,10 @@ async def get_my_games(
                     "currency", Currency.code,
                     "won", func.bool_or(Ticket.won),
                     "demo", func.bool_and(Ticket.demo),
-                    "image", Jackpot.image,
+                    "image", func.concat(
+                        f"{settings.back_url}/v1/file/games?path=game/",
+                        func.coalesce(Jackpot.image, "default_jackpot.png")
+                    ),
                     "status", Jackpot.status,
                     "total_amount", func.sum(Ticket.amount).label("total_amount"),
                     "ticket_count", func.count(Ticket.id).label("ticket_count"),
@@ -537,7 +542,10 @@ async def get_my_games(
                     "game_id", Game.id,
                     "currency", Currency.code,
                     "name", Game.name,
-                    "image", Game.image,
+                    "image", func.concat(
+                        f"{settings.back_url}/v1/file/games?path=game/",
+                        func.coalesce(Game.image, "default_image.png")
+                    ),
                     "status", Game.status,
                     "price", Game.price,
                     "won", func.bool_or(Ticket.won),
