@@ -511,7 +511,7 @@ async def get_my_games(
                     "won", func.bool_or(Ticket.won),
                     "demo", func.bool_and(Ticket.demo),
                     "image", func.concat(
-                        f"{settings.back_url}/v1/file/games?path=game/",
+                        f"{settings.back_url}/v1/file/games?path=",
                         func.coalesce(Jackpot.image, "default_jackpot.png")
                     ),
                     "status", Jackpot.status,
@@ -543,7 +543,7 @@ async def get_my_games(
                     "currency", Currency.code,
                     "name", Game.name,
                     "image", func.concat(
-                        f"{settings.back_url}/v1/file/games?path=game/",
+                        f"{settings.back_url}/v1/file/games?path=",
                         func.coalesce(Game.image, "default_image.png")
                     ),
                     "status", Game.status,
