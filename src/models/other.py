@@ -105,7 +105,7 @@ class Jackpot(Base):
     currency_id: Mapped[int] = Column(Integer, ForeignKey('currencies.id'), nullable=True)
     percentage: Mapped[decimal.Decimal] = Column(DECIMAL(5, 2), default=10, doc="Percentage of deductions from daily money games")
     image: Mapped[str] = Column(
-        FileType(storage=MinioStorage(bucket="games", path="jackpot", public=True)),
+        FileType(storage=MinioStorage(bucket="games", public=True)),
         nullable=True,
         doc="The image of the instance"
     )
@@ -206,7 +206,7 @@ class Game(Base):
     numbers: Mapped[list[int]] = Column(ARRAY(Integer), nullable=True)
 
     image: Mapped[str] = Column(
-        FileType(storage=MinioStorage(bucket="games", path="game", public=True)),
+        FileType(storage=MinioStorage(bucket="games", public=True)),
         nullable=True,
         doc="The image of the game instance"
     )
