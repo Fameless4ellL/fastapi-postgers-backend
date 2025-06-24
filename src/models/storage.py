@@ -17,7 +17,7 @@ class MinioStorage(BaseStorage):
     def __init__(
         self,
         bucket: str,
-        path: str = None,
+        path: str = "",
         public: bool = False
     ):
         self.client = Minio(
