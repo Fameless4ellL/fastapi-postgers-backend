@@ -528,9 +528,8 @@ async def unblock_user(
     user = user.scalars().first()
 
     await UserExceptions.raise_exception_user_not_found(user)
-    await UserExceptions.user_is_blocked(user)
 
-    user.is_blocked = False
+    user.is_blocked = not user.is_blocked
     db.add(user)
 
     await db.commit()
