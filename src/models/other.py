@@ -16,6 +16,7 @@ from sqlalchemy import (
 )
 from sqlalchemy.orm import relationship, Mapped
 
+from . import MinioStorage, FileType
 from .db import Base
 from .utils import generate_unique_ticket_number
 
@@ -103,7 +104,11 @@ class Jackpot(Base):
     _type: Mapped[JackpotType] = Column(SqlEnum(JackpotType), default=JackpotType.GLOBAL)
     currency_id: Mapped[int] = Column(Integer, ForeignKey('currencies.id'), nullable=True)
     percentage: Mapped[decimal.Decimal] = Column(DECIMAL(5, 2), default=10, doc="Percentage of deductions from daily money games")
-    image: Mapped[str] = Column(String(255), nullable=True, default="default_jackpot.png", doc="The image of the instance")
+    image: Mapped[str] = Column(
+        FileType(storage=MinioStorage(bucket="games", path="jackpot", public=True)),
+        nullable=True,
+        doc="The image of the instance"
+    )
     country: Mapped[str] = Column(String(32), nullable=True)
 
     scheduled_datetime: Mapped[datetime.datetime] = Column(
@@ -200,7 +205,11 @@ class Game(Base):
 
     numbers: Mapped[list[int]] = Column(ARRAY(Integer), nullable=True)
 
-    image: Mapped[str] = Column(String(255), nullable=True, default="default_image.png", doc="The image of the game instance")
+    image: Mapped[str] = Column(
+        FileType(storage=MinioStorage(bucket="games", path="game", public=True)),
+        nullable=True,
+        doc="The image of the game instance"
+    )
     status: Mapped[GameStatus] = Column(SqlEnum(GameStatus), default=GameStatus.PENDING)
 
     scheduled_datetime: Mapped[datetime.datetime] = Column(

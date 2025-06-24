@@ -4,7 +4,6 @@ import os
 from enum import Enum
 from typing import Union
 
-from fastapi_storages import FileSystemStorage
 from sqlalchemy import DECIMAL, Boolean, Column, DateTime, ForeignKey, Integer, String, Enum as SQLEnum
 from sqlalchemy.orm import relationship, Mapped
 
@@ -50,12 +49,12 @@ class User(Base):
 
     kyc: Mapped[bool] = Column(Boolean, default=False)
 
-    _avatar_v1: Mapped[FileType] = Column(FileType(storage=MinioStorage(bucket="avatars")))
+    _avatar_v1: Mapped[FileType] = Column(FileType(storage=MinioStorage(bucket="users", path="avatars")))
 
     totp: Mapped[str] = Column(String(256), nullable=True, default=TotpFactory.new().to_json())
     verified: Mapped[bool] = Column(Boolean, default=False)
 
-    referral_id: Mapped[Union[str, None]] = Column(Integer, ForeignKey('referral_links.id'), nullable=True)
+    referral_id: Mapped[Union[int, None]] = Column(Integer, ForeignKey('referral_links.id'), nullable=True)
 
     is_blocked: Mapped[bool] = Column(Boolean, default=False)
 
@@ -80,7 +79,7 @@ class User(Base):
             os.remove(self._avatar_v1.path)
 
         # Сохранение нового файла
-        value.filename = f"{self.id}_{value.filename}"
+        value.filename = f"{self.id}/{value.filename}"
         self._avatar_v1 = value
 
 
@@ -89,7 +88,7 @@ class Document(Base):
 
     id: Mapped[int] = Column(Integer, primary_key=True, index=True)
     user_id: Mapped[int] = Column(Integer, ForeignKey('users.id', ondelete='CASCADE'), nullable=True)
-    file: Mapped[FileType] = Column(FileType(storage=FileSystemStorage(path="/app/static/kyc")))
+    file: Mapped[FileType] = Column(FileType(storage=MinioStorage(bucket="users", path="kyc")))
     created_at: Mapped[datetime.datetime] = Column(DateTime, default=datetime.datetime.now)
     updated_at: Mapped[datetime.datetime] = Column(
         DateTime,

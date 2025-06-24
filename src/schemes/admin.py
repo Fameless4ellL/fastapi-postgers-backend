@@ -29,7 +29,7 @@ from src.models.limit import LimitType, Period, RiskLevel, OperationType
 from src.models.other import GameStatus, GameType, GameView, JackpotType, RepeatType, TicketStatus
 from src.models.user import BalanceChangeHistory, Role, User as DBUser
 from src.utils.validators import get_currency_by_id, get_first_currency
-from src.schemes.base import Country, Country_by_name, ModPhoneNumber, Image
+from src.schemes.base import Country, Country_by_name, ModPhoneNumber
 from src.utils.datastructure import MultiValueStrEnum
 
 
@@ -265,7 +265,7 @@ class GameBase(BaseAdmin):
     description: Optional[str]
     max_win_amount: Optional[float] = 8.0
     prize: Union[float, str] = 1000
-    image: Optional[Image] = "default_image.png"
+    image: Optional[str] = None
     country: Optional[str]
     min_ticket_count: int = 1
     scheduled_datetime: Optional[datetime]
@@ -343,7 +343,7 @@ class GameSchema(BaseAdmin):
     min_ticket_count: int = 1
     price: float = 1.0
     prize: Union[float, str] = 1000.0
-    image: Optional[Image] = "default_image.png"
+    image: Optional[str] = None
     has_tickets: bool = False
     game_type: GameType
     status: GameStatus
@@ -436,7 +436,7 @@ class JackpotBase(BaseAdmin):
     currency_id: Optional[int] = None
     percentage: Optional[float] = 10.0
     price: float = 1.0
-    image: Optional[Image] = "default_image.png"
+    image: Optional[str] = None
     game_type: JackpotType = Field(..., alias="_type")
     status: Optional[GameStatus] = None
     repeat: RepeatType = RepeatType.NONE
@@ -506,7 +506,7 @@ class JackpotSchema(BaseAdmin):
     id: int
     name: str
     game_type: JackpotType = Field(..., alias="_type")
-    image: Optional[Image] = "default_jackpot.png"
+    image: Optional[str] = None
     has_tickets: bool = False
     country: Country
     status: Optional[GameStatus] = None

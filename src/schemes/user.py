@@ -1,14 +1,20 @@
+import base64
 import json
+import mimetypes
+import traceback
 from decimal import Decimal
 
 import pycountry
 from typing import Annotated, Optional, Union
+
+
+from minio import S3Error
 from pydantic import BaseModel, computed_field, AfterValidator, Field
 from pydantic_extra_types.country import CountryAlpha3
 from pydantic_extra_types.language_code import LanguageAlpha2
 
+from src.globals import storage
 from src.models import BalanceChangeHistory
-from src.utils.validators import url_for, url_for_encoded
 
 
 class UserBalance(BaseModel):
@@ -40,20 +46,34 @@ class Address(BaseModel):
 
 class Docs(BaseModel):
     id: Optional[int] = None
+    file: Optional[str] = None
     filename: Optional[str] = None
     created_at: Optional[float] = None
 
     @computed_field
     def data(self) -> Union[str, None]:
-        if self.filename is not None:
-            return url_for_encoded("static/kyc", path=self.filename)
-        return
+        content_type, _ = mimetypes.guess_type(self.filename)
+        if content_type != 'application/pdf':
+            return
 
-    @computed_field
-    def file(self) -> Union[str, None]:
+        filename = 'kyc/' + self.filename if not self.filename.startswith('kyc/') else self.filename
+        encoded = None
         if self.filename is not None:
-            return url_for("static/kyc", path=self.filename)
-        return
+            response = None
+            try:
+                response = storage.get_object(
+                    bucket_name='users',
+                    object_name=filename,
+                )
+                encoded = base64.b64encode(response.read()).decode("utf-8")
+            except S3Error:
+                traceback.print_exc()
+            finally:
+                if response:
+                    response.close()
+                    response.release_conn()
+
+        return encoded
 
 
 class KYCProfile(KYC):

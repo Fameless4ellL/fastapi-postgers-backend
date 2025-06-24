@@ -24,7 +24,6 @@ from src.schemes.admin import (
     WalletBase,
 )
 from src.utils.dependencies import Token, JWTBearerAdmin
-from src.utils.validators import url_for
 
 
 @admin.get(
@@ -126,10 +125,7 @@ async def get_user(
         .limit(4)
     )
     documents = docs.scalars().all()
-    documents = [
-        url_for("static/kyc", path=doc.file.name)
-        for doc in documents
-    ]
+    documents = [doc.file for doc in documents]
 
     data = {
         "id": user.id,

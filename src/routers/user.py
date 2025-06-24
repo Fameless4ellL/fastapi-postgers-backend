@@ -114,24 +114,29 @@ async def get_kyc(
 ):
     stmt = (
         select(
-            func.json_build_object(
-                "id", Document.id,
-                "filename", Document.file,
-                "created_at", func.date_part('epoch', Document.created_at)
-            )
+            Document.id,
+            Document.file,
+            func.date_part('epoch', Document.created_at).label('epoch')
         )
         .select_from(Document)
         .filter(Document.user_id == user.id)
     )
     data = await db.execute(stmt)
-    data = data.scalars().all()
+    data = data.fetchall()
 
-    return KYCProfile(
-        first_name=user.firstname,
-        last_name=user.lastname,
-        patronomic=user.patronomic,
-        documents=data
-    )
+    data = {
+        "first_name": user.firstname,
+        "last_name": user.lastname,
+        "patronomic": user.patronomic,
+        "documents": [{
+            "id": obj.id,
+            "file": obj.file,
+            "filename": obj.file.name if obj.file else None,
+            "created_at": obj.epoch
+        } for obj in data]
+    }
+
+    return data
 
 
 @public.get(
@@ -285,11 +290,8 @@ async def upload_kyc(
             delete(Document).where(Document.user_id == user.id)
         )
         for file in files:
-            file.filename = f"{user.id}_{file.filename}"
-            doc = Document(
-                user_id=user.id,
-                file=file
-            )
+            file.filename = f"{user.id}/{file.filename}"
+            doc = Document(user_id=user.id, file=file)
             db.add(doc)
 
     await db.commit()

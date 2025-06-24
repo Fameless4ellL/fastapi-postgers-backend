@@ -133,7 +133,6 @@ def proceed_game(game_id: Optional[int] = None):
     """
     Proceed the game instance and distribute the prize money
     """
-    from src.utils.validators import url_for
     db = next(get_sync_db())
 
     if game_id:
@@ -285,7 +284,7 @@ def proceed_game(game_id: Optional[int] = None):
                     args=json.dumps({
                         "game": game.name,
                         "type": type(game).__name__,
-                        "image": url_for("static", path=game.image),
+                        "image": game.image,
                         "amount": str(_ticket.amount),
                         "currency": game.currency.code
                     })
@@ -301,7 +300,7 @@ def proceed_game(game_id: Optional[int] = None):
                     args=json.dumps({
                         "game": game.name,
                         "type": type(game).__name__,
-                        "image": url_for("static", path=game.image),
+                        "image": game.image,
                         "amount": str(_ticket.amount),
                         "currency": game.currency.code
                     })
@@ -396,7 +395,6 @@ def proceed_jackpot(jackpot_id: Optional[int] = None):
     """
     Proceed the jackpot instance and distribute the prize money
     """
-    from src.utils.validators import url_for
     db = next(get_sync_db())
 
     if jackpot_id:
@@ -500,7 +498,7 @@ def proceed_jackpot(jackpot_id: Optional[int] = None):
                 args=json.dumps({
                     "game": jackpot.name,
                     "type": type(jackpot).__name__,
-                    "image": url_for("static", path=jackpot.image),
+                    "image": jackpot.image,
                     "amount": str(prize),
                     "currency": jackpot.currency.code
                 })
