@@ -12,6 +12,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.sql import sqltypes
 from tronpy.keys import to_base58check_address
 
+from settings import settings
 from src.globals import aredis, q
 from src.models.db import get_db
 from src.models.log import Action
@@ -509,7 +510,10 @@ async def get_my_games(
                     "currency", Currency.code,
                     "won", func.bool_or(Ticket.won),
                     "demo", func.bool_and(Ticket.demo),
-                    "image", Jackpot.image,
+                    "image", func.concat(
+                        f"{settings.back_url}/v1/file/games?path=game/",
+                        func.coalesce(Jackpot.image, "default_jackpot.png")
+                    ),
                     "status", Jackpot.status,
                     "total_amount", func.sum(Ticket.amount).label("total_amount"),
                     "ticket_count", func.count(Ticket.id).label("ticket_count"),
@@ -538,7 +542,10 @@ async def get_my_games(
                     "game_id", Game.id,
                     "currency", Currency.code,
                     "name", Game.name,
-                    "image", Game.image,
+                    "image", func.concat(
+                        f"{settings.back_url}/v1/file/games?path=game/",
+                        func.coalesce(Game.image, "default_image.png")
+                    ),
                     "status", Game.status,
                     "price", Game.price,
                     "won", func.bool_or(Ticket.won),
