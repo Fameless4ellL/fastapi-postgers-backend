@@ -347,7 +347,7 @@ async def get_w3(
 
 
 def nth(iterable, n, default=None):
-    "Returns the nth item or a default value."
+    """Returns the nth item or a default value."""
     return next(islice(iterable, n, None), default)
 
 
@@ -386,27 +386,27 @@ async def is_field_unique(
     return not result.scalar()
 
 
-async def transaction_atomic(db: Annotated[AsyncSession, Depends(get_db)]):
-    """
-    Context manager for handling transactions in an async session.
-    """
-    async with db.begin():
-        yield db
-
-
-class LimitTypeBase:
+class LimitTypeBase(ABC):
     """
     Base class for limit types.
     """
-    def __init__(self, user: User = None, db: AsyncSession = None, request: Request = None, limit: Limit = None):
+    def __init__(
+        self,
+        user: User = None,
+        db: AsyncSession = None,
+        request: Request = None,
+        limit: Limit = None
+    ):
         self.user = user
         self.db = db
         self.request = request
         self.limit = limit
 
+    @abstractmethod
     async def check(self):
         raise NotImplementedError("Subclasses should implement this method.")
 
+    @abstractmethod
     def clean(self, op: Decimal):
         raise NotImplementedError("Subclasses should implement this method.")
 

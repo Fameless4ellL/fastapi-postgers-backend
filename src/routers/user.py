@@ -27,13 +27,13 @@ from src.models.user import (
     Document
 )
 from src.routers import public
-from src.utils import worker
-from src.utils.dependencies import get_user, get_currency, Token, JWTBearer
 from src.schemes import Country, JsonForm, UserBalanceList, KYCProfile
+from src.schemes import KYC, Notifications, Profile, Usersettings, Transactions
 from src.schemes import (
     MyGames, MyGamesType, Tickets, Withdraw
 )
-from src.schemes import KYC, Notifications, Profile, Usersettings, Transactions
+from src.utils import worker
+from src.utils.dependencies import get_user, get_currency, Token, JWTBearer
 
 
 @public.get(
@@ -286,10 +286,11 @@ async def upload_kyc(
 
     db.add(user)
 
+    await db.execute(
+        delete(Document).where(Document.user_id == user.id)
+    )
+
     if files:
-        await db.execute(
-            delete(Document).where(Document.user_id == user.id)
-        )
         for file in files:
             file.filename = f"{user.id}/{file.filename}"
             doc = Document(user_id=user.id, file=file)

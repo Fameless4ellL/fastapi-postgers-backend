@@ -51,7 +51,6 @@ async def delete_jackpot(
     game = game.scalar()
 
     await JackpotExceptions.raise_exception_user_not_found(game)
-    await JackpotExceptions.raise_exception_jackpot_already_started(game)
 
     if _type == "delete":
         game.status = GameStatus.DELETED
