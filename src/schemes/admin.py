@@ -434,7 +434,7 @@ class JackpotBase(BaseAdmin):
     name: str
     country: Country
     currency_id: Optional[int] = None
-    percentage: Optional[float] = 10.0
+    percentage: Optional[float] = Field(default=10.0, ge=1, le=99)
     price: float = 1.0
     image: Optional[str] = None
     game_type: JackpotType = Field(..., alias="_type")

@@ -532,7 +532,7 @@ async def get_my_games(
                 Currency.code,
                 Jackpot.name,
             )
-            .order_by(func.min(Ticket.created_at).desc())
+            .order_by(Jackpot.scheduled_datetime.desc())
         )
 
     else:
@@ -567,7 +567,7 @@ async def get_my_games(
                 Game.name,
                 Currency.code,
             )
-            .order_by(func.min(Ticket.created_at).desc())
+            .order_by(Game.scheduled_datetime.desc())
         )
 
     count = stmt.order_by(None).with_only_columns(func.count())

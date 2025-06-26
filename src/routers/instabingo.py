@@ -5,6 +5,7 @@ from fastapi import Depends, status
 from fastapi.responses import JSONResponse
 from sqlalchemy.orm import Session
 
+from src.exceptions.game import GameExceptions
 from src.models.db import get_sync_db
 from src.models.log import Action
 from src.models.user import Balance, BalanceChangeHistory, User, Wallet
@@ -91,12 +92,6 @@ async def instabingo_check(
     """
     generate tickets
     """
-    if len(set(item.numbers)) != 15:
-        return JSONResponse(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            content=BadResponse(message="Invalid numbers, should be 15").model_dump()
-        )
-
     stmt = db.query(InstaBingo).filter(
         InstaBingo.country == user.country,
         InstaBingo.deleted.is_(False)
@@ -128,11 +123,7 @@ async def instabingo_check(
                 InstaBingo.country.is_(None),
             ).first()
 
-    if not game:
-        return JSONResponse(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            content=BadResponse(message="Game not found").model_dump()
-        )
+    await GameExceptions.raise_exception_game_not_found(game)
 
     tickets = [
         dict(
@@ -196,11 +187,7 @@ async def buy_tickets(
                 InstaBingo.country.is_(None),
             ).first()
 
-    if not game:
-        return JSONResponse(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            content=BadResponse(message="Game not found").model_dump()
-        )
+    await GameExceptions.raise_exception_game_not_found(game)
 
     jackpot_id = None
 

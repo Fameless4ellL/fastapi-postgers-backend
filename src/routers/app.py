@@ -9,6 +9,7 @@ from fastapi import Depends, Path, status
 from fastapi.responses import JSONResponse, Response
 from sqlalchemy import func, select
 
+from src.exceptions.game import GameExceptions
 from src.globals import aredis, storage
 from src.models.db import get_db
 from src.models.log import Action
@@ -152,12 +153,7 @@ async def calc_balance(
         .filter(Game.id == game_id)
     )
     game = result.scalars().first()
-
-    if game is None:
-        return JSONResponse(
-            status_code=status.HTTP_404_NOT_FOUND,
-            content=BadResponse(message="Game not found").model_dump()
-        )
+    await GameExceptions.raise_exception_game_not_found(game)
 
     stmt = select(Balance).filter(
         Balance.user_id == user.id,
@@ -199,20 +195,8 @@ async def read_game(
 
     result = await db.execute(stmt)
     game = result.scalars().first()
-
-    if game is None:
-        return JSONResponse(
-            status_code=status.HTTP_404_NOT_FOUND,
-            content=BadResponse(message="Game not found").model_dump()
-        )
-    if (
-        game.game_type == GameType.LOCAL
-        and str(game.country) != user.country
-    ):
-        return JSONResponse(
-            status_code=status.HTTP_404_NOT_FOUND,
-            content=BadResponse(message="Game not found").model_dump()
-        )
+    await GameExceptions.raise_exception_game_not_found(game)
+    await GameExceptions.raise_exception_on_local_game(game)
 
     data = {
         "id": game.id,
@@ -260,42 +244,11 @@ async def buy_tickets(
             joinedload(Game.currency).joinedload(Currency.network)
         )
     )
+
     game: Optional[Game] = game.scalar()
-
-    if not game:
-        return JSONResponse(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            content=BadResponse(message="Game not found").model_dump()
-        )
-
-    if (
-        game.game_type == GameType.LOCAL
-        and str(game.country) != user.country
-    ):
-        return JSONResponse(
-            status_code=status.HTTP_404_NOT_FOUND,
-            content=BadResponse(message="Game not found").model_dump()
-        )
-
-    if any(len(set(n)) != game.limit_by_ticket for n in item.numbers):
-        return JSONResponse(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            content=BadResponse(
-                message=(
-                    f"Invalid ticket numbers, "
-                    f"need {game.limit_by_ticket} per ticket"
-                )
-            ).model_dump()
-        )
-
-    for numbers in item.numbers:
-        if not all(0 < i <= game.max_limit_grid for i in numbers):
-            return JSONResponse(
-                status_code=status.HTTP_400_BAD_REQUEST,
-                content=BadResponse(
-                    message="Invalid ticket numbers, need proper number based on game settings"
-                ).model_dump()
-            )
+    await GameExceptions.raise_exception_game_not_found(game)
+    await GameExceptions.raise_exception_on_local_game(game, user)
+    await GameExceptions.raise_exception_on_game_conditions(game, item.numbers)
 
     jackpot_id = None
 
@@ -436,13 +389,10 @@ async def gen_tickets(
     game = await db.execute(
         select(Game)
         .filter(Game.id == game_id)
+        .filter(Game.status != GameStatus.PENDING)
     )
     game = game.scalar()
-    if game is None or game.status != GameStatus.PENDING:
-        return JSONResponse(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            content=BadResponse(message="Game not found").model_dump()
-        )
+    await GameExceptions.raise_exception_game_not_found(game)
 
     tickets = []
 
@@ -518,13 +468,10 @@ async def edit_ticket(
     game = await db.execute(
         select(Game)
         .filter(Game.id == game_id)
+        .filter(Game.status != GameStatus.PENDING)
     )
     game = game.scalar()
-    if game is None or game.status != GameStatus.PENDING:
-        return JSONResponse(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            content=BadResponse(message="Game not found").model_dump()
-        )
+    await GameExceptions.raise_exception_game_not_found(game)
 
     if len(set(item.edited_numbers)) != game.limit_by_ticket:
         return JSONResponse(

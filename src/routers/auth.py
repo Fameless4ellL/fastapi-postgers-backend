@@ -9,12 +9,12 @@ from fastapi.responses import JSONResponse
 from sqlalchemy import select, or_
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from src.exceptions.user import UserExceptions
 from src.globals import aredis
 from src.models.db import get_db
 from src.models.log import Action
 from src.models.user import User, ReferralLink, Wallet
 from src.routers import public
-from src.schemes import BadResponse
 from src.schemes import (
     CheckCode,
     SendCode,
@@ -63,11 +63,9 @@ async def register(
             },
         )
 
-    # hashed_password = get_password_hash(user.password.get_secret_value())
     if not user_in_db:
         user_in_db = User(
             phone_number=user.phone_number,
-            # password=hashed_password,
             username=user.username,
             country=user.country,
             last_session=datetime.now()
@@ -125,40 +123,25 @@ async def register(
         ex=ACCESS_TOKEN_EXPIRE_MINUTES
     )
 
-    return JSONResponse(
-        status_code=200, content={"access_token": access_token, "token_type": "bearer"}
-    )
+    return {"access_token": access_token, "token_type": "bearer"}
 
 
 @public.post(
     "/login",
     tags=["auth", Action.LOGIN],
-    responses={
-        400: {"model": BadResponse},
-        200: {"model": AccessToken},
-    }
+    responses={200: {"model": AccessToken},}
 )
 async def login(
     request: Request,
     db: Annotated[AsyncSession, Depends(get_db)],
     user: UserLogin,
 ):
-    if not user.phone_number:
-        return JSONResponse(
-            status_code=400, content={"message": "Phone number is required"}
-        )
-
     userdb = await db.execute(
         select(User)
-        .filter(
-            or_(User.phone_number == user.phone_number)
-        )
+        .filter(User.phone_number == user.phone_number)
     )
     userdb = userdb.scalar()
-    if not userdb:
-        return JSONResponse(
-            status_code=status.HTTP_404_NOT_FOUND, content={"message": "User not found"}
-        )
+    await UserExceptions.raise_exception_user_not_found(userdb)
 
     if not await aredis.exists(f"SMS:{request.client.host}"):
         return JSONResponse(
@@ -175,13 +158,6 @@ async def login(
 
     await aredis.delete(f"SMS:{request.client.host}")
 
-    # if not user or not verify_password(
-    #     user.password.get_secret_value(), userdb.password
-    # ):
-    #     return JSONResponse(
-    #         status_code=400, content={"message": "Invalid phone number or password"}
-    #     )
-
     data = {
         "id": userdb.id,
         "username": userdb.username,
@@ -196,9 +172,7 @@ async def login(
         ex=ACCESS_TOKEN_EXPIRE_MINUTES
     )
 
-    return JSONResponse(
-        status_code=200, content={"access_token": access_token, "token_type": "bearer"}
-    )
+    return {"access_token": access_token, "token_type": "bearer"}
 
 
 @public.post("/send_code", tags=["auth"])

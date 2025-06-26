@@ -113,6 +113,7 @@ async def transfer(
 
     # if limit is reached more than 1000, by one transaction
     if amount > 1000:
+        # TODO
         notification = Notification(
             user_id=wallet.user_id,
             head="Large Deposit Alert",
