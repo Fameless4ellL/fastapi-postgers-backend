@@ -389,7 +389,7 @@ async def gen_tickets(
     game = await db.execute(
         select(Game)
         .filter(Game.id == game_id)
-        .filter(Game.status != GameStatus.PENDING)
+        .filter(Game.status == GameStatus.PENDING)
     )
     game = game.scalar()
     await GameExceptions.raise_exception_game_not_found(game)
@@ -468,7 +468,7 @@ async def edit_ticket(
     game = await db.execute(
         select(Game)
         .filter(Game.id == game_id)
-        .filter(Game.status != GameStatus.PENDING)
+        .filter(Game.status == GameStatus.PENDING)
     )
     game = game.scalar()
     await GameExceptions.raise_exception_game_not_found(game)
