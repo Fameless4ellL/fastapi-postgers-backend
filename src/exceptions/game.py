@@ -57,5 +57,7 @@ class GameExceptions:
         if any(len(n) != game.limit_by_ticket for n in numbers):
             raise ValuePydanticError(ERR_MIN_NUMBERS_CONDITION)
 
-        if any(all(0 < i <= game.max_limit_grid for i in numbers) for numbers in numbers):
-            raise ValuePydanticError(ERR_NUMBER_CONDITION)
+        for numbers in numbers:
+            if not all(0 < i <= game.max_limit_grid for i in numbers):
+                raise ValuePydanticError(ERR_NUMBER_CONDITION)
+
