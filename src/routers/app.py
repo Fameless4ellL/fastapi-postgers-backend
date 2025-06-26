@@ -196,7 +196,7 @@ async def read_game(
     result = await db.execute(stmt)
     game = result.scalars().first()
     await GameExceptions.raise_exception_game_not_found(game)
-    await GameExceptions.raise_exception_on_local_game(game)
+    await GameExceptions.raise_exception_on_local_game(game, user)
 
     data = {
         "id": game.id,
