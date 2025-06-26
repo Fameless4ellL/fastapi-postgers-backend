@@ -217,10 +217,6 @@ def get_crud_router(
                     }]
                 )
 
-        db.add(new_item)
-        await db.commit()
-        await db.refresh(new_item)
-
         if model.__name__ == "Game":
             file = getattr(file, "image", None)
             if file:
@@ -255,6 +251,7 @@ def get_crud_router(
             )
 
         await db.commit()
+        await db.refresh(new_item)
 
         return get_schema.model_validate(new_item)
 
