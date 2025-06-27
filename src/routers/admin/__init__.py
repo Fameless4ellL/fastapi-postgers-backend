@@ -250,6 +250,7 @@ def get_crud_router(
                 job_id=f"proceed_jackpot_status_{new_item.id}",
             )
 
+        db.add(new_item)
         await db.commit()
         await db.refresh(new_item)
 
