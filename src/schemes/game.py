@@ -57,7 +57,7 @@ class Games(BaseModel):
 
 
 class BuyTicket(BaseModel):
-    numbers: list[set[int]]
+    numbers: list[list[int]]
     demo: bool = False
 
 
@@ -72,7 +72,7 @@ class BuyInstaTicket(BaseModel):
 
 
 class EditTicket(BaseModel):
-    numbers: list[set[int]]
+    numbers: list[list[int]]
     edited_numbers: set[int]
 
 
@@ -81,7 +81,7 @@ class GenTicket:
         self,
         mode: TicketMode = TicketMode.AUTO,
         quantity: int = 1,
-        numbers: Optional[list[set[int]]] = None
+        numbers: Optional[list[list[int]]] = None
     ):
         self.mode = mode
         self.quantity = quantity
