@@ -66,6 +66,7 @@ async def get_countries(
         "PSE",
         "KAZ",
         "RUS",
+        "BLR",
     }
     data = [{
         "alpha_3": country.alpha_3,
