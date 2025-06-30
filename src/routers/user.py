@@ -13,6 +13,7 @@ from sqlalchemy.sql import sqltypes
 from tronpy.keys import to_base58check_address
 
 from settings import settings
+from src.exceptions.base import BadRequestError
 from src.globals import aredis, q
 from src.models.db import get_db
 from src.models.log import Action
@@ -211,6 +212,9 @@ async def withdraw(
             status_code=status.HTTP_400_BAD_REQUEST,
             content="Wallet not found"
         )
+
+    if wallet.address == item.address:
+        raise BadRequestError("Can't withdraw same address as your wallet")
 
     balance_result = await db.execute(
         select(Balance)
