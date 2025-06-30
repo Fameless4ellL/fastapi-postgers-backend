@@ -7,7 +7,7 @@ from sqlalchemy import select, func, or_, exists, String
 from src.models.log import Action
 from src.models.other import Game, Ticket
 
-from src.schemes.base import BadResponse, ErrorMessage
+from src.exceptions.schemas import ErrorMessage
 from pydantic import BaseModel
 from src.models.db import get_db
 from src.models.user import Role

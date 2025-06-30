@@ -10,7 +10,8 @@ from httpx import AsyncClient
 from src.middlewares import RequestMiddleware
 from src.routers import public, admin, _cron
 from settings import settings
-from src.schemes import BadResponse, ErrorMessage
+from src.schemes import BadResponse
+from src.exceptions.schemas import ErrorMessage
 from src.handler import add_exception_handlers
 
 
