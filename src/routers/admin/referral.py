@@ -1,11 +1,10 @@
-from fastapi import Depends, Path, status
+from fastapi import Depends, Path, status, APIRouter
 from fastapi.responses import JSONResponse
 from typing import Annotated
 
 from sqlalchemy import func, select
 from src.models.log import Action
 from src.models.user import BalanceChangeHistory, Role, ReferralLink, User
-from src.routers import admin
 from src.routers.admin import get_crud_router
 from sqlalchemy.ext.asyncio import AsyncSession
 from src.models.db import get_db
@@ -19,7 +18,11 @@ from src.schemes.admin import (
 )
 
 
+referral = APIRouter(tags=["v1.admin.referrals"])
+
+
 get_crud_router(
+    router=referral,
     model=ReferralLink,
     prefix="/referrals",
     schema=Referrals,
@@ -37,7 +40,7 @@ get_crud_router(
 )
 
 
-@admin.delete(
+@referral.delete(
     "/referrals/{referral_id}",
     tags=[Action.ADMIN_DELETE],
 )
@@ -68,7 +71,7 @@ async def delete_referral(
     )
 
 
-@admin.get(
+@referral.get(
     "/referrals/{referral_id}/users",
     responses={200: {"model": ReferralUsersList}},
 )

@@ -1,19 +1,21 @@
 import datetime
 import json
-import mimetypes
 import random
 from contextlib import suppress
 from decimal import Decimal, DecimalException
 from typing import Annotated, Optional
-from fastapi import Depends, Path, status
-from fastapi.responses import JSONResponse, Response
-from sqlalchemy import func, select
 
+from fastapi import Depends, Path, status, APIRouter
+from fastapi.responses import JSONResponse
+from sqlalchemy import func, select
+from sqlalchemy.ext.asyncio import AsyncSession
+from sqlalchemy.orm import joinedload
+
+from settings import settings
 from src.exceptions.game import GameExceptions
-from src.globals import aredis, storage
+from src.globals import aredis
 from src.models.db import get_db
 from src.models.log import Action
-from src.models.user import Balance, BalanceChangeHistory, User, Wallet
 from src.models.other import (
     Currency,
     Game,
@@ -24,10 +26,7 @@ from src.models.other import (
     JackpotType,
     GameView,
 )
-from src.routers import public
-from src.utils.dependencies import get_user
-from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy.orm import joinedload
+from src.models.user import Balance, BalanceChangeHistory, User, Wallet
 from src.schemes import BadResponse
 from src.schemes import (
     BuyTicket,
@@ -37,52 +36,15 @@ from src.schemes import (
     Tickets,
     GenTicket,
     TicketMode,
-    Jackpot as JackpotModel,
 )
-from src.schemes import WidgetLogin
-from src.utils.signature import TgAuth
-from settings import settings
+from src.utils.dependencies import get_user
 from src.utils.web3 import transfer
 
-
-@public.post("/tg/login", deprecated=True)
-async def tg_login(item: WidgetLogin):
-    """
-        Для логина в telegram mini app через seamless auth
-    """
-    if not TgAuth(item, settings.bot_token.encode("utf-8")).check_hash():
-        return JSONResponse(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            content="Bad Request"
-        )
-
-    return JSONResponse(status_code=status.HTTP_200_OK, content="OK")
+public_games = APIRouter(tags=["v1.public.games"])
 
 
-@public.get("/file/games")
-async def get_file(path: str):
-    response = None
-    try:
-        response = storage.get_object("games", path)
-        data = response.data
-        content_type, _ = mimetypes.guess_type(path)
-
-    except Exception:
-        return Response(status_code=404, content="Image not found")
-    finally:
-        if response:
-            response.close()
-            response.release_conn()
-
-    return Response(
-        content=data,
-        media_type=content_type or "application/octet-stream"
-    )
-
-
-@public.get(
+@public_games.get(
     "/games",
-    tags=["game"],
     responses={200: {"model": Games}}
 )
 async def game_instances(
@@ -137,9 +99,8 @@ async def game_instances(
     return Games(games=data, count=count)
 
 
-@public.get(
+@public_games.get(
     "/game/{game_id}/calc",
-    tags=["game"],
     responses={200: {"description": "OK"}}
 )
 async def calc_balance(
@@ -175,8 +136,8 @@ async def calc_balance(
     )
 
 
-@public.get(
-    "/game/{game_id}", tags=["game"],
+@public_games.get(
+    "/game/{game_id}",
     responses={200: {"model": GameInstanceModel}}
 )
 async def read_game(
@@ -222,9 +183,9 @@ async def read_game(
     )
 
 
-@public.post(
+@public_games.post(
     "/game/{game_id}/tickets",
-    tags=["game", Action.TRANSACTION],
+    tags=[Action.TRANSACTION],
     # dependencies=[Depends(LimitVerifier(OperationType.PURCHASE))],
     responses={201: {"description": "OK"}}
 )
@@ -373,8 +334,8 @@ async def buy_tickets(
     )
 
 
-@public.put(
-    "/game/{game_id}/tickets", tags=["game"],
+@public_games.put(
+    "/game/{game_id}/tickets",
     responses={200: {"model": Tickets}}
 )
 async def gen_tickets(
@@ -454,8 +415,8 @@ async def gen_tickets(
     )
 
 
-@public.patch(
-    "/game/{game_id}/tickets/{ticket_id}", tags=["game"],
+@public_games.patch(
+    "/game/{game_id}/tickets/{ticket_id}",
     responses={200: {"model": Tickets}}
 )
 async def edit_ticket(
@@ -508,8 +469,8 @@ async def edit_ticket(
     )
 
 
-@public.get(
-    "/game/{game_id}/leaderboard", tags=["game"],
+@public_games.get(
+    "/game/{game_id}/leaderboard",
     responses={200: {"model": Tickets}}
 )
 async def get_leaderboard(
@@ -550,65 +511,4 @@ async def get_leaderboard(
     return JSONResponse(
         status_code=status.HTTP_200_OK,
         content=Tickets(tickets=data, count=count).model_dump()
-    )
-
-
-@public.get(
-    "/jackpots",
-    tags=["Jackpot"],
-    responses={200: {"model": JackpotModel}}
-)
-async def get_jackpots(
-    user: Annotated[User, Depends(get_user)],
-    db: Annotated[AsyncSession, Depends(get_db)],
-):
-    """
-    Получение списка джекпотов
-    """
-    stmt = select(
-        func.sum(Ticket.amount).label("total_tickets"),
-        Jackpot.id,
-        Jackpot.status,
-        Jackpot.image,
-        Jackpot.scheduled_datetime,
-        Jackpot.percentage,
-        Jackpot.created_at,
-    ).outerjoin(Ticket, Ticket.jackpot_id == Jackpot.id).filter(
-        Jackpot.status == GameStatus.PENDING,
-        Jackpot._type == JackpotType.LOCAL,
-        Jackpot.country == user.country
-    ).group_by(Jackpot.id).offset(0).limit(5)
-    local = await db.execute(stmt)
-    local = local.fetchall() or []
-
-    stmt = select(
-        func.sum(Ticket.amount).label("total_tickets"),
-        Jackpot.id,
-        Jackpot.status,
-        Jackpot.image,
-        Jackpot.scheduled_datetime,
-        Jackpot.percentage,
-        Jackpot.created_at,
-    ).outerjoin(Ticket, Ticket.jackpot_id == Jackpot.id).filter(
-        Jackpot.status == GameStatus.PENDING,
-        Jackpot._type == JackpotType.GLOBAL,
-    ).group_by(Jackpot.id).offset(0).limit(5)
-    global_ = await db.execute(stmt)
-    global_ = global_.fetchall() or []
-
-    data = [
-        {
-            "id": j.id,
-            "status": j.status.value,
-            "endtime": j.scheduled_datetime.timestamp(),
-            "image": j.image,
-            "amount": float(j.total_tickets or 0),
-            "percentage": float(j.percentage),
-            "created": j.created_at.timestamp()
-        } for j in local + global_
-    ]
-
-    return JSONResponse(
-        status_code=status.HTTP_200_OK,
-        content=data
     )

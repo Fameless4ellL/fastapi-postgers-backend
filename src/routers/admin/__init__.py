@@ -11,7 +11,6 @@ from src.exceptions.schemas import ErrorMessage
 from pydantic import BaseModel
 from src.models.db import get_db
 from src.models.user import Role
-from src.routers import admin
 from src.globals import q
 from src.utils.dependencies import get_admin_token, Token
 from src.schemes.admin import Empty
@@ -25,7 +24,7 @@ def get_crud_router(
     get_schema: Type[BaseModel],
     create_schema: Type[BaseModel],
     update_schema: Type[BaseModel],
-    router: APIRouter = admin,
+    router: APIRouter,
     filters: Type[BaseModel] = Annotated[Empty, Depends(Empty)],
     files: Type[BaseModel] = Annotated[Empty, Depends(Empty)],
     prefix: str = "",
@@ -350,6 +349,5 @@ from .instabingo import *
 from .kyc import *
 from .profile import *
 from .jackpots import *
-from .lobby import *
 from .dashboard import *
 from .finance import *

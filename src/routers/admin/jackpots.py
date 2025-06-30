@@ -1,6 +1,6 @@
 from typing import Annotated, Literal, Optional
 
-from fastapi import Depends, Path, Query
+from fastapi import Depends, Path, Query, APIRouter
 from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -10,7 +10,6 @@ from src.models.db import get_db
 from src.models.log import Action
 from src.models.other import GameStatus, Jackpot, Ticket, RepeatType
 from src.models.user import User
-from src.routers import admin
 from src.routers.admin import get_crud_router
 from src.schemes import JsonForm
 from src.schemes.admin import (
@@ -22,7 +21,12 @@ from src.schemes.admin import (
     JackpotFilter, JackpotWinner,
 )
 
+
+jackpots = APIRouter(tags=["v1.admin.jackpots"])
+
+
 get_crud_router(
+    router=jackpots,
     model=Jackpot,
     prefix="/jackpots",
     schema=Jackpots,
@@ -34,7 +38,7 @@ get_crud_router(
 )
 
 
-@admin.delete(
+@jackpots.delete(
     "/jackpots/{game_id}",
     tags=[Action.ADMIN_DELETE],
 )
@@ -69,7 +73,7 @@ async def delete_jackpot(
     return "Success"
 
 
-@admin.get("/jackpots/{game_id}/participants")
+@jackpots.get("/jackpots/{game_id}/participants")
 async def get_participants(
     db: Annotated[AsyncSession, Depends(get_db)],
     game_id: Annotated[int, Path()],
@@ -109,7 +113,7 @@ async def get_participants(
     return {"count": count, "data": participants}
 
 
-@admin.get("/jackpots/{obj_id}/ticket/{user_id}")
+@jackpots.get("/jackpots/{obj_id}/ticket/{user_id}")
 async def get_tickets(
     db: Annotated[AsyncSession, Depends(get_db)],
     obj_id: Annotated[int, Path(ge=0)],
@@ -149,7 +153,7 @@ async def get_tickets(
     return {"count": count, "data": tickets}
 
 
-@admin.get(
+@jackpots.get(
     "/jackpots/{obj_id}/winner",
     responses={200: {"model": JackpotWinner}},
 )

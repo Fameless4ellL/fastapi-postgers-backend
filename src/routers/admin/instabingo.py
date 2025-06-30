@@ -1,6 +1,6 @@
 from typing import Annotated
 
-from fastapi import Depends, Path, status
+from fastapi import Depends, Path, status, APIRouter
 from fastapi.responses import JSONResponse
 from sqlalchemy import select, func, or_, String
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -11,7 +11,6 @@ from src.exceptions.game import GameExceptions
 from src.models.db import get_db, get_sync_db
 from src.models.other import InstaBingo, Ticket, Currency, Number
 from src.models.user import Role, User
-from src.routers import admin
 from src.routers.admin import get_crud_router
 from src.schemes.admin import (
     InstaBingoFilter,
@@ -24,7 +23,12 @@ from src.schemes.admin import (
     Countries
 )
 
+
+bingo = APIRouter(tags=["v1.admin.instabingo"])
+
+
 get_crud_router(
+    router=bingo,
     model=InstaBingo,
     prefix="/bingo",
     schema=InstaBingos,
@@ -44,7 +48,7 @@ get_crud_router(
 )
 
 
-@admin.get("/instabingo/default",)
+@bingo.get("/instabingo/default",)
 async def get_instabingo_default(
     db: Annotated[Session, Depends(get_sync_db)],
 ):
@@ -83,7 +87,7 @@ async def get_instabingo_default(
     return data
 
 
-@admin.get(
+@bingo.get(
     "/instabingos",
     responses={200: {"model": InstaBingoList}},
 )
@@ -153,7 +157,7 @@ async def get_instabingo_tickets_list(
     )
 
 
-@admin.get("/instabingo/{game_id}")
+@bingo.get("/instabingo/{game_id}")
 async def get_instabingo_ticket(
     db: Annotated[AsyncSession, Depends(get_db)],
     game_id: Annotated[int, Path()],
@@ -203,7 +207,7 @@ async def get_instabingo_ticket(
     )
 
 
-@admin.get("/instabingo/{game_id}/gnumbers")
+@bingo.get("/instabingo/{game_id}/gnumbers")
 async def get_generated_numbers(
     db: Annotated[AsyncSession, Depends(get_db)],
     game_id: Annotated[int, Path()],
@@ -225,7 +229,7 @@ async def get_generated_numbers(
     return data
 
 
-@admin.delete("/bingo/{instabingo_id}")
+@bingo.delete("/bingo/{instabingo_id}")
 async def set_instabingo_as_deleted(
     db: Annotated[AsyncSession, Depends(get_db)],
     instabingo_id: Annotated[int, Path()],

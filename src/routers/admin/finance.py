@@ -6,7 +6,7 @@ from decimal import Decimal
 from io import StringIO
 from typing import Annotated
 
-from fastapi import Depends, Path
+from fastapi import Depends, Path, APIRouter
 from pytz.tzinfo import DstTzInfo
 from rq.exceptions import InvalidJobOperation
 from sqlalchemy import func, select, String, not_
@@ -23,7 +23,6 @@ from src.models import Currency
 from src.models.db import get_db
 from src.models.limit import Limit
 from src.models.user import User, BalanceChangeHistory, Balance
-from src.routers import admin
 from src.schemes.admin import (
     Operations,
     OperationFilter,
@@ -33,7 +32,10 @@ from src.utils import worker
 from src.utils.dependencies import get_timezone, Token, JWTBearerAdmin
 
 
-@admin.get(
+finance = APIRouter(tags=["v1.admin.finance"])
+
+
+@finance.get(
     "/operations",
     responses={200: {"model": Operations}},
 )
@@ -128,7 +130,7 @@ async def get_operation_list(
     return Operations(items=result, count=count)
 
 
-@admin.get(
+@finance.get(
     "/operations/{obj_id}",
     responses={200: {"model": Operation}},
 )
@@ -168,7 +170,7 @@ async def get_operation(
     return Operation(**result)
 
 
-@admin.get(
+@finance.get(
     "/limits",
     responses={200: {"model": Limits}},
 )
@@ -213,7 +215,7 @@ async def get_limit_list(
     return Limits(items=result, count=count)
 
 
-@admin.get(
+@finance.get(
     "/limits/{obj_id}",
     response_model=LimitBase,
 )
@@ -250,7 +252,7 @@ async def get_limit(
     return result
 
 
-@admin.post("/limit")
+@finance.post("/limit")
 async def create_limit(
     db: Annotated[AsyncSession, Depends(get_db)],
     token: Annotated[Token, Depends(JWTBearerAdmin())],
@@ -270,7 +272,7 @@ async def create_limit(
     return "Limit created successfully"
 
 
-@admin.put("/limits/{obj_id}")
+@finance.put("/limits/{obj_id}")
 async def update_limit(
     token: Annotated[Token, Depends(JWTBearerAdmin())],
     db: Annotated[AsyncSession, Depends(get_db)],
@@ -297,7 +299,7 @@ async def update_limit(
     return "Limit updated successfully"
 
 
-@admin.patch("/limits/{obj_id}")
+@finance.patch("/limits/{obj_id}")
 async def set_status_limit(
     token: Annotated[Token, Depends(JWTBearerAdmin())],
     db: Annotated[AsyncSession, Depends(get_db)],
@@ -320,7 +322,7 @@ async def set_status_limit(
     return "Limit updated successfully"
 
 
-@admin.post("/operation/block/user/{obj_id}")
+@finance.post("/operation/block/user/{obj_id}")
 async def block_user(
     db: Annotated[AsyncSession, Depends(get_db)],
     obj_id: Annotated[int, Path(ge=1)],
@@ -485,7 +487,7 @@ async def block_user(
     return {"message": "User blocked successfully"}
 
 
-@admin.post("/operation/block/{obj_id}")
+@finance.post("/operation/block/{obj_id}")
 async def block_operation(
     db: Annotated[AsyncSession, Depends(get_db)],
     obj_id: Annotated[int, Path(ge=1)],
@@ -514,7 +516,7 @@ async def block_operation(
     return {"message": "Operation blocked successfully"}
 
 
-@admin.post("/operation/unblock/user/{obj_id}")
+@finance.post("/operation/unblock/user/{obj_id}")
 async def unblock_user(
     db: Annotated[AsyncSession, Depends(get_db)],
     obj_id: Annotated[int, Path(ge=1)],

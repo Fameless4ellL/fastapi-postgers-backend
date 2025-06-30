@@ -7,11 +7,12 @@ from fastapi import Depends
 from pydantic import BaseModel, ConfigDict
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
-from src.models.db import get_db
-from src.models.user import BalanceChangeHistory, Wallet, Balance, Notification
-from src.models.other import Currency
-from src.routers import _cron
+
 from src.globals import q
+from src.models.db import get_db
+from src.models.other import Currency
+from src.models.user import BalanceChangeHistory, Wallet, Balance, Notification
+from src.routers import cron_
 from src.utils import worker
 
 
@@ -31,7 +32,7 @@ class Transfer(BaseModel):
     value: float
 
 
-@_cron.post("/add_job/")
+@cron_.post("/add_job/")
 async def add_job(request: JobRequest):
     try:
         func = getattr(worker, request.func_name, None)
@@ -48,7 +49,7 @@ async def add_job(request: JobRequest):
     return {"status": "ok"}
 
 
-@_cron.post("/api/transfer/")
+@cron_.post("/api/transfer/")
 async def transfer(
     db: Annotated[AsyncSession, Depends(get_db)],
     item: Transfer
@@ -125,7 +126,7 @@ async def transfer(
     return {"status": "ok"}
 
 
-@_cron.get("/hourly")
+@cron_.get("/hourly")
 async def hourly():
     """Часовой отчет по метрикам"""
     q.enqueue(

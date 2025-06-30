@@ -2,7 +2,7 @@ from typing import Annotated, Optional
 
 from eth_account import Account
 from eth_account.signers.local import LocalAccount
-from fastapi import Depends, Path, Query
+from fastapi import Depends, Path, Query, APIRouter
 from sqlalchemy import and_, func, select, or_, String
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -11,7 +11,6 @@ from src.globals import aredis
 from src.models.db import get_db
 from src.models.other import Currency, Game, GameView, Network, Ticket, Jackpot, InstaBingo
 from src.models.user import Balance, User, Role, Wallet, BalanceChangeHistory, Document
-from src.routers import admin
 from src.schemes import Country_by_name
 from src.schemes.admin import (
     BalanceBase,
@@ -26,7 +25,10 @@ from src.schemes.admin import (
 from src.utils.dependencies import Token, JWTBearerAdmin
 
 
-@admin.get(
+users = APIRouter(tags=["v1.admin.users"])
+
+
+@users.get(
     "/users",
     responses={200: {"model": Users}},
 )
@@ -76,7 +78,7 @@ async def get_users(
     return Users(users=data, count=count)
 
 
-@admin.get(
+@users.get(
     "/users/{user_id}",
     responses={200: {"model": UserScheme}},
 )
@@ -153,7 +155,7 @@ async def get_user(
     return UserScheme(**data)
 
 
-@admin.get(
+@users.get(
     "/users/{user_id}/games",
     responses={200: {"model": UserGames}},
 )
@@ -208,7 +210,7 @@ async def get_user_games(
     return UserGames(games=game_instances, count=count)
 
 
-@admin.get(
+@users.get(
     "/users/{user_id}/games/{game_id}",
     responses={200: {"model": UserTickets},},
 )
@@ -265,7 +267,7 @@ async def get_user_tickets(
     return {"tickets": data, "count": count}
 
 
-@admin.get(
+@users.get(
     "/users/{user_id}/jackpots",
     responses={200: {"model": UserJackpots},},
 )
@@ -318,7 +320,7 @@ async def get_user_jackpots(
     return UserJackpots(jackpots=data, count=count)
 
 
-@admin.get(
+@users.get(
     "/users/{user_id}/jackpots/{game_id}",
     responses={200: {"model": UserTickets}},
 )
@@ -375,7 +377,7 @@ async def get_user_tickets_by_jackpots(
     return {"tickets": data, "count": count}
 
 
-@admin.get(
+@users.get(
     "/users/{user_id}/transactions",
     responses={200: {"model": HistoryList}},
 )
@@ -410,7 +412,7 @@ async def get_user_transactions(
     return HistoryList(items=data, count=count)
 
 
-@admin.get(
+@users.get(
     "/users/{user_id}/wallet",
     responses={200: {"model": WalletBase}},
 )
@@ -448,7 +450,7 @@ async def get_user_wallet(
     return data
 
 
-@admin.get(
+@users.get(
     "/users/{user_id}/balance",
     responses={200: {"model": BalanceBase}},
 )
@@ -488,7 +490,7 @@ async def get_user_balance(
     return {"balances": data, "total": total}
 
 
-@admin.get("/users/{user_id}/winings")
+@users.get("/users/{user_id}/winings")
 async def get_user_winings(
     db: Annotated[AsyncSession, Depends(get_db)],
     user_id: Annotated[int, Path()],

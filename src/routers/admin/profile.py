@@ -1,19 +1,20 @@
 from typing import Annotated
 
-from fastapi import Depends
+from fastapi import Depends, APIRouter
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from src.models import get_db
 from src.models.user import User, Document
-from src.routers import admin
 from src.schemes.admin import (
     Profile,
 )
 from src.utils.dependencies import get_admin
 
 
-@admin.get(
+profile = APIRouter(tags=["v1.admin.profile"])
+
+@profile.get(
     "/profile",
     responses={200: {"model": Profile}},
 )

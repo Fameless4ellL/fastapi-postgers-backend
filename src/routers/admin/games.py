@@ -1,6 +1,6 @@
 from typing import Annotated, Literal
 
-from fastapi import Depends, Path, status
+from fastapi import Depends, Path, status, APIRouter
 from fastapi.responses import JSONResponse
 from sqlalchemy import select, func, orm, exists, Text
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -11,7 +11,6 @@ from src.models.db import get_db, get_sync_db
 from src.models.log import Action
 from src.models.other import Currency, Game, GameStatus, GameView, TicketStatus, Ticket
 from src.models.user import Role, User
-from src.routers import admin
 from src.routers.admin import get_crud_router
 from src.schemes import JsonForm
 from src.schemes.admin import (
@@ -28,7 +27,12 @@ from src.schemes.admin import (
 )
 from src.utils.dependencies import Permission, IsSuper, IsAdmin, IsGlobal, IsLocal
 
+
+games_router = APIRouter(tags=["v1.admin.games"])
+
+
 get_crud_router(
+    router=games_router,
     model=Game,
     prefix="/games",
     schema=Games,
@@ -48,7 +52,7 @@ get_crud_router(
 )
 
 
-@admin.delete(
+@games_router.delete(
     "/games/{game_id}",
     tags=[Action.ADMIN_DELETE],
     dependencies=[Depends(Permission([IsSuper, IsAdmin, IsGlobal, IsLocal]))],
@@ -92,7 +96,7 @@ async def delete_game(
     )
 
 
-@admin.get(
+@games_router.get(
     "/games/{game_id}/purchased",
     responses={200: {"model": PurchasedTickets}},
 )
@@ -143,7 +147,7 @@ async def get_purchased_tickets(
     )
 
 
-@admin.get(
+@games_router.get(
     "/games/{game_id}/participants",
     responses={200: {"model": list[Participant]}},
 )
@@ -190,7 +194,7 @@ async def get_participants(
     return data
 
 
-@admin.get(
+@games_router.get(
     "/games/{game_id}/participants/{user_id}",
     responses={200: {"model": list[ParticipantTickets]}},
 )
@@ -232,7 +236,7 @@ async def get_participant_tickets(
     return data
 
 
-@admin.get(
+@games_router.get(
     "/games/{game_id}/winners",
     responses={200: {"model": Winners}},
 )
@@ -295,7 +299,7 @@ async def get_winners(
     return {"count": count, "items": tickets}
 
 
-@admin.put(
+@games_router.put(
     "/games/{game_id}/winners/{ticket_id}",
     tags=[Action.ADMIN_UPDATE],
     responses={200: {"description": "OK"}},

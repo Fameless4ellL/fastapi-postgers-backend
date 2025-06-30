@@ -3,7 +3,7 @@ from datetime import timedelta
 from operator import methodcaller
 from typing import Annotated, Union, Literal, Optional
 
-from fastapi import status, Depends
+from fastapi import status, Depends, APIRouter
 from fastapi.responses import JSONResponse
 from pydantic import BaseModel, Field
 from pytz.tzinfo import DstTzInfo
@@ -11,11 +11,12 @@ from sqlalchemy import select, func
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from src.models import get_logs_db, Metric, HiddenMetric, get_db, User
-from src.routers import admin
 from src.utils.dependencies import Token, get_timezone, JWTBearerAdmin
 from src.schemes.admin import DatePicker, Countries
 from src.utils.datastructure import MultiValueStrEnum
 
+
+dashboard = APIRouter(tags=["v1.admin.dashboard"])
 
 @dataclasses.dataclass
 class PeriodData:
@@ -92,11 +93,11 @@ class UpdateMetricVisibilityRequest(BaseModel):
     is_hidden: bool
 
 
-@admin.get(
+@dashboard.get(
     "/dashboard",
     responses={200: {"model": Dashboard}},
 )
-async def dashboard(
+async def get_dashboard(
     token: Annotated[Token, Depends(JWTBearerAdmin())],
     timezone: Annotated[DstTzInfo, Depends(get_timezone)],
     _db: Annotated[AsyncSession, Depends(get_db)],
@@ -203,7 +204,7 @@ async def dashboard(
     )
 
 
-@admin.post(
+@dashboard.post(
     "/dashboard/metrics/visibility",
     responses={
         200: {"description": "Metric visibility updated successfully"},

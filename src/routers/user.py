@@ -2,10 +2,9 @@ import json
 from decimal import Decimal
 from typing import Annotated, Union
 
-import pycountry
 from eth_account import Account
 from eth_account.signers.local import LocalAccount
-from fastapi import Depends, Query, status, UploadFile, File, HTTPException
+from fastapi import Depends, status, UploadFile, File, HTTPException, APIRouter
 from fastapi.responses import JSONResponse
 from sqlalchemy import func, select, update, delete
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -27,8 +26,7 @@ from src.models.user import (
     BalanceChangeHistory,
     Document
 )
-from src.routers import public
-from src.schemes import Country, JsonForm, UserBalanceList, KYCProfile
+from src.schemes import JsonForm, UserBalanceList, KYCProfile
 from src.schemes import KYC, Notifications, Profile, Usersettings, Transactions
 from src.schemes import (
     MyGames, MyGamesType, Tickets, Withdraw
@@ -36,10 +34,11 @@ from src.schemes import (
 from src.utils import worker
 from src.utils.dependencies import get_user, get_currency, Token, JWTBearer
 
+users_router = APIRouter(tags=["v1.public.users"])
 
-@public.get(
+
+@users_router.get(
     "/profile",
-    tags=["user"],
     response_model=Profile,
 )
 async def profile(
@@ -105,9 +104,8 @@ async def profile(
     return _profile
 
 
-@public.get(
+@users_router.get(
     "/kyc",
-    tags=["user"],
     response_model=KYCProfile
 )
 async def get_kyc(
@@ -141,9 +139,8 @@ async def get_kyc(
     return data
 
 
-@public.get(
+@users_router.get(
     "/balance",
-    tags=["user"],
     response_model=UserBalanceList
 )
 async def balance(
@@ -177,9 +174,9 @@ async def balance(
     return {"items": data}
 
 
-@public.post(
+@users_router.post(
     "/withdraw",
-    tags=["user", Action.WITHDRAW],
+    tags=[Action.WITHDRAW],
     # dependencies=[Depends(LimitVerifier(OperationType.WITHDRAWAL))],
 )
 async def withdraw(
@@ -266,9 +263,9 @@ async def withdraw(
     return "OK"
 
 
-@public.post(
+@users_router.post(
     "/upload",
-    tags=["user", Action.UPDATE],
+    tags=[Action.UPDATE],
     responses={200: {"model": str}}
 )
 async def upload_kyc(
@@ -305,9 +302,8 @@ async def upload_kyc(
     return "OK"
 
 
-@public.get(
+@users_router.get(
     "/tickets",
-    tags=["user"],
     responses={200: {"model": Tickets}}
 )
 async def get_tickets(
@@ -360,59 +356,8 @@ async def get_tickets(
     )
 
 
-@public.get(
-    "/countries",
-    tags=["settings"],
-    responses={200: {"model": Country}}
-)
-async def get_countries(
-    q: str = Query('', description="Search query")
-):
-    """
-    Получение список стран
-    """
-    try:
-        if q:
-            countries = pycountry.countries.search_fuzzy(q)
-        else:
-            countries = sorted(pycountry.countries, key=lambda x: x.name)
-    except LookupError:
-        return JSONResponse(
-            status_code=status.HTTP_200_OK,
-            content=[]
-        )
-
-    excluded_alpha_3 = {
-        "ATA",
-        "GRL",
-        "HKG",
-        "PRI",
-        "TWN",
-        "GIB",
-        "BMU",
-        "FLK",
-        "VAT",
-        "ESH",
-        "PSE",
-    }
-    data = [{
-        "alpha_3": country.alpha_3,
-        "name": country.name,
-        "flag": country.flag
-    }
-        for country in countries
-        if country.alpha_3 not in excluded_alpha_3
-    ]
-
-    return JSONResponse(
-        status_code=status.HTTP_200_OK,
-        content=data
-    )
-
-
-@public.get(
+@users_router.get(
     "/history",
-    tags=["user"],
     responses={200: {"model": Transactions}}
 )
 async def get_history(
@@ -461,9 +406,8 @@ async def get_history(
     )
 
 
-@public.get(
+@users_router.get(
     "/mygames",
-    tags=["user"],
     responses={200: {"model": MyGames}}
 )
 async def get_my_games(
@@ -584,9 +528,8 @@ async def get_my_games(
     return MyGames(games=items, count=count)
 
 
-@public.get(
+@users_router.get(
     "/notifications",
-    tags=["user"],
     response_model=Notifications
 )
 async def get_notifications(
@@ -629,9 +572,9 @@ async def get_notifications(
     return {"items": notifications, "count": count}
 
 
-@public.post(
+@users_router.post(
     "/settings",
-    tags=["user", Action.UPDATE],
+    tags=[Action.UPDATE],
 )
 async def set_settings(
     db: Annotated[AsyncSession, Depends(get_db)],
@@ -647,16 +590,3 @@ async def set_settings(
     await db.commit()
     return "OK"
 
-
-@public.post(
-    "/logout",
-    tags=["user", Action.LOGOUT],
-)
-async def logout(
-    token: Annotated[Token, Depends(JWTBearer())],
-):
-    """
-    Удаление токена из дб
-    """
-    await aredis.delete(f"TOKEN:USERS:{token.id}")
-    return "OK"

@@ -1,6 +1,6 @@
 from typing import Annotated
 
-from fastapi import Depends, status
+from fastapi import Depends, status, APIRouter
 from fastapi.responses import JSONResponse
 from sqlalchemy import select, insert, delete
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -8,7 +8,6 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from src.models.db import get_db
 from src.models.log import Action
 from src.models.user import Kyc
-from src.routers import admin
 from src.schemes.admin import (
     KycBase,
     KycCreate,
@@ -17,7 +16,10 @@ from src.schemes.admin import (
 )
 
 
-@admin.get(
+kyc = APIRouter(tags=["v1.admin.kyc"])
+
+
+@kyc.get(
     "/kyc",
     responses={200: {"model": list[KycBase]}},
 )
@@ -39,7 +41,7 @@ async def get_kyc_list(
     return KycList(items=data)
 
 
-@admin.post(
+@kyc.post(
     "/kyc/create",
     tags=[Action.ADMIN_CREATE],
 )
@@ -67,7 +69,7 @@ async def create_kyc_list(
     return {"message": "Countries created successfully"}
 
 
-@admin.delete(
+@kyc.delete(
     "/kyc",
     tags=[Action.ADMIN_DELETE],
 )
@@ -94,7 +96,7 @@ async def detele_kyc_list(
     return {"message": "Countries deleted successfully"}
 
 
-@admin.put(
+@kyc.put(
     "/kyc",
     tags=[Action.ADMIN_UPDATE],
 )

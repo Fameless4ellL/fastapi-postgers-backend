@@ -1,14 +1,15 @@
 import datetime
 import json
 from typing import Annotated
-from fastapi import Depends, status
+
+from fastapi import Depends, status, APIRouter
 from fastapi.responses import JSONResponse
 from sqlalchemy.orm import Session
 
+from settings import settings
 from src.exceptions.game import GameExceptions
 from src.models.db import get_sync_db
 from src.models.log import Action
-from src.models.user import Balance, BalanceChangeHistory, User, Wallet
 from src.models.other import (
     Currency,
     InstaBingo,
@@ -16,19 +17,19 @@ from src.models.other import (
     Ticket,
     Number
 )
-from src.routers import public
-from src.utils.dependencies import get_user
+from src.models.user import Balance, BalanceChangeHistory, User, Wallet
 from src.schemes import BadResponse
 from src.schemes import BuyInstaTicket
 from src.schemes.instabingo import InstaBingoInfo, InstaBingoResults
-from settings import settings
-from src.utils.workers import deposit, withdraw
+from src.utils.dependencies import get_user
 from src.utils.rng import get_random
+from src.utils.workers import deposit, withdraw
+
+public_instabingo = APIRouter(tags=["v1.public.instabingo"])
 
 
-@public.get(
+@public_instabingo.get(
     "/instabingo",
-    tags=["InstaBingo"],
     responses={200: {"model": InstaBingoInfo}},
 )
 async def get_instabingo(
@@ -80,9 +81,8 @@ async def get_instabingo(
     )
 
 
-@public.put(
+@public_instabingo.put(
     "/instabingo/{game_id}/check",
-    tags=["game"],
 )
 async def instabingo_check(
     item: BuyInstaTicket,
@@ -142,9 +142,9 @@ async def instabingo_check(
     )
 
 
-@public.post(
+@public_instabingo.post(
     "/instabingo/tickets",
-    tags=["InstaBingo", Action.TRANSACTION],
+    tags=[Action.TRANSACTION],
     # dependencies=[Depends(LimitVerifier(OperationType.PURCHASE))],
     responses={201: {"description": "OK"}}
 )

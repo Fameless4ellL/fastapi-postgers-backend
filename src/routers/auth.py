@@ -4,7 +4,7 @@ from typing import Annotated
 
 from eth_account import Account
 from eth_account.signers.local import LocalAccount
-from fastapi import Depends, Request, status
+from fastapi import Depends, Request, status, APIRouter
 from fastapi.responses import JSONResponse
 from sqlalchemy import select, or_
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -14,7 +14,6 @@ from src.globals import aredis
 from src.models.db import get_db
 from src.models.log import Action
 from src.models.user import User, ReferralLink, Wallet
-from src.routers import public
 from src.schemes import (
     CheckCode,
     SendCode,
@@ -22,12 +21,15 @@ from src.schemes import (
     UserLogin,
     AccessToken
 )
+from src.utils.dependencies import JWTBearer, Token
 from src.utils.signature import create_access_token, ACCESS_TOKEN_EXPIRE_MINUTES
 
+public_auth = APIRouter(tags=["v1.public.auth"])
 
-@public.post(
+
+@public_auth.post(
     "/register",
-    tags=["auth", Action.REGISTER],
+    tags=[Action.REGISTER],
     responses={200: {"model": AccessToken}}
 )
 async def register(
@@ -126,9 +128,9 @@ async def register(
     return {"access_token": access_token, "token_type": "bearer"}
 
 
-@public.post(
+@public_auth.post(
     "/login",
-    tags=["auth", Action.LOGIN],
+    tags=[Action.LOGIN],
     responses={200: {"model": AccessToken},}
 )
 async def login(
@@ -175,7 +177,7 @@ async def login(
     return {"access_token": access_token, "token_type": "bearer"}
 
 
-@public.post("/send_code", tags=["auth"])
+@public_auth.post("/send_code")
 async def send_code(
     request: Request,
     db: Annotated[AsyncSession, Depends(get_db)],
@@ -210,7 +212,7 @@ async def send_code(
     )
 
 
-@public.post("/check_code", tags=["auth"])
+@public_auth.post("/check_code")
 async def check_code(
     request: Request,
     item: CheckCode,
@@ -239,3 +241,17 @@ async def check_code(
         status_code=200,
         content={"message": "Code is correct"}
     )
+
+
+@public_auth.post(
+    "/logout",
+    tags=[Action.LOGOUT],
+)
+async def logout(
+    token: Annotated[Token, Depends(JWTBearer())],
+):
+    """
+    Удаление токена из дб
+    """
+    await aredis.delete(f"TOKEN:USERS:{token.id}")
+    return "OK"

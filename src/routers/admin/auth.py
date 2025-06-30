@@ -1,7 +1,7 @@
 import secrets
 from typing import Annotated
 
-from fastapi import Depends, status, Response
+from fastapi import Depends, status, Response, APIRouter
 from fastapi.responses import JSONResponse
 from httpx import AsyncClient
 from passlib.exc import MalformedTokenError, TokenError
@@ -17,7 +17,6 @@ from src.globals import aredis, TotpFactory, q
 from src.models.db import get_db
 from src.models.log import Action
 from src.models.user import User
-from src.routers import admin, public
 from src.schemes import AccessToken
 from src.schemes.admin import (
     ResetPassword,
@@ -35,9 +34,13 @@ from src.utils.signature import (
     ACCESS_TOKEN_EXPIRE_MINUTES
 )
 
-@public.post(
+
+admin_panel_auth = APIRouter(tags=["v1.admin.auth"])
+
+
+@admin_panel_auth.post(
     "/admin/login",
-    tags=["admin", Action.ADMIN_LOGIN],
+    tags=[Action.ADMIN_LOGIN],
     responses={200: {"model": AccessToken}},
 )
 async def login(
@@ -79,7 +82,7 @@ async def login(
     )
 
 
-@public.post("/admin/reset", tags=["admin"])
+@admin_panel_auth.post("/admin/reset")
 async def set_reset_password(
     db: Annotated[AsyncSession, Depends(get_db)],
     ip: Annotated[str, Depends(get_ip)],
@@ -123,7 +126,7 @@ async def set_reset_password(
     return "OK"
 
 
-@public.post("/admin/registration", tags=["admin"])
+@admin_panel_auth.post("/admin/registration")
 async def set_new_user_password(
     db: Annotated[AsyncSession, Depends(get_db)],
     ip: Annotated[str, Depends(get_ip)],
@@ -132,7 +135,7 @@ async def set_new_user_password(
     return await set_reset_password(db, ip, item)
 
 
-@public.post("/admin/reset/password", tags=["admin"])
+@admin_panel_auth.post("/admin/reset/password")
 async def send_reset_password(
     db: Annotated[AsyncSession, Depends(get_db)],
     item: ForgotPassword,
@@ -168,8 +171,9 @@ async def send_reset_password(
     return "Email has been sent"
 
 
-@admin.post(
-    "/logout",
+@admin_panel_auth.post(
+    "/admin/logout",
+    dependencies=[Depends(Permission())],
     tags=[Action.ADMIN_LOGOUT],
 )
 async def logout(
@@ -182,9 +186,8 @@ async def logout(
     return "OK"
 
 
-@public.get(
+@admin_panel_auth.get(
     "/admin/totp",
-    tags=["admin"],
     dependencies=[Depends(Permission([IsNotUser, IsAuthenticated]))]
 )
 async def get_totp(
@@ -227,9 +230,8 @@ async def get_totp(
     )
 
 
-@public.post(
+@admin_panel_auth.post(
     "/admin/totp",
-    tags=["admin"],
     dependencies=[Depends(Permission([IsNotUser, IsAuthenticated]))]
 )
 async def verify_totp(
@@ -268,7 +270,7 @@ async def verify_totp(
     return {"access_token": access_token, "token_type": "bearer"}
 
 
-@public.post("/admin/verify/link")
+@admin_panel_auth.post("/admin/verify/link")
 async def verify_link(
     ip: Annotated[str, Depends(get_ip)],
     item: VerifyLink,

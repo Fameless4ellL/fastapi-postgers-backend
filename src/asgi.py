@@ -4,10 +4,12 @@ from typing import AsyncIterator, Union
 from fastapi import FastAPI
 from contextlib import asynccontextmanager
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.openapi.utils import get_openapi
 from httpx import AsyncClient
 
 from src.middlewares import RequestMiddleware
-from src.routers import public, admin, _cron, network
+from src.models import Action
+from src.routers import public, admin_, cron_
 from settings import settings
 from src.schemes import BadResponse
 from src.exceptions.schemas import ErrorMessage
@@ -34,9 +36,8 @@ async def lifespan(app: FastAPI) -> AsyncIterator[dict[str, AsyncClient]]:
 
 def init_routers(app_: FastAPI) -> None:
     app_.include_router(public)
-    app_.include_router(admin)
-    app_.include_router(_cron)
-    app_.include_router(network)
+    app_.include_router(admin_)
+    app_.include_router(cron_)
 
 
 def create_app() -> FastAPI:
@@ -45,7 +46,7 @@ def create_app() -> FastAPI:
         description="""
         Bingo is a secure, modular, and scalable API designed to power next-generation applications.
 
-        - **Version**: 1.0.0
+        - **Version**: 0.9.9
         - **Environment-Aware**: Documentation visibility adapts to `settings.debug`.
         - **Error Handling**: Common 400 responses unified under structured models (`ErrorMessage`, `BadResponse`).
 
@@ -69,7 +70,32 @@ def create_app() -> FastAPI:
         # docs_url=None if settings.debug else "/docs",
         # redoc_url=None if settings.debug else "/redoc",
     )
-    init_routers(app_=app_)
+    init_routers(app_)
+
+    def custom_openapi():
+        if app_.openapi_schema:
+            return app_.openapi_schema
+
+        openapi_schema = get_openapi(
+            title=app_.title,
+            version=app_.version,
+            description=app_.description,
+            routes=app_.routes,
+        )
+
+        actions = {i.value for i in Action}
+
+        for path in openapi_schema.get("paths", {}).values():
+            for operation in path.values():
+                if "tags" in operation:
+                    operation["tags"] = [
+                        tag for tag in operation["tags"] if tag not in actions
+                    ]
+
+        app_.openapi_schema = openapi_schema
+        return app_.openapi_schema
+
+    app_.openapi = custom_openapi
 
     origins = ['*']
     app_.add_middleware(

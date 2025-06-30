@@ -15,7 +15,6 @@ from src.models.db import get_db
 from src.models.log import Action
 from src.models.other import Network, Currency
 from src.models.user import User, Role, Document
-from src.routers import admin
 from src.routers.admin import get_crud_router
 from src.schemes import JsonForm
 from fastapi import APIRouter
@@ -48,9 +47,9 @@ from src.utils.dependencies import (
 )
 
 
-network = APIRouter(tags=["admin.networks"])
-currencies = APIRouter(tags=["admin.currencies"])
-admins = APIRouter(tags=["admin.admins"])
+network = APIRouter(tags=["v1.admin.networks"])
+currencies = APIRouter(tags=["v1.admin.currencies"])
+admins = APIRouter(tags=["v1.admin.admins"])
 
 
 get_crud_router(
@@ -77,7 +76,7 @@ get_crud_router(
 )
 
 
-@admin.get(
+@admins.get(
     "/admins",
     dependencies=[Depends(Permission([IsSuper, IsAdmin, IsGlobal]))],
     responses={200: {"model": Admins}},
@@ -140,7 +139,7 @@ async def get_admin_list(
     return Admins(admins=data, count=count)
 
 
-@admin.get(
+@admins.get(
     "/admins/{admin_id}",
     dependencies=[Depends(Permission([IsSuper, IsAdmin]))],
     response_model=Profile,
@@ -183,7 +182,7 @@ async def get_admin(
     return data
 
 
-@admin.post(
+@admins.post(
     "/admins/create",
     tags=[Action.ADMIN_CREATE],
     dependencies=[Depends(Permission([IsSuper, IsAdmin, IsGlobal]))],
@@ -279,7 +278,7 @@ async def create_admin(
     return "OK"
 
 
-@admin.put(
+@admins.put(
     "/admins/{admin_id}/update",
     tags=[Action.ADMIN_UPDATE],
     dependencies=[Depends(Permission([IsSuper, IsAdmin]))],
@@ -355,7 +354,7 @@ async def update_admin(
     return "OK"
 
 
-@admin.delete(
+@admins.delete(
     "/admins/{admin_id}",
     tags=[Action.ADMIN_DELETE],
     dependencies=[Depends(Permission([IsSuper, IsAdmin]))],
