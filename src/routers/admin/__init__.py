@@ -25,6 +25,7 @@ def get_crud_router(
     get_schema: Type[BaseModel],
     create_schema: Type[BaseModel],
     update_schema: Type[BaseModel],
+    router: APIRouter = admin,
     filters: Type[BaseModel] = Annotated[Empty, Depends(Empty)],
     files: Type[BaseModel] = Annotated[Empty, Depends(Empty)],
     prefix: str = "",
@@ -36,8 +37,6 @@ def get_crud_router(
         Role.SUPPORT.value,
     ],
 ) -> APIRouter:
-    router = admin
-
     @router.get(
         f"{prefix}",
         responses={200: {"model": schema}},

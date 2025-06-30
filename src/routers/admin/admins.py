@@ -18,6 +18,7 @@ from src.models.user import User, Role, Document
 from src.routers import admin
 from src.routers.admin import get_crud_router
 from src.schemes import JsonForm
+from fastapi import APIRouter
 from src.schemes.admin import (
     Admin,
     AdminCreate,
@@ -46,8 +47,15 @@ from src.utils.dependencies import (
     JWTBearerAdmin
 )
 
+
+network = APIRouter(tags=["admin.networks"])
+currencies = APIRouter(tags=["admin.currencies"])
+admins = APIRouter(tags=["admin.admins"])
+
+
 get_crud_router(
     model=Network,
+    router=network,
     prefix="/networks",
     schema=Networks,
     get_schema=NetworkSchema,
@@ -58,6 +66,7 @@ get_crud_router(
 )
 get_crud_router(
     model=Currency,
+    router=currencies,
     prefix="/currencies",
     schema=Currencies,
     get_schema=CurrencySchema,
@@ -71,7 +80,7 @@ get_crud_router(
 @admin.get(
     "/admins",
     dependencies=[Depends(Permission([IsSuper, IsAdmin, IsGlobal]))],
-    responses={200: {"model": Admins},},
+    responses={200: {"model": Admins}},
 )
 async def get_admin_list(
     db: Annotated[AsyncSession, Depends(get_db)],

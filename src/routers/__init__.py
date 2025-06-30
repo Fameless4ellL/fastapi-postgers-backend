@@ -26,8 +26,8 @@ bot = Bot(token=settings.bot_token)
 dp = Dispatcher(bot=bot)
 dp.update.outer_middleware(DBSessionMiddleware())
 
-public = APIRouter(prefix="/v1", tags=["v1"], lifespan=lifespan)
-admin = APIRouter(prefix="/v1/admin", tags=["admin"], dependencies=[Depends(Permission())])
+public = APIRouter(prefix="/v1",  lifespan=lifespan)
+admin = APIRouter(prefix="/v1/admin", dependencies=[Depends(Permission())])
 _cron = APIRouter(
     prefix="/v1/cron",
     tags=["cron"],

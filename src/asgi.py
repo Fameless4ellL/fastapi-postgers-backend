@@ -4,11 +4,10 @@ from typing import AsyncIterator, Union
 from fastapi import FastAPI
 from contextlib import asynccontextmanager
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.staticfiles import StaticFiles
 from httpx import AsyncClient
 
 from src.middlewares import RequestMiddleware
-from src.routers import public, admin, _cron
+from src.routers import public, admin, _cron, network
 from settings import settings
 from src.schemes import BadResponse
 from src.exceptions.schemas import ErrorMessage
@@ -33,21 +32,56 @@ async def lifespan(app: FastAPI) -> AsyncIterator[dict[str, AsyncClient]]:
         yield {"client": client}
 
 
-fastapp = FastAPI(lifespan=lifespan, responses={400: {"model": Union[ErrorMessage, BadResponse]}})
+def init_routers(app_: FastAPI) -> None:
+    app_.include_router(public)
+    app_.include_router(admin)
+    app_.include_router(_cron)
+    app_.include_router(network)
 
-fastapp.include_router(public)
-fastapp.include_router(admin)
-fastapp.include_router(_cron)
-fastapp.mount("/static", app=StaticFiles(directory="static"), name="static")
 
-origins = ['*']
+def create_app() -> FastAPI:
+    app_ = FastAPI(
+        title="Bingo API Gateway",
+        description="""
+        Bingo is a secure, modular, and scalable API designed to power next-generation applications.
 
-fastapp.add_middleware(
-    CORSMiddleware,
-    allow_origins=origins,
-    allow_credentials=True,
-    allow_methods=['*'],
-    allow_headers=['*'],
-)
-fastapp.add_middleware(RequestMiddleware)
-add_exception_handlers(fastapp)
+        - **Version**: 1.0.0
+        - **Environment-Aware**: Documentation visibility adapts to `settings.debug`.
+        - **Error Handling**: Common 400 responses unified under structured models (`ErrorMessage`, `BadResponse`).
+
+        This API gateway centralizes access for public and internal consumers, streamlining authentication,
+        validation, and routing across service boundaries.
+        """,
+        version="0.9.9",
+        responses={
+            400: {"model": Union[ErrorMessage, BadResponse]},
+            422: {"model": ErrorMessage},
+        },
+        lifespan=lifespan,
+        swagger_ui_parameters={
+            "docExpansion": "list",
+            "persistAuthorization": True,
+            "displayRequestDuration": True,
+            "filter": True,
+            "layout": "BaseLayout",
+            "deepLinking": True,
+        },
+        # docs_url=None if settings.debug else "/docs",
+        # redoc_url=None if settings.debug else "/redoc",
+    )
+    init_routers(app_=app_)
+
+    origins = ['*']
+    app_.add_middleware(
+        CORSMiddleware,
+        allow_origins=origins,
+        allow_credentials=True,
+        allow_methods=['*'],
+        allow_headers=['*'],
+    )
+    app_.add_middleware(RequestMiddleware)
+    add_exception_handlers(app_)
+    return app_
+
+
+fastapp = create_app()
