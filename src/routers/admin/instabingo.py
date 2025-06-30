@@ -6,12 +6,13 @@ from sqlalchemy import select, func, or_, String
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import Session
 
+from src.exceptions.currency import CurrencyExceptions
+from src.exceptions.game import GameExceptions
 from src.models.db import get_db, get_sync_db
 from src.models.other import InstaBingo, Ticket, Currency, Number
 from src.models.user import Role, User
 from src.routers import admin
 from src.routers.admin import get_crud_router
-from src.schemes import BadResponse
 from src.schemes.admin import (
     InstaBingoFilter,
     InstaBingoSchema,
@@ -58,11 +59,7 @@ async def get_instabingo_default(
 
     if not default:
         currency = db.query(Currency).first()
-        if not currency:
-            return JSONResponse(
-                status_code=status.HTTP_400_BAD_REQUEST,
-                content=BadResponse(message="Currency not found").model_dump()
-            )
+        await CurrencyExceptions.currency_not_found(currency)
 
         game = InstaBingo(
             currency_id=currency.id,
@@ -83,10 +80,7 @@ async def get_instabingo_default(
         "created_at": default.created_at.strftime("%Y-%m-%d %H:%M:%S"),
     }
 
-    return JSONResponse(
-        status_code=status.HTTP_200_OK,
-        content=data
-    )
+    return data
 
 
 @admin.get(
@@ -190,11 +184,7 @@ async def get_instabingo_ticket(
 
     game = await db.execute(stmt)
     game = game.fetchone()
-
-    if not game:
-        return JSONResponse(
-            status_code=status.HTTP_400_BAD_REQUEST, content="Game not found"
-        )
+    await GameExceptions.raise_exception_game_not_found(game)
 
     data = {
         "id": game.id,
@@ -232,10 +222,7 @@ async def get_generated_numbers(
         "end_date": i.end_date.strftime("%Y-%m-%d %H:%M:%S"),
     } for i in numbers]
 
-    return JSONResponse(
-        status_code=status.HTTP_200_OK,
-        content=data
-    )
+    return data
 
 
 @admin.delete("/bingo/{instabingo_id}")
@@ -250,17 +237,10 @@ async def set_instabingo_as_deleted(
     number = await db.execute(stmt)
     number = number.scalar_one_or_none()
 
-    if not number:
-        return JSONResponse(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            content="Instabingo not found"
-        )
+    await GameExceptions.raise_exception_game_not_found(number)
 
     number.deleted = True
     db.add(number)
     await db.commit()
 
-    return JSONResponse(
-        status_code=status.HTTP_200_OK,
-        content="Instabingo deleted"
-    )
+    return "Instabingo deleted"

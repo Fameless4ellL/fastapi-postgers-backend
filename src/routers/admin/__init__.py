@@ -7,7 +7,7 @@ from sqlalchemy import select, func, or_, exists, String
 from src.models.log import Action
 from src.models.other import Game, Ticket
 
-from src.schemes.base import BadResponse
+from src.schemes.base import BadResponse, ErrorMessage
 from pydantic import BaseModel
 from src.models.db import get_db
 from src.models.user import Role
@@ -16,6 +16,7 @@ from src.globals import q
 from src.utils.dependencies import get_admin_token, Token
 from src.schemes.admin import Empty
 from src.utils import worker
+from ...exceptions.base import NotFoundError
 
 
 def get_crud_router(
@@ -174,9 +175,11 @@ def get_crud_router(
         item = item.scalar()
 
         if not item:
-            return JSONResponse(
-                status_code=status.HTTP_400_BAD_REQUEST,
-                content=BadResponse(message=f"{model.__name__} not found").model_dump(mode='json')
+            raise NotFoundError(
+                ErrorMessage(
+                    message=f"{model.__name__} not found",
+                    code_error=f"{model.__name__}NotFound"
+                )
             )
 
         return JSONResponse(
@@ -273,11 +276,11 @@ def get_crud_router(
         db_item = await db.execute(stmt)
         db_item = db_item.scalar()
         if not db_item:
-            return JSONResponse(
-                status_code=status.HTTP_400_BAD_REQUEST,
-                content=BadResponse(
-                    message=f"{model.__name__} not found"
-                ).model_dump(mode='json')
+            raise NotFoundError(
+                ErrorMessage(
+                    message=f"{model.__name__} not found",
+                    code_error=f"{model.__name__}NotFound"
+                )
             )
 
         for key, value in item.model_dump().items():

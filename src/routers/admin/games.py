@@ -5,6 +5,7 @@ from fastapi.responses import JSONResponse
 from sqlalchemy import select, func, orm, exists, Text
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from src.exceptions.game import GameExceptions
 from src.globals import q
 from src.models.db import get_db, get_sync_db
 from src.models.log import Action
@@ -61,10 +62,7 @@ async def delete_game(
     stmt = select(Game).filter(Game.id == game_id)
     game = await db.execute(stmt)
     game = game.scalar()
-    if not game:
-        return JSONResponse(
-            status_code=status.HTTP_400_BAD_REQUEST, content="Game not found"
-        )
+    await GameExceptions.raise_exception_game_not_found(game)
 
     tickets = select(exists().where(Ticket.game_id == game_id))
     tickets = await db.execute(tickets)

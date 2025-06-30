@@ -60,7 +60,7 @@ async def tg_login(item: WidgetLogin):
 
 
 @public.get("/file/games")
-def get_file(path: str):
+async def get_file(path: str):
     response = None
     try:
         response = storage.get_object("games", path)
