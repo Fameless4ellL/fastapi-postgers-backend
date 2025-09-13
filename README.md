@@ -1,4 +1,7 @@
 # bingo-backend
+This is the backend for bingo app. It is built with FastAPI and uses PostgreSQL as the database.
+It also uses Alembic for database migrations and Docker for containerization.
+Client didn't pay for this project, so it is open source now and free to use.
 ## alembic
 ### Init
 ```bash
